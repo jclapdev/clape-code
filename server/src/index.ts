@@ -95,6 +95,10 @@ async function rebuildDocs() {
   }
   for (const i of items) {
     if (i.kind === "plugin") continue;
+    if (i.kind === "hook-def") {
+      docs.push({ kind: "hook", ref: i.path, title: `Hook: ${i.name}`, subtitle: i.display, body: i.description });
+      continue;
+    }
     docs.push({ kind: i.kind, ref: i.path, title: i.name, subtitle: i.description || i.display, body: i.access === "secret" ? "" : await read(i.path) });
   }
   replaceDocs(docs);

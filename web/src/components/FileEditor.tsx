@@ -23,7 +23,7 @@ export async function openOnComputer(path: string, editor = true) {
  * View and edit one file. Saving sends the hash of the version that was loaded;
  * if the file changed on disk meanwhile, the server refuses and the conflict dialog shows both versions.
  */
-export function FileEditor({ path, header, onSaved }: { path: string; header?: ReactNode; onSaved?: () => void }) {
+export function FileEditor({ path, header, onSaved, line }: { path: string; header?: ReactNode; onSaved?: () => void; line?: number }) {
   const q = useQuery(fileQuery(path));
   const qc = useQueryClient();
   const [text, setText] = useState<string | null>(null);
@@ -108,7 +108,7 @@ export function FileEditor({ path, header, onSaved }: { path: string; header?: R
         <div className="p-6 text-muted-foreground">This file is too large to open here.</div>
       ) : (
         <div className="min-h-0 flex-1 overflow-hidden">
-          <Editor value={text ?? ""} onChange={setText} path={path} readOnly={!editable} onSave={() => editable && dirty && save()} />
+          <Editor value={text ?? ""} onChange={setText} path={path} line={line} readOnly={!editable} onSave={() => editable && dirty && save()} />
         </div>
       )}
       {editable && (

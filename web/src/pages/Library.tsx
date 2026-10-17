@@ -22,13 +22,18 @@ export const KIND_LABEL: Record<Kind, [string, string]> = {
   command: ["Command", "Commands"],
   rule: ["Rule", "Rules"],
   "output-style": ["Output style", "Output styles"],
+  "hook-def": ["Hook", "Hooks"],
   hook: ["Hook script", "Hook scripts"],
+  settings: ["Settings file", "Settings files"],
   "claude-md": ["CLAUDE.md", "CLAUDE.md files"],
   plan: ["Plan", "Plans"],
   memory: ["Memory note", "Memory"],
   plugin: ["Plugin", "Plugins"],
 };
-const KIND_ORDER: Kind[] = ["skill", "agent", "command", "rule", "output-style", "hook", "claude-md", "plan", "memory", "plugin"];
+const KIND_ORDER: Kind[] = ["skill", "agent", "command", "rule", "output-style", "hook-def", "hook", "settings", "claude-md", "plan", "memory", "plugin"];
+/** Items whose file is shared with other things (a settings file holds many hooks), so they are never archived or deleted. */
+const NO_DELETE: Kind[] = ["claude-md", "hook-def", "settings"];
+const itemKey = (i: LibraryItem) => `${i.path}#${i.line ?? ""}`;
 const ARCHIVABLE: Kind[] = ["skill", "agent", "command", "rule", "output-style", "plan", "memory"];
 
 function sourceTag(i: LibraryItem) {
@@ -61,7 +66,7 @@ export function LibraryList({ items, scope, emptyText }: { items: LibraryItem[];
           {items
             .filter((i) => i.kind === k)
             .map((i) => (
-              <Link key={i.path} to="/library" search={{ scope, path: i.path, kind: k }} className="flex items-center gap-3 rounded-md px-3 py-2 text-ink no-underline hover:bg-sunken">
+              <Link key={itemKey(i)} to="/library" search={{ scope, path: i.path, kind: k, line: i.line ? String(i.line) : undefined }} className="flex items-center gap-3 rounded-md px-3 py-2 text-ink no-underline hover:bg-sunken">
                 <span className="w-48 flex-none truncate font-medium">{i.name}</span>
                 <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">{i.description}</span>
                 {stateTag(i)}
@@ -179,6 +184,7 @@ function ItemDetail({ item, scope }: { item: LibraryItem; scope: string }) {
   return (
     <FileEditor
       path={item.path}
+      line={item.line}
       header={
         <DetailHeader
           title={item.name}
@@ -186,7 +192,13 @@ function ItemDetail({ item, scope }: { item: LibraryItem; scope: string }) {
             <span className="flex flex-wrap items-center gap-2">
               <span>{KIND_LABEL[item.kind][0]}</span>
               {sourceTag(item)}
-              {item.mtime && <span>changed {when(item.mtime)}</span>}
+              {item.kind === "hook-def" && (
+                <span>
+                  {String(item.meta.type)} hook in {String(item.meta.file)}, line {item.line}
+                  {item.meta.if ? `, only when ${String(item.meta.if)}` : ""}
+                </span>
+              )}
+              {item.mtime && item.kind !== "hook-def" && <span>changed {when(item.mtime)}</span>}
               {item.error && <Tag tone="danger">{item.error}</Tag>}
             </span>
           }
@@ -207,7 +219,7 @@ function ItemDetail({ item, scope }: { item: LibraryItem; scope: string }) {
                   <Archive className="size-3.5" aria-hidden /> Archive
                 </Button>
               )}
-              {editable && item.kind !== "claude-md" && (
+              {editable && !NO_DELETE.includes(item.kind) && (
                 <Button
                  
                   variant="destructive"
@@ -279,7 +291,7 @@ function ItemDetail({ item, scope }: { item: LibraryItem; scope: string }) {
 }
 
 export function LibraryPage() {
-  const s = useSearch({ strict: false }) as { kind?: string; scope?: string; path?: string };
+  const s = useSearch({ strict: false }) as { kind?: string; scope?: string; path?: string; line?: string };
   const scope = s.scope ?? "global";
   const navigate = useNavigate();
   const lib = useLibrary(scope);
@@ -296,7 +308,7 @@ export function LibraryPage() {
   }, [items]);
   const f = filter.toLowerCase();
   const shown = items.filter((i) => (!kind || i.kind === kind) && (!f || i.name.toLowerCase().includes(f) || i.description.toLowerCase().includes(f)));
-  const selected = s.path ? items.find((i) => i.path === s.path) : undefined;
+  const selected = s.path ? items.find((i) => i.path === s.path && String(i.line ?? "") === (s.line ?? "")) : undefined;
   const creatable = (["skill", "agent", "command", "rule"] as Kind[]).includes(kind ?? "skill") ? (kind ?? "skill") : null;
 
   const list = (
@@ -346,11 +358,11 @@ export function LibraryPage() {
       <ErrorNote error={lib.error} />
       <ul className="px-2">
         {shown.map((i) => (
-          <li key={i.path}>
+          <li key={itemKey(i)}>
             <Link
               to="/library"
-              search={{ scope, kind: kind ?? undefined, path: i.path }}
-              className={cn("flex flex-col gap-0.5 rounded-md px-2.5 py-2 text-ink no-underline hover:bg-sunken", selected?.path === i.path && "bg-surface shadow-[0_0_0_1px_var(--line-strong)]", i.state === "off" && "opacity-70")}
+              search={{ scope, kind: kind ?? undefined, path: i.path, line: i.line ? String(i.line) : undefined }}
+              className={cn("flex flex-col gap-0.5 rounded-md px-2.5 py-2 text-ink no-underline hover:bg-sunken", selected && itemKey(selected) === itemKey(i) && "bg-surface shadow-[0_0_0_1px_var(--line-strong)]", i.state === "off" && "opacity-70")}
             >
               <span className="flex items-center gap-2">
                 <span className="min-w-0 flex-1 truncate font-medium">{i.name}</span>
@@ -376,7 +388,7 @@ export function LibraryPage() {
         list={list}
         detail={
           selected ? (
-            <ItemDetail item={selected} scope={scope} />
+            <ItemDetail key={itemKey(selected)} item={selected} scope={scope} />
           ) : (
             <EmptyState title={kind ? KIND_LABEL[kind][1] : "Library"}>Pick an item to read or edit it. Items you own can be archived, deleted or turned off.</EmptyState>
           )

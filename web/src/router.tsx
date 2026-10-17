@@ -41,7 +41,7 @@ const library = createRoute({
   getParentRoute: () => root,
   path: "/library",
   component: LibraryPage,
-  validateSearch: (s: Record<string, unknown>): { kind?: string; scope?: string; path?: string } => ({ kind: str(s.kind), scope: str(s.scope), path: str(s.path) }),
+  validateSearch: (s: Record<string, unknown>): { kind?: string; scope?: string; path?: string; line?: string } => ({ kind: str(s.kind), scope: str(s.scope), path: str(s.path), line: s.line === undefined ? undefined : String(s.line) }),
 });
 const settings = createRoute({
   getParentRoute: () => root,

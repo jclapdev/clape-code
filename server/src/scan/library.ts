@@ -1,9 +1,10 @@
 import { basename, join } from "node:path";
 import { claudeDir, tildify } from "../fs/paths";
 import { classify, type Access } from "../fs/policy";
+import { hooksIn } from "./hooks";
 import { firstLine, isDir, ls, mtimeOf, readJson, readMd } from "./md";
 
-export type Kind = "skill" | "agent" | "command" | "rule" | "output-style" | "hook" | "claude-md" | "plan" | "memory" | "plugin";
+export type Kind = "skill" | "agent" | "command" | "rule" | "output-style" | "hook" | "hook-def" | "settings" | "claude-md" | "plan" | "memory" | "plugin";
 
 export interface LibraryItem {
   kind: Kind;
@@ -20,6 +21,7 @@ export interface LibraryItem {
   mtime: number | null;
   error: string | null;
   meta: Record<string, unknown>;
+  line?: number; // for hooks: where the hook sits inside its settings file
 }
 
 interface Scope {
@@ -186,6 +188,7 @@ export async function globalLibrary(): Promise<{ items: LibraryItem[]; plugins: 
     items.push(await item({ kind: "claude-md", name: "CLAUDE.md (all projects)", path: join(cd, "CLAUDE.md"), source: "user" }));
   }
   items.push(...(await hookScripts(join(cd, "hooks"), "user", null)));
+  items.push(...(await hookDefs([join(cd, "settings.json"), join(cd, "settings.local.json")], "user", null)));
   return { items, plugins };
 }
 
@@ -202,7 +205,45 @@ export async function projectLibrary(dir: string): Promise<LibraryItem[]> {
     if (await Bun.file(p).exists()) items.push(await item({ kind: "claude-md", name: f.replace(/\\/g, "/"), path: p, source: "project", sourceName: name }));
   }
   items.push(...(await hookScripts(join(base, "hooks"), "project", name)));
+  const settingsFiles = [join(base, "settings.json"), join(base, "settings.local.json")];
+  for (const p of settingsFiles) {
+    if (!(await Bun.file(p).exists())) continue;
+    const shared = !p.endsWith(".local.json");
+    items.push(
+      await item({
+        kind: "settings",
+        name: basename(p),
+        description: shared ? "Project settings, shared through the repository" : "Your settings for this project only, not shared",
+        path: p,
+        source: "project",
+        sourceName: name,
+      }),
+    );
+  }
+  items.push(...(await hookDefs(settingsFiles, "project", name)));
   return items;
+}
+
+/** One item per hook defined in the given settings files; opening it jumps to the hook's line. */
+async function hookDefs(files: string[], source: LibraryItem["source"], sourceName: string | null) {
+  const out: LibraryItem[] = [];
+  for (const f of files) {
+    for (const h of await hooksIn(f)) {
+      out.push(
+        await item({
+          kind: "hook-def",
+          name: h.matcher ? `${h.event} · ${h.matcher}` : h.event,
+          description: h.run,
+          path: f,
+          source,
+          sourceName,
+          line: h.line,
+          meta: { event: h.event, matcher: h.matcher, type: h.type, timeout: h.timeout, if: h.condition, file: basename(f) },
+        }),
+      );
+    }
+  }
+  return out;
 }
 
 async function hookScripts(dir: string, source: LibraryItem["source"], sourceName: string | null) {

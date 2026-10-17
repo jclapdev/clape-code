@@ -91,7 +91,7 @@ export interface ProjectDetail extends Omit<Project, "sessions" | "backlog" | "d
   sessions: (Session & { worktree: boolean })[];
 }
 
-export type Kind = "skill" | "agent" | "command" | "rule" | "output-style" | "hook" | "claude-md" | "plan" | "memory" | "plugin";
+export type Kind = "skill" | "agent" | "command" | "rule" | "output-style" | "hook" | "hook-def" | "settings" | "claude-md" | "plan" | "memory" | "plugin";
 
 export interface LibraryItem {
   kind: Kind;
@@ -108,6 +108,7 @@ export interface LibraryItem {
   mtime: number | null;
   error: string | null;
   meta: Record<string, any>;
+  line?: number;
 }
 
 export interface Job {

@@ -8,7 +8,7 @@ import { tags as t } from "@lezer/highlight";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import CodeMirror, { basicSetup } from "@uiw/react-codemirror";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export function languageFor(path: string): Extension[] {
   const p = path.toLowerCase();
@@ -56,7 +56,7 @@ const ccHighlight = syntaxHighlighting(
   ]),
 );
 
-export function Editor({ value, onChange, path, readOnly, onSave }: { value: string; onChange: (v: string) => void; path: string; readOnly?: boolean; onSave?: () => void }) {
+export function Editor({ value, onChange, path, readOnly, onSave, line }: { value: string; onChange: (v: string) => void; path: string; readOnly?: boolean; onSave?: () => void; line?: number }) {
   const saveRef = useRef(onSave);
   saveRef.current = onSave;
   const extensions = useMemo(
@@ -69,8 +69,20 @@ export function Editor({ value, onChange, path, readOnly, onSave }: { value: str
     ],
     [path],
   );
+  const [view, setView] = useState<EditorView | null>(null);
+  const jumped = useRef<string | null>(null);
+  // Put the cursor on `line` once the editor exists and the document has loaded (opens a settings file at one hook).
+  useEffect(() => {
+    const key = `${path}:${line}`;
+    if (!view || !line || !value || view.state.doc.length === 0 || jumped.current === key) return;
+    const n = Math.min(Math.max(1, line), view.state.doc.lines);
+    const at = view.state.doc.line(n);
+    view.dispatch({ selection: { anchor: at.from, head: at.to }, effects: EditorView.scrollIntoView(at.from, { y: "center" }) });
+    jumped.current = key;
+  }, [view, line, path, value]);
   return (
     <CodeMirror
+      onCreateEditor={setView}
       value={value}
       onChange={onChange}
       extensions={extensions}
