@@ -89,7 +89,7 @@ export function CommandPalette({ open, onClose, onToggleNav }: { open: boolean; 
     shownActions.push({
       label: `Save “${q.trim()}” as feedback about this app`,
       run: () => {
-        api.post("/feedback", { text: q.trim() }).then(() => toast.success("Feedback saved."), (e) => toast.error(e.message));
+        api.post("/feedback", { text: q.trim() }).then(() => toast.success("Feedback added to FEEDBACK.md."), (e) => toast.error(e.message));
         onClose();
       },
     });

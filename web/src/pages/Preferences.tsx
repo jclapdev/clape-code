@@ -15,6 +15,7 @@ interface Config {
   projectRoots: string[];
   port: number;
   lan: { enabled: boolean; hasPassword: boolean };
+  feedbackFile: string;
   platform: string;
 }
 
@@ -45,6 +46,43 @@ const METRIC_LABEL: Record<string, string> = {
   "items.deleted": "Delete actions",
 };
 
+function FeedbackFileField() {
+  const cfg = useQuery({ queryKey: ["config"], queryFn: () => api.get<Config>("/config") });
+  const [path, setPath] = useState("");
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (cfg.data) setPath(cfg.data.feedbackFile);
+  }, [cfg.data]);
+  const save = useMutation({
+    mutationFn: () => api.post("/config", { feedbackFile: path }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["config"] });
+      qc.invalidateQueries({ queryKey: ["metrics"] });
+      toast.success("Feedback file saved.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <form
+      className="flex flex-col gap-1.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <label htmlFor="ff" className="text-[13px] text-ink-2">
+        Feedback is added to
+      </label>
+      <div className="flex gap-2">
+        <Input id="ff" value={path} onChange={(e) => setPath(e.target.value)} className="font-mono text-[13px]" />
+        <Button type="submit" variant="outline" busy={save.isPending} disabled={!path.trim() || path === cfg.data?.feedbackFile}>
+          Save
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function UsageCard() {
   const q = useQuery({ queryKey: ["metrics"], queryFn: () => api.get<{ counts: Record<string, number>; feedback: string }>("/metrics") });
   const counts = q.data?.counts ?? {};
@@ -65,6 +103,7 @@ function UsageCard() {
         ))}
       </dl>
       {views && <p className="text-[13px] text-muted-foreground">Views opened: {views}</p>}
+      <FeedbackFileField />
       {q.data?.feedback && <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-sunken p-2.5 text-[12.5px]">{q.data.feedback}</pre>}
     </Card>
   );

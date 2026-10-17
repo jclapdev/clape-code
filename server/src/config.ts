@@ -7,11 +7,13 @@ export interface AppConfig {
   port: number;
   lan: { enabled: boolean; passwordHash: string | null };
   sessionSecret: string;
+  feedbackFile: string; // where palette feedback is appended; "~/…" style
 }
 
 const defaults = (): AppConfig => ({
   projectRoots: ["~/projects"],
   port: 4317,
+  feedbackFile: "~/projects/control-center/FEEDBACK.md",
   lan: { enabled: false, passwordHash: null },
   sessionSecret: crypto.randomUUID() + crypto.randomUUID(),
 });
@@ -44,5 +46,6 @@ export async function saveConfig(c: AppConfig) {
 export const publicConfig = (c: AppConfig) => ({
   projectRoots: c.projectRoots,
   port: c.port,
+  feedbackFile: c.feedbackFile,
   lan: { enabled: c.lan.enabled, hasPassword: !!c.lan.passwordHash },
 });

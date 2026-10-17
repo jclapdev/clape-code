@@ -1,11 +1,15 @@
-import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { appDir } from "./fs/paths";
+import { getConfig } from "./config";
+import { appDir, untildify } from "./fs/paths";
+import { readWithHash, safeWrite } from "./fs/safeWrite";
 
 // Local-only counts for the post-launch review: which views get used, edits saved,
 // conflicts caught, sessions answered from the browser. Nothing leaves this machine.
 const file = () => join(appDir(), "metrics.json");
-export const feedbackFile = () => join(appDir(), "feedback.md");
+
+/** FEEDBACK.md in the repo by default, so the Iterate step can review it there. */
+export const feedbackFile = async () => untildify((await getConfig()).feedbackFile);
 
 let counts: Record<string, number> | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -34,11 +38,15 @@ export async function bump(key: string) {
 
 export const getMetrics = async () => ({ ...(await load()) });
 
+/** Append one dated note. Goes through safeWrite like every other change to a user's file. */
 export async function addFeedback(text: string) {
-  await mkdir(appDir(), { recursive: true });
-  await appendFile(feedbackFile(), `- ${new Date().toISOString().slice(0, 16).replace("T", " ")} ${text.replace(/\s+/g, " ").trim()}\n`);
+  const path = await feedbackFile();
+  const cur = await readWithHash(path);
+  const base = cur?.content ?? "# Feedback\n\nNotes saved from Control Center's search box, oldest first.\n\n";
+  const line = `- ${new Date().toISOString().slice(0, 16).replace("T", " ")} ${text.replace(/\s+/g, " ").trim()}\n`;
+  await safeWrite(path, base.endsWith("\n") ? base + line : base + "\n" + line, cur?.hash ?? null);
 }
 
 export async function readFeedback(): Promise<string> {
-  return readFile(feedbackFile(), "utf8").catch(() => "");
+  return readFile(await feedbackFile(), "utf8").catch(() => "");
 }

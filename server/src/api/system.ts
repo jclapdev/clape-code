@@ -4,7 +4,7 @@ import { streamSSE } from "hono/streaming";
 import { allowLoginAttempt, COOKIE, issueToken, verifyToken } from "../auth";
 import { getConfig, publicConfig, saveConfig } from "../config";
 import { subscribe, type AppEvent } from "../events";
-import { canRead } from "../fs/policy";
+import { canRead, canWrite } from "../fs/policy";
 import { untildify } from "../fs/paths";
 import { WriteError } from "../fs/safeWrite";
 import { waitingCount } from "../live/sessions";
@@ -43,10 +43,20 @@ system.post("/auth/logout", (c) => {
 system.get("/config", async (c) => c.json({ ...publicConfig(await getConfig()), platform: process.platform }));
 
 system.post("/config", async (c) => {
-  const { projectRoots } = await c.req.json();
-  if (!Array.isArray(projectRoots) || !projectRoots.every((r) => typeof r === "string" && r.trim())) throw new WriteError(400, "Project folders must be a list of paths.");
+  const { projectRoots, feedbackFile } = await c.req.json();
   const cfg = await getConfig();
-  await saveConfig({ ...cfg, projectRoots: projectRoots.map((r: string) => r.trim()) });
+  const next = { ...cfg };
+  if (projectRoots !== undefined) {
+    if (!Array.isArray(projectRoots) || !projectRoots.every((r) => typeof r === "string" && r.trim())) throw new WriteError(400, "Project folders must be a list of paths.");
+    next.projectRoots = projectRoots.map((r: string) => r.trim());
+  }
+  if (feedbackFile !== undefined) {
+    const f = String(feedbackFile).trim();
+    if (!f.toLowerCase().endsWith(".md")) throw new WriteError(400, "The feedback file must be a .md file.");
+    if (!canWrite(untildify(f))) throw new WriteError(400, "The feedback file must be inside one of your projects so the app may write it.");
+    next.feedbackFile = f;
+  }
+  await saveConfig(next);
   return c.json(publicConfig(await getConfig()));
 });
 
