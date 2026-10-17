@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { readdir, stat } from "node:fs/promises";
+import { cp, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { archiveItem, listArchive, restoreItem, trashItem, type ArchiveKind } from "../fs/archive";
 import { emit } from "../events";
@@ -192,10 +193,8 @@ content.post("/archive/:id/restore", async (c) => {
   return c.json(rec);
 });
 
-content.post("/library/validate", async (c) => {
-  const { path } = await c.req.json();
-  const dir = await itemTarget(path, "skill");
-  if (!canRead(dir) || !(await isDir(dir))) throw new WriteError(400, "Not a skill folder.");
+/** Run the Agent Skills reference validator on a skill folder. uvx caches the tool after the first run. */
+async function runSkillsRef(dir: string) {
   const cmd = ["uvx", "--from", "git+https://github.com/agentskills/agentskills#subdirectory=skills-ref", "skills-ref", "validate", dir];
   try {
     const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
@@ -203,9 +202,36 @@ content.post("/library/validate", async (c) => {
     const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
     const code = await p.exited;
     clearTimeout(timer);
-    return c.json({ available: true, ok: code === 0, output: (out + "\n" + err).trim() });
+    return { available: true, ok: code === 0, output: (out + "\n" + err).trim() };
   } catch {
-    return c.json({ available: false, ok: false, output: "uvx is not installed, so the skill can't be validated here." });
+    return { available: false, ok: false, output: "uvx is not installed, so the skill can't be validated here." };
+  }
+}
+
+async function skillDir(path: string) {
+  const dir = await itemTarget(path, "skill");
+  if (!canRead(dir) || !(await isDir(dir))) throw new WriteError(400, "Not a skill folder.");
+  return dir;
+}
+
+content.post("/library/validate", async (c) => {
+  const { path } = await c.req.json();
+  return c.json(await runSkillsRef(await skillDir(path)));
+});
+
+/** Validate unsaved SKILL.md text: copy the folder to a temp dir, put the draft in it, validate that copy. */
+content.post("/library/validate-draft", async (c) => {
+  const { path, content: draft } = await c.req.json();
+  const dir = await skillDir(path);
+  const tmp = await mkdtemp(join(tmpdir(), "cc-skill-"));
+  try {
+    const copy = join(tmp, basename(dir)); // the validator checks the folder name against the skill name
+    await cp(dir, copy, { recursive: true });
+    await writeFile(join(copy, "SKILL.md"), String(draft ?? ""), "utf8");
+    const r = await runSkillsRef(copy);
+    return c.json({ ...r, output: r.output.split(copy).join(tildify(dir)) });
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
   }
 });
 

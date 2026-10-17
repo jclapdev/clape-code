@@ -32,6 +32,7 @@ export function FileEditor({ path, header, onSaved }: { path: string; header?: R
   const [conflict, setConflict] = useState<{ content: string; hash: string | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [check, setCheck] = useState<{ output: string; overHash?: string | null } | null>(null);
 
   // Take the server's version whenever there are no unsaved edits.
   useEffect(() => {
@@ -62,11 +63,21 @@ export function FileEditor({ path, header, onSaved }: { path: string; header?: R
   const editable = f.access === "edit";
   const dirty = text !== null && base !== null && text !== base.content;
 
-  const save = async (overHash?: string | null) => {
+  const isSkill = /[\\/]SKILL\.md$/.test(path);
+
+  const save = async (overHash?: string | null, opts: { skipCheck?: boolean } = {}) => {
     if (text === null || !base) return;
     setSaving(true);
     setError(null);
     try {
+      // Skills are checked against the Agent Skills spec before they are written; a failure asks first.
+      if (isSkill && !opts.skipCheck) {
+        const v = await api.post<{ available: boolean; ok: boolean; output: string }>("/library/validate-draft", { path, content: text });
+        if (v.available && !v.ok) {
+          setCheck({ output: v.output, overHash });
+          return;
+        }
+      }
       const r = await api.put<{ hash: string; backupPath: string | null }>("/file", { path, content: text, hash: overHash !== undefined ? overHash : base.hash });
       setBase({ content: text, hash: r.hash });
       setConflict(null);
@@ -128,6 +139,31 @@ export function FileEditor({ path, header, onSaved }: { path: string; header?: R
             </Button>
             <Button size="lg" busy={saving} onClick={() => save()}>
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!check} onOpenChange={(o) => !o && setCheck(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>This skill doesn't pass the skills check</DialogTitle>
+            <DialogDescription>Nothing was saved yet. The Agent Skills validator reported:</DialogDescription>
+          </DialogHeader>
+          <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-danger-line bg-danger-soft p-3 font-mono text-xs text-danger">{check?.output}</pre>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCheck(null)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="destructive"
+              busy={saving}
+              onClick={() => {
+                const c = check;
+                setCheck(null);
+                void save(c?.overHash, { skipCheck: true });
+              }}
+            >
+              Save anyway
             </Button>
           </DialogFooter>
         </DialogContent>
