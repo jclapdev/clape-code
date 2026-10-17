@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Command } from "cmdk";
-import { Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "next-themes";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { api, enc } from "@/lib/api";
-import { useTheme } from "@/lib/prefs";
-import { Kbd, useToast } from "./ui";
+import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "./ui/command";
+import { Kbd } from "./ui/kbd";
 
 interface Hit {
   kind: string;
@@ -41,25 +41,14 @@ function useDebounced<T>(v: T, ms: number) {
   return d;
 }
 
-const itemClass =
-  "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-[14px] text-ink data-[selected=true]:bg-accent-soft data-[selected=true]:text-accent-strong";
-
 export function CommandPalette({ open, onClose, onToggleNav }: { open: boolean; onClose: () => void; onToggleNav: () => void }) {
   const [q, setQ] = useState("");
   const dq = useDebounced(q.trim(), 150);
   const navigate = useNavigate();
-  const [theme, setTheme] = useTheme();
-  const toast = useToast();
-  const ref = useRef<HTMLDialogElement>(null);
+  const { resolvedTheme, setTheme } = useTheme();
 
   useEffect(() => {
-    const d = ref.current;
-    if (!d) return;
-    if (open && !d.open) {
-      setQ("");
-      d.showModal();
-    }
-    if (!open && d.open) d.close();
+    if (open) setQ("");
   }, [open]);
 
   const results = useQuery({
@@ -75,6 +64,7 @@ export function CommandPalette({ open, onClose, onToggleNav }: { open: boolean; 
     navigate({ to: pathname, search: Object.fromEntries(new URLSearchParams(query)) } as any);
   };
 
+  const dark = resolvedTheme === "dark";
   const actions = useMemo(
     () => [
       { label: "Start a new session", run: () => go("/live?new=1") },
@@ -86,12 +76,12 @@ export function CommandPalette({ open, onClose, onToggleNav }: { open: boolean; 
       { label: "Go to Map", run: () => go("/map") },
       { label: "Go to Archive", run: () => go("/archive") },
       { label: "Show archived sessions", run: () => go("/sessions?archived=1") },
-      { label: theme === "dark" ? "Switch to light theme" : "Switch to dark theme", run: () => (setTheme(theme === "dark" ? "light" : "dark"), onClose()) },
+      { label: dark ? "Switch to light theme" : "Switch to dark theme", run: () => (setTheme(dark ? "light" : "dark"), onClose()) },
       { label: "Collapse or expand the menu", run: () => (onToggleNav(), onClose()) },
       { label: "Open preferences", run: () => go("/preferences") },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [theme],
+    [dark],
   );
   const lower = q.toLowerCase().trim();
   const shownActions = actions.filter((a) => !lower || a.label.toLowerCase().includes(lower)).slice(0, lower ? 4 : 8);
@@ -99,7 +89,7 @@ export function CommandPalette({ open, onClose, onToggleNav }: { open: boolean; 
     shownActions.push({
       label: `Save “${q.trim()}” as feedback about this app`,
       run: () => {
-        api.post("/feedback", { text: q.trim() }).then(() => toast({ tone: "ok", text: "Feedback saved. Read it under Preferences." }), (e) => toast({ tone: "danger", text: e.message }));
+        api.post("/feedback", { text: q.trim() }).then(() => toast.success("Feedback saved."), (e) => toast.error(e.message));
         onClose();
       },
     });
@@ -107,65 +97,47 @@ export function CommandPalette({ open, onClose, onToggleNav }: { open: boolean; 
   const hits = dq.length >= 2 ? (results.data ?? []) : [];
 
   return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      onClick={(e) => e.target === ref.current && onClose()}
-      aria-label="Search"
-      className="mx-auto mt-[12vh] w-[calc(100%-32px)] max-w-[680px] overflow-hidden rounded-xl border border-line bg-surface p-0 text-ink shadow-pop backdrop:bg-black/40"
-    >
-      {open && (
-        <Command shouldFilter={false} loop label="Search everything">
-          <div className="flex items-center gap-2.5 border-b border-line px-4">
-            <Search className="size-4 text-muted" aria-hidden />
-            <Command.Input
-              autoFocus
-              value={q}
-              onValueChange={setQ}
-              placeholder="Search projects, sessions, skills, memory…"
-              className="h-13 min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-faint"
-            />
-            <Kbd>esc</Kbd>
-          </div>
-          <Command.List className="max-h-[60vh] overflow-y-auto p-2">
-            <Command.Empty className="px-3 py-6 text-muted">{results.isFetching ? "Searching…" : "Nothing matches. Try a project, file or session name."}</Command.Empty>
-            {shownActions.length > 0 && (
-              <Command.Group heading="Actions" className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted">
-                {shownActions.map((a) => (
-                  <Command.Item key={a.label} value={`action:${a.label}`} onSelect={a.run} className={itemClass}>
-                    {a.label}
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
-            {hits.length > 0 && (
-              <Command.Group heading="Results" className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted">
-                {hits.map((h) => (
-                  <Command.Item key={h.kind + h.ref} value={`${h.kind}:${h.ref}`} onSelect={() => go(h.link)} className={itemClass}>
-                    <span className="w-24 flex-none text-xs font-medium text-muted">{KIND_LABEL[h.kind] ?? h.kind}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{h.title}</span>
-                      {h.snippet && <span className="block truncate text-xs text-muted">{h.snippet.replace(/\s+/g, " ")}</span>}
-                    </span>
-                    <span className="hidden max-w-[40%] truncate font-mono text-xs text-muted sm:block">{h.display}</span>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
-          </Command.List>
-          <div className="flex flex-wrap gap-4 border-t border-line px-4 py-2 text-xs text-muted">
-            <span>
-              <Kbd>↑</Kbd> <Kbd>↓</Kbd> move
-            </span>
-            <span>
-              <Kbd>↵</Kbd> open
-            </span>
-            <span>
-              <Kbd>[</Kbd> <Kbd>]</Kbd> hide panes
-            </span>
-          </div>
-        </Command>
-      )}
-    </dialog>
+    <CommandDialog open={open} onOpenChange={(o) => !o && onClose()} title="Search" description="Search projects, sessions, config and memory, or run an action." className="sm:max-w-[680px]">
+      <Command shouldFilter={false} loop>
+        <CommandInput value={q} onValueChange={setQ} placeholder="Search projects, sessions, skills, memory…" />
+        <CommandList className="max-h-[60vh]">
+          <CommandEmpty>{results.isFetching ? "Searching…" : "Nothing matches. Try a project, file or session name."}</CommandEmpty>
+          {shownActions.length > 0 && (
+            <CommandGroup heading="Actions">
+              {shownActions.map((a) => (
+                <CommandItem key={a.label} value={`action:${a.label}`} onSelect={a.run}>
+                  {a.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+          {hits.length > 0 && (
+            <CommandGroup heading="Results">
+              {hits.map((h) => (
+                <CommandItem key={h.kind + h.ref} value={`${h.kind}:${h.ref}`} onSelect={() => go(h.link)}>
+                  <span className="w-24 flex-none text-xs font-medium text-muted-foreground">{KIND_LABEL[h.kind] ?? h.kind}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{h.title}</span>
+                    {h.snippet && <span className="block truncate text-xs text-muted-foreground">{h.snippet.replace(/\s+/g, " ")}</span>}
+                  </span>
+                  <span className="hidden max-w-[40%] truncate font-mono text-xs text-muted-foreground sm:block">{h.display}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+        </CommandList>
+        <div className="flex flex-wrap gap-4 border-t px-4 py-2 text-xs text-muted-foreground">
+          <span>
+            <Kbd>↑</Kbd> <Kbd>↓</Kbd> move
+          </span>
+          <span>
+            <Kbd>↵</Kbd> open
+          </span>
+          <span>
+            <Kbd>[</Kbd> <Kbd>]</Kbd> hide panes
+          </span>
+        </div>
+      </Command>
+    </CommandDialog>
   );
 }

@@ -1,7 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
-import { Button } from "./ui";
+import {  } from "./ui";
 
 /** In home-network mode, other devices sign in with the password before seeing anything. */
 export function LoginGate({ children }: { children: ReactNode }) {
@@ -40,20 +42,20 @@ export function LoginGate({ children }: { children: ReactNode }) {
           <img src="/favicon.svg" alt="" className="size-7" />
           <h1 className="text-[18px] font-semibold">Control Center</h1>
         </div>
-        <p className="text-muted">Enter the password set on the computer running the app.</p>
+        <p className="text-muted-foreground">Enter the password set on the computer running the app.</p>
         <label className="flex flex-col gap-1.5">
           <span className="text-[13px] text-ink-2">Password</span>
-          <input
+          <Input
             type="password"
             autoComplete="current-password"
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="h-10 rounded-md border border-line-strong bg-surface px-3 text-[15px] outline-none focus:border-accent"
+            className="h-10 text-[15px]"
           />
         </label>
         {error && <p className="text-danger">{error}</p>}
-        <Button type="submit" variant="primary" busy={busy} disabled={!password}>
+        <Button size="lg" type="submit" variant="default" busy={busy} disabled={!password}>
           Sign in
         </Button>
       </form>

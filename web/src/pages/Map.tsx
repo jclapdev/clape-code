@@ -4,7 +4,9 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import type { Access } from "@/lib/types";
 import { Page } from "@/components/Panes";
-import { AccessTag, cn, ErrorNote, Spinner } from "@/components/ui";
+import { AccessTag, ErrorNote, Loading, cn } from "@/components/ui";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface MapEntry {
   path: string;
@@ -35,23 +37,23 @@ export function MapPage() {
   return (
     <Page title="Map" sub="Every file and folder Claude Code uses on this machine: what it is, its format, and whether you can edit it." wide>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="Filter by access" className="flex flex-wrap gap-1.5">
+        <ToggleGroup type="single" variant="outline" size="sm" value={f} onValueChange={(v) => v && setF(v as typeof f)} aria-label="Filter by access" className="flex-wrap">
           {FILTERS.map((x) => (
-            <button key={x.id} type="button" aria-pressed={f === x.id} onClick={() => setF(x.id)} className={cn("h-8 rounded-full border px-3 text-[13px]", f === x.id ? "border-ink bg-ink text-bg" : "border-line-strong bg-surface text-ink-2 hover:bg-sunken")}>
+            <ToggleGroupItem key={x.id} value={x.id} className="data-[state=on]:bg-foreground data-[state=on]:text-background">
               {x.label}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
-        <label className="ml-auto flex items-center gap-2 text-[13px] text-muted">
-          <input type="checkbox" checked={hideMissing} onChange={(e) => setHideMissing(e.target.checked)} /> Hide what doesn't exist yet
+        </ToggleGroup>
+        <label className="ml-auto flex items-center gap-2 text-[13px] text-muted-foreground">
+          <Checkbox checked={hideMissing} onCheckedChange={(v) => setHideMissing(v === true)} /> Hide what doesn't exist yet
         </label>
       </div>
-      {q.isLoading && <Spinner />}
+      {q.isLoading && <Loading />}
       <ErrorNote error={q.error} />
       <div className="overflow-x-auto rounded-lg border border-line bg-surface">
         <table className="w-full min-w-[860px] border-collapse text-left">
           <thead>
-            <tr className="text-xs text-muted">
+            <tr className="text-xs text-muted-foreground">
               <th className="px-4 py-2.5 font-normal">Where</th>
               <th className="px-4 py-2.5 font-normal">What it is</th>
               <th className="px-4 py-2.5 font-normal">Format</th>
@@ -73,7 +75,7 @@ export function MapPage() {
                   <tr key={e.path} onClick={() => e.link && open(e.link)} className={cn("border-t border-line", e.link && "cursor-pointer hover:bg-sunken/50", !e.exists && "opacity-55")}>
                     <td className="px-4 py-2.5 font-mono text-[12.5px]">
                       {e.link ? (
-                        <a href={e.link} onClick={(ev) => (ev.preventDefault(), open(e.link!))} className="text-ink no-underline hover:text-accent">
+                        <a href={e.link} onClick={(ev) => (ev.preventDefault(), open(e.link!))} className="text-ink no-underline hover:text-primary">
                           {e.path}
                         </a>
                       ) : (
@@ -81,8 +83,8 @@ export function MapPage() {
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-[13.5px] text-ink-2">{e.what}</td>
-                    <td className="px-4 py-2.5 text-[12.5px] text-muted">{e.format}</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-[12.5px] text-muted">{e.count ?? ""}</td>
+                    <td className="px-4 py-2.5 text-[12.5px] text-muted-foreground">{e.format}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-[12.5px] text-muted-foreground">{e.count ?? ""}</td>
                     <td className="px-4 py-2.5">
                       <AccessTag access={e.access} />
                     </td>
@@ -93,7 +95,7 @@ export function MapPage() {
           })}
         </table>
       </div>
-      <p className="mt-4 text-[13px] text-muted">Secret items are listed so you know they exist; the app never opens them or sends their contents to the browser.</p>
+      <p className="mt-4 text-[13px] text-muted-foreground">Secret items are listed so you know they exist; the app never opens them or sends their contents to the browser.</p>
     </Page>
   );
 }

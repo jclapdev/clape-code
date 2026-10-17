@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Archive, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -7,7 +9,12 @@ import { when } from "@/lib/format";
 import type { Kind, LibraryItem, Project } from "@/lib/types";
 import { FileEditor } from "@/components/FileEditor";
 import { DetailHeader, TwoPane } from "@/components/Panes";
-import { Button, cn, Dialog, Empty, ErrorNote, Segmented, Spinner, Tag, useConfirm, useToast } from "@/components/ui";
+import { EmptyState, ErrorNote, Loading, Tag, cn, useConfirm } from "@/components/ui";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { SimpleSelect } from "@/components/SimpleSelect";
 
 export const KIND_LABEL: Record<Kind, [string, string]> = {
   skill: ["Skill", "Skills"],
@@ -44,19 +51,19 @@ const useLibrary = (scope: string) =>
 
 /** Compact list used inside a project's Config tab. */
 export function LibraryList({ items, scope, emptyText }: { items: LibraryItem[]; scope: string; emptyText: string }) {
-  if (!items.length) return <Empty title="Nothing here yet">{emptyText}</Empty>;
+  if (!items.length) return <EmptyState title="Nothing here yet">{emptyText}</EmptyState>;
   const kinds = KIND_ORDER.filter((k) => items.some((i) => i.kind === k));
   return (
     <div className="flex flex-col gap-4">
       {kinds.map((k) => (
         <section key={k}>
-          <h3 className="px-3 pb-1 text-xs font-medium text-muted">{KIND_LABEL[k][1]}</h3>
+          <h3 className="px-3 pb-1 text-xs font-medium text-muted-foreground">{KIND_LABEL[k][1]}</h3>
           {items
             .filter((i) => i.kind === k)
             .map((i) => (
               <Link key={i.path} to="/library" search={{ scope, path: i.path, kind: k }} className="flex items-center gap-3 rounded-md px-3 py-2 text-ink no-underline hover:bg-sunken">
                 <span className="w-48 flex-none truncate font-medium">{i.name}</span>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-muted">{i.description}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">{i.description}</span>
                 {stateTag(i)}
               </Link>
             ))}
@@ -69,7 +76,6 @@ export function LibraryList({ items, scope, emptyText }: { items: LibraryItem[];
 function NewItemDialog({ open, onClose, scope, kind }: { open: boolean; onClose: () => void; scope: string; kind: Kind }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const toast = useToast();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const valid = /^[a-z0-9][a-z0-9-]{0,63}$/.test(name);
@@ -92,35 +98,36 @@ function NewItemDialog({ open, onClose, scope, kind }: { open: boolean; onClose:
       setDescription("");
       qc.invalidateQueries({ queryKey: ["library"] });
       navigate({ to: "/library", search: { scope, kind, path } });
-      toast({ tone: "ok", text: `Created ${KIND_LABEL[kind][0].toLowerCase()} ${name}.` });
+      toast.success(`Created ${KIND_LABEL[kind][0].toLowerCase()} ${name}.`);
     },
-    onError: (e: Error) => toast({ tone: "danger", text: e.message }),
+    onError: (e: Error) => toast.error(e.message),
   });
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title={`New ${KIND_LABEL[kind][0].toLowerCase()}`}
-      footer={
-        <>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" disabled={!valid} busy={create.isPending} onClick={() => create.mutate()}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{`New ${KIND_LABEL[kind][0].toLowerCase()}`}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] text-ink-2">Name</span>
+            <Input autoFocus value={name} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="lowercase-with-dashes" className="font-mono" />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] text-ink-2">{kind === "rule" ? "What the rule says" : "When Claude should use it"}</span>
+            <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+          </label>
+          <p className="font-mono text-xs text-muted-foreground">{valid ? path : "Use lowercase letters, numbers and dashes."}</p>
+        </div>
+        <DialogFooter>
+          <Button size="lg" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="lg" disabled={!valid} busy={create.isPending} onClick={() => create.mutate()}>
             Create
           </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-[13px] text-ink-2">Name</span>
-          <input autoFocus value={name} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="lowercase-with-dashes" className="h-9 rounded-md border border-line-strong bg-surface px-3 font-mono outline-none focus:border-accent" />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[13px] text-ink-2">{kind === "rule" ? "What the rule says" : "When Claude should use it"}</span>
-          <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="rounded-md border border-line-strong bg-surface p-2.5 outline-none focus:border-accent" />
-        </label>
-        <p className="font-mono text-xs text-muted">{valid ? path : "Use lowercase letters, numbers and dashes."}</p>
-      </div>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }
@@ -128,7 +135,6 @@ function NewItemDialog({ open, onClose, scope, kind }: { open: boolean; onClose:
 function ItemDetail({ item, scope }: { item: LibraryItem; scope: string }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const toast = useToast();
   const navigate = useNavigate();
   const [validation, setValidation] = useState<{ ok: boolean; output: string } | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ["library"] });
@@ -149,25 +155,22 @@ function ItemDetail({ item, scope }: { item: LibraryItem; scope: string }) {
     onSuccess: (r: any, op) => {
       if (op === "validate") return setValidation(r);
       if (op === "sync") {
-        toast({ tone: "ok", text: `Index updated: ${r.added} added, ${r.removed} removed.` });
+        toast.success(`Index updated: ${r.added} added, ${r.removed} removed.`);
         return qc.invalidateQueries({ queryKey: ["memory"] });
       }
       refresh();
       navigate({ to: "/library", search: { scope, kind: item.kind } });
-      toast({
-        tone: "ok",
-        text: op === "archive" ? `Archived ${item.name}.` : `Moved ${item.name} to the trash.`,
-        action: op === "archive" ? { label: "Open archive", run: () => navigate({ to: "/archive" }) } : undefined,
-      });
+      if (op === "archive") toast.success(`Archived ${item.name}.`, { action: { label: "Open archive", onClick: () => navigate({ to: "/archive" }) } });
+      else toast.success(`Moved ${item.name} to the trash.`);
     },
-    onError: (e: Error) => toast({ tone: "danger", text: e.message }),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const setState = useMutation({
     mutationFn: (state: string) =>
       item.kind === "plugin" ? api.post("/library/plugin", { key: item.overrideKey, enabled: state === "on" }) : api.post("/library/skill-state", { key: item.overrideKey, state, scope }),
     onSuccess: () => refresh(),
-    onError: (e: Error) => toast({ tone: "danger", text: e.message }),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const editable = item.access === "edit";
@@ -190,13 +193,13 @@ function ItemDetail({ item, scope }: { item: LibraryItem; scope: string }) {
           actions={
             <>
               {item.kind === "skill" && editable && (
-                <Button size="sm" busy={act.isPending && act.variables === "validate"} onClick={() => act.mutate("validate")}>
+                <Button variant="outline" busy={act.isPending && act.variables === "validate"} onClick={() => act.mutate("validate")}>
                   <ShieldCheck className="size-3.5" aria-hidden /> Validate
                 </Button>
               )}
               {canArchive && (
-                <Button
-                  size="sm"
+                <Button variant="outline"
+                 
                   onClick={async () => {
                     if (await confirm({ title: `Archive ${item.name}?`, body: "Claude Code stops loading it. You can restore it from Archive at any time.", confirm: "Archive" })) act.mutate("archive");
                   }}
@@ -206,8 +209,8 @@ function ItemDetail({ item, scope }: { item: LibraryItem; scope: string }) {
               )}
               {editable && item.kind !== "claude-md" && (
                 <Button
-                  size="sm"
-                  variant="danger"
+                 
+                  variant="destructive"
                   onClick={async () => {
                     if (await confirm({ title: `Delete ${item.name}?`, body: "It moves to your computer's trash, where you can still recover it.", confirm: "Move to trash", danger: true })) act.mutate("delete");
                   }}
@@ -225,34 +228,40 @@ function ItemDetail({ item, scope }: { item: LibraryItem; scope: string }) {
           )}
           {item.overrideKey && item.kind === "skill" && (
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-[13px] text-muted">Who can use it</span>
-              <Segmented
-                label="Skill visibility"
-                value={item.state ?? "on"}
-                onChange={(v) => setState.mutate(v)}
-                options={[
-                  { value: "on", label: "On", title: "Claude sees it and you can type /name" },
-                  { value: "name-only", label: "Name only", title: "Claude sees only its name" },
-                  { value: "user-invocable-only", label: "Only me", title: "Claude doesn't see it; you can still type /name" },
-                  { value: "off", label: "Off", title: "Hidden from Claude and from / autocomplete" },
-                ]}
-              />
-              <span className="text-xs text-muted">Saved to {scope === "global" ? "~/.claude/settings.json" : ".claude/settings.local.json"}</span>
+              <span className="text-[13px] text-muted-foreground">Who can use it</span>
+              <ToggleGroup type="single" variant="outline" size="sm" value={item.state ?? "on"} onValueChange={(v) => v && setState.mutate(v)} aria-label="Skill visibility">
+                <ToggleGroupItem value="on" title="Claude sees it and you can type /name">
+                  On
+                </ToggleGroupItem>
+                <ToggleGroupItem value="name-only" title="Claude sees only its name">
+                  Name only
+                </ToggleGroupItem>
+                <ToggleGroupItem value="user-invocable-only" title="Claude doesn't see it; you can still type /name">
+                  Only me
+                </ToggleGroupItem>
+                <ToggleGroupItem value="off" title="Hidden from Claude and from / autocomplete">
+                  Off
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <span className="text-xs text-muted-foreground">Saved to {scope === "global" ? "~/.claude/settings.json" : ".claude/settings.local.json"}</span>
             </div>
           )}
           {item.kind === "plugin" && (
             <div className="flex items-center gap-3">
-              <Segmented label="Plugin" value={item.state ?? "off"} onChange={(v) => setState.mutate(v)} options={[{ value: "on", label: "Enabled" }, { value: "off", label: "Disabled" }]} />
-              {item.meta.version && <span className="text-xs text-muted">Version {String(item.meta.version)}</span>}
+              <ToggleGroup type="single" variant="outline" size="sm" value={item.state ?? "off"} onValueChange={(v) => v && setState.mutate(v)} aria-label="Plugin">
+                <ToggleGroupItem value="on">Enabled</ToggleGroupItem>
+                <ToggleGroupItem value="off">Disabled</ToggleGroupItem>
+              </ToggleGroup>
+              {item.meta.version && <span className="text-xs text-muted-foreground">Version {String(item.meta.version)}</span>}
             </div>
           )}
-          {item.source === "plugin" && item.kind !== "plugin" && <p className="text-[13px] text-muted">Part of the {item.sourceName} plugin. Turn the whole plugin on or off under Plugins.</p>}
+          {item.source === "plugin" && item.kind !== "plugin" && <p className="text-[13px] text-muted-foreground">Part of the {item.sourceName} plugin. Turn the whole plugin on or off under Plugins.</p>}
           {memIssue && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-attn-line bg-attn-soft px-3 py-2 text-[13px] text-attn">
               <span>
                 MEMORY.md is out of step: {memIssue.missingFromIndex.length} notes missing from it, {memIssue.deadLinks.length} links to notes that no longer exist.
               </span>
-              <Button size="sm" variant="attn" onClick={() => act.mutate("sync")}>
+              <Button variant="attn" onClick={() => act.mutate("sync")}>
                 Rebuild index
               </Button>
             </div>
@@ -294,51 +303,46 @@ export function LibraryPage() {
     <div className="flex flex-col pb-6">
       <div className="sticky top-0 z-10 flex flex-col gap-2 bg-panel px-4 pb-2 pt-4">
         <div className="flex gap-2">
-          <label htmlFor="scope" className="sr-only">
-            Scope
-          </label>
-          <select
-            id="scope"
+          <SimpleSelect
+            label="Scope"
             value={scope}
-            onChange={(e) => navigate({ to: "/library", search: { scope: e.target.value, kind: kind ?? undefined } })}
-            className="h-9 min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-2 text-[13.5px]"
-          >
-            <option value="global">Global (all projects)</option>
-            {(projects.data ?? [])
-              .filter((p) => p.hasClaudeDir || p.docs.includes("CLAUDE.md"))
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
+            onChange={(v) => navigate({ to: "/library", search: { scope: v, kind: kind ?? undefined } })}
+            className="min-w-0 flex-1"
+            options={[
+              { value: "global", label: "Global (all projects)" },
+              ...(projects.data ?? []).filter((p) => p.hasClaudeDir || p.docs.includes("CLAUDE.md")).map((p) => ({ value: p.id, label: p.name })),
+            ]}
+          />
           {creatable && (
-            <Button size="sm" className="h-9" onClick={() => setCreating(true)} aria-label={`New ${KIND_LABEL[creatable][0].toLowerCase()}`}>
-              <Plus className="size-4" aria-hidden /> New
+            <Button variant="outline" onClick={() => setCreating(true)} aria-label={`New ${KIND_LABEL[creatable][0].toLowerCase()}`}>
+              <Plus aria-hidden /> New
             </Button>
           )}
         </div>
-        <div className="flex flex-wrap gap-1">
-          <button type="button" onClick={() => navigate({ to: "/library", search: { scope } })} className={cn("h-7 rounded-full px-2.5 text-[12.5px]", !kind ? "bg-ink text-bg" : "bg-sunken text-ink-2 hover:text-ink")}>
+        <ToggleGroup
+          type="single"
+          size="sm"
+          spacing={1}
+          value={kind ?? "all"}
+          onValueChange={(v) => v && navigate({ to: "/library", search: { scope, kind: v === "all" ? undefined : v } })}
+          aria-label="Item type"
+          className="flex-wrap"
+        >
+          <ToggleGroupItem value="all" className="rounded-full data-[state=on]:bg-foreground data-[state=on]:text-background">
             All
-          </button>
+          </ToggleGroupItem>
           {KIND_ORDER.filter((k) => counts[k]).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => navigate({ to: "/library", search: { scope, kind: k } })}
-              className={cn("h-7 rounded-full px-2.5 text-[12.5px]", kind === k ? "bg-ink text-bg" : "bg-sunken text-ink-2 hover:text-ink")}
-            >
+            <ToggleGroupItem key={k} value={k} className="rounded-full data-[state=on]:bg-foreground data-[state=on]:text-background">
               {KIND_LABEL[k][1]} <span className="opacity-70">{counts[k]}</span>
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
         <label htmlFor="lf" className="sr-only">
           Filter
         </label>
-        <input id="lf" data-filter value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter  /" className="h-9 rounded-md border border-line-strong bg-surface px-3 outline-none focus:border-accent" />
+        <Input id="lf" data-filter value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter  /" />
       </div>
-      {lib.isLoading && <Spinner />}
+      {lib.isLoading && <Loading />}
       <ErrorNote error={lib.error} />
       <ul className="px-2">
         {shown.map((i) => (
@@ -353,12 +357,12 @@ export function LibraryPage() {
                 {stateTag(i)}
                 {sourceTag(i)}
               </span>
-              {i.description && <span className="line-clamp-1 text-[12.5px] text-muted">{i.description}</span>}
+              {i.description && <span className="line-clamp-1 text-[12.5px] text-muted-foreground">{i.description}</span>}
             </Link>
           </li>
         ))}
       </ul>
-      {!lib.isLoading && !shown.length && <p className="px-5 py-4 text-muted">Nothing matches.</p>}
+      {!lib.isLoading && !shown.length && <p className="px-5 py-4 text-muted-foreground">Nothing matches.</p>}
     </div>
   );
 
@@ -374,7 +378,7 @@ export function LibraryPage() {
           selected ? (
             <ItemDetail item={selected} scope={scope} />
           ) : (
-            <Empty title={kind ? KIND_LABEL[kind][1] : "Library"}>Pick an item to read or edit it. Items you own can be archived, deleted or turned off.</Empty>
+            <EmptyState title={kind ? KIND_LABEL[kind][1] : "Library"}>Pick an item to read or edit it. Items you own can be archived, deleted or turned off.</EmptyState>
           )
         }
       />

@@ -3,7 +3,8 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { api, enc } from "@/lib/api";
 import type { Access, Project } from "@/lib/types";
 import { Page } from "@/components/Panes";
-import { cn, ErrorNote, Spinner, Tag } from "@/components/ui";
+import { ErrorNote, Loading, Tag, cn } from "@/components/ui";
+import { SimpleSelect } from "@/components/SimpleSelect";
 
 type Source = "managed" | "local" | "project" | "user";
 interface Entry {
@@ -50,35 +51,31 @@ export function SettingsPage() {
       title="Settings"
       sub="What Claude Code uses, and which file each value comes from."
       actions={
-        <label className="flex items-center gap-2 text-[13px] text-muted">
-          Show settings for
-          <select value={s.project ?? ""} onChange={(e) => navigate({ to: "/settings", search: { project: e.target.value || undefined } })} className="h-9 rounded-md border border-line-strong bg-surface px-2 text-[13.5px] text-ink">
-            <option value="">No project (user settings only)</option>
-            {(projects.data ?? [])
-              .filter((p) => p.hasClaudeDir)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+          <span>Show settings for</span>
+          <SimpleSelect
+            label="Show settings for"
+            value={s.project ?? ""}
+            onChange={(v) => navigate({ to: "/settings", search: { project: v || undefined } })}
+            options={[{ value: "", label: "No project (user settings only)" }, ...(projects.data ?? []).filter((p) => p.hasClaudeDir).map((p) => ({ value: p.id, label: p.name }))]}
+          />
+        </div>
       }
     >
-      {q.isLoading && <Spinner />}
+      {q.isLoading && <Loading />}
       <ErrorNote error={q.error} />
       {q.data && (
         <div className="flex flex-col gap-5">
           <section aria-label="Which file wins" className="flex flex-col gap-2">
-            <p className="text-[13px] text-muted">When two files set the same thing, the one further left wins. Lists such as permission rules are combined across files.</p>
+            <p className="text-[13px] text-muted-foreground">When two files set the same thing, the one further left wins. Lists such as permission rules are combined across files.</p>
             <ol className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
               {q.data.sources.map((f) => (
                 <li key={f.source} className={cn("flex flex-col gap-1 rounded-lg border bg-surface px-3.5 py-3", f.exists ? "border-line" : "border-dashed border-line opacity-60")}>
                   <span className="flex items-center justify-between gap-2">
                     <span className="font-semibold">{SOURCE_LABEL[f.source]}</span>
-                    {f.error ? <Tag tone="danger">Invalid JSON</Tag> : !f.exists && <span className="text-xs text-muted">not created</span>}
+                    {f.error ? <Tag tone="danger">Invalid JSON</Tag> : !f.exists && <span className="text-xs text-muted-foreground">not created</span>}
                   </span>
-                  <span className="break-all font-mono text-[11.5px] text-muted">{f.display}</span>
+                  <span className="break-all font-mono text-[11.5px] text-muted-foreground">{f.display}</span>
                   <span className="text-xs text-ink-2">{SOURCE_HELP[f.source]}</span>
                   {f.access === "edit" && (
                     <Link to="/file" search={{ path: f.path }} className="text-[13px]">
@@ -91,7 +88,7 @@ export function SettingsPage() {
           </section>
           <div className="flex flex-wrap items-start gap-4">
             <section aria-label="Effective values" className="min-w-0 flex-[999_1_520px] overflow-hidden rounded-lg border border-line bg-surface">
-              <div className="grid grid-cols-[minmax(150px,1.1fr)_minmax(120px,1.4fr)_100px] gap-3 border-b border-line px-4 py-2 text-xs text-muted">
+              <div className="grid grid-cols-[minmax(150px,1.1fr)_minmax(120px,1.4fr)_100px] gap-3 border-b border-line px-4 py-2 text-xs text-muted-foreground">
                 <span>Setting</span>
                 <span>Value</span>
                 <span>From</span>
@@ -102,14 +99,14 @@ export function SettingsPage() {
                   type="button"
                   aria-pressed={sel?.key === e.key}
                   onClick={() => navigate({ to: "/settings", search: { project: s.project, key: e.key }, replace: true })}
-                  className={cn("grid min-h-11 w-full grid-cols-[minmax(150px,1.1fr)_minmax(120px,1.4fr)_100px] items-center gap-3 border-b border-line px-4 py-2 text-left last:border-0 hover:bg-sunken/60", sel?.key === e.key && "bg-accent-soft/50")}
+                  className={cn("grid min-h-11 w-full grid-cols-[minmax(150px,1.1fr)_minmax(120px,1.4fr)_100px] items-center gap-3 border-b border-line px-4 py-2 text-left last:border-0 hover:bg-sunken/60", sel?.key === e.key && "bg-accent/50")}
                 >
                   <span className="truncate font-mono text-[12.5px]">{e.key}</span>
                   <span className="truncate text-ink-2">{summary(e.value)}</span>
                   <span><Tag tone={SOURCE_TONE[e.from]}>{SOURCE_LABEL[e.from]}</Tag></span>
                 </button>
               ))}
-              {!q.data.entries.length && <p className="px-4 py-3 text-muted">No settings set in these files.</p>}
+              {!q.data.entries.length && <p className="px-4 py-3 text-muted-foreground">No settings set in these files.</p>}
             </section>
             {sel && (
               <aside aria-label="Setting details" className="flex min-w-0 flex-[1_1_300px] flex-col gap-3 rounded-lg border border-line bg-surface p-4">
@@ -123,7 +120,7 @@ export function SettingsPage() {
                 </p>
                 <pre className="max-h-80 overflow-auto rounded-md bg-sunken p-2.5 font-mono text-[12px]">{JSON.stringify(sel.value, null, 2)}</pre>
                 {sel.overridden.map((o) => (
-                  <div key={o.source} className="text-[12.5px] text-muted">
+                  <div key={o.source} className="text-[12.5px] text-muted-foreground">
                     Ignored from {SOURCE_LABEL[o.source].toLowerCase()}: <span className="font-mono">{JSON.stringify(o.value)}</span>
                   </div>
                 ))}

@@ -1,9 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Kbd } from "@/components/ui/kbd";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { useTheme, type Theme } from "@/lib/prefs";
+import { useTheme } from "next-themes";
 import { Page } from "@/components/Panes";
-import { Button, Kbd, Segmented, Spinner, useConfirm, useToast } from "@/components/ui";
+import { Loading, useConfirm } from "@/components/ui";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface Config {
   projectRoots: string[];
@@ -49,7 +55,7 @@ function UsageCard() {
     .join(", ");
   return (
     <Card title="How you use this app">
-      <p className="text-[13px] text-muted">Counted on this computer only, for reviewing what to build next. Save feedback from the search box (⌘K): type a note and choose “Save as feedback”.</p>
+      <p className="text-[13px] text-muted-foreground">Counted on this computer only, for reviewing what to build next. Save feedback from the search box (⌘K): type a note and choose “Save as feedback”.</p>
       <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-[13.5px]">
         {Object.entries(METRIC_LABEL).map(([k, label]) => (
           <div key={k} className="contents">
@@ -58,7 +64,7 @@ function UsageCard() {
           </div>
         ))}
       </dl>
-      {views && <p className="text-[13px] text-muted">Views opened: {views}</p>}
+      {views && <p className="text-[13px] text-muted-foreground">Views opened: {views}</p>}
       {q.data?.feedback && <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-sunken p-2.5 text-[12.5px]">{q.data.feedback}</pre>}
     </Card>
   );
@@ -67,11 +73,10 @@ function UsageCard() {
 export function PreferencesPage() {
   const q = useQuery({ queryKey: ["config"], queryFn: () => api.get<Config>("/config") });
   const auth = useQuery({ queryKey: ["auth"], queryFn: () => api.get<{ isLocal: boolean }>("/auth/status") });
-  const [theme, setTheme] = useTheme();
+  const { theme, setTheme } = useTheme();
   const [roots, setRoots] = useState("");
   const [password, setPassword] = useState("");
   const qc = useQueryClient();
-  const toast = useToast();
   const confirm = useConfirm();
   useEffect(() => {
     if (q.data) setRoots(q.data.projectRoots.join("\n"));
@@ -81,21 +86,21 @@ export function PreferencesPage() {
     mutationFn: () => api.post("/config", { projectRoots: roots.split("\n").map((r) => r.trim()).filter(Boolean) }),
     onSuccess: () => {
       qc.invalidateQueries();
-      toast({ tone: "ok", text: "Project folders saved." });
+      toast.success("Project folders saved.");
     },
-    onError: (e: Error) => toast({ tone: "danger", text: e.message }),
+    onError: (e: Error) => toast.error(e.message),
   });
   const lan = useMutation({
     mutationFn: (enabled: boolean) => api.post("/lan", { enabled, password: password || undefined }),
     onSuccess: (_r, enabled) => {
       setPassword("");
       qc.invalidateQueries({ queryKey: ["config"] });
-      toast({ tone: "ok", text: enabled ? "Home network mode is on. The app restarts on HTTPS; reload this page." : "Home network mode is off." });
+      toast.success(enabled ? "Home network mode is on. The app restarts on HTTPS; reload this page." : "Home network mode is off.");
     },
-    onError: (e: Error) => toast({ tone: "danger", text: e.message }),
+    onError: (e: Error) => toast.error(e.message),
   });
 
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <Loading />;
   const c = q.data!;
   return (
     <Page title="Preferences">
@@ -103,32 +108,27 @@ export function PreferencesPage() {
         <Card title="Appearance">
           <div className="flex items-center justify-between gap-3">
             <span className="text-ink-2">Theme</span>
-            <Segmented<Theme>
-              label="Theme"
-              value={theme}
-              onChange={setTheme}
-              options={[
-                { value: "system", label: "Match system" },
-                { value: "light", label: "Light" },
-                { value: "dark", label: "Dark" },
-              ]}
-            />
+            <ToggleGroup type="single" variant="outline" size="sm" value={theme ?? "system"} onValueChange={(v) => v && setTheme(v)} aria-label="Theme">
+              <ToggleGroupItem value="system">Match system</ToggleGroupItem>
+              <ToggleGroupItem value="light">Light</ToggleGroupItem>
+              <ToggleGroupItem value="dark">Dark</ToggleGroupItem>
+            </ToggleGroup>
           </div>
-          <p className="text-[13px] text-muted">Pane sizes and collapsed panes are remembered in this browser. Drag a divider to resize; double-click it to reset.</p>
+          <p className="text-[13px] text-muted-foreground">Pane sizes and collapsed panes are remembered in this browser. Drag a divider to resize; double-click it to reset.</p>
         </Card>
 
         <Card title="Project folders">
-          <p className="text-[13px] text-muted">Each folder inside these is listed as a project. Folders where you've run Claude elsewhere are found automatically.</p>
-          <textarea rows={3} value={roots} onChange={(e) => setRoots(e.target.value)} aria-label="Project folders, one per line" className="rounded-md border border-line-strong bg-surface p-2.5 font-mono text-[13px] outline-none focus:border-accent" />
+          <p className="text-[13px] text-muted-foreground">Each folder inside these is listed as a project. Folders where you've run Claude elsewhere are found automatically.</p>
+          <Textarea rows={3} value={roots} onChange={(e) => setRoots(e.target.value)} aria-label="Project folders, one per line" className="font-mono text-[13px]" />
           <div>
-            <Button variant="primary" size="sm" busy={saveRoots.isPending} onClick={() => saveRoots.mutate()}>
+            <Button variant="default" busy={saveRoots.isPending} onClick={() => saveRoots.mutate()}>
               Save folders
             </Button>
           </div>
         </Card>
 
         <Card title="Home network">
-          <p className="text-[13px] text-muted">
+          <p className="text-[13px] text-muted-foreground">
             {c.lan.enabled
               ? `On. Other devices on your network can open https://<this computer's address>:${c.port} and sign in with the password. Your browser will warn about the certificate the first time; it is made by this app.`
               : "Off. Only this computer can open the app. Turn it on to check sessions and answer Claude from your phone at home."}
@@ -137,24 +137,24 @@ export function PreferencesPage() {
             <>
               <label className="flex flex-col gap-1">
                 <span className="text-[13px] text-ink-2">{c.lan.hasPassword ? "New password (leave empty to keep the current one)" : "Password (at least 10 characters)"}</span>
-                <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="h-9 rounded-md border border-line-strong bg-surface px-3 outline-none focus:border-accent" />
+                <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
               </label>
               <div className="flex gap-2">
                 {c.lan.enabled ? (
                   <>
                     {password && (
-                      <Button size="sm" busy={lan.isPending} onClick={() => lan.mutate(true)}>
+                      <Button variant="outline" busy={lan.isPending} onClick={() => lan.mutate(true)}>
                         Change password
                       </Button>
                     )}
-                    <Button size="sm" variant="danger" busy={lan.isPending} onClick={() => lan.mutate(false)}>
+                    <Button variant="destructive" busy={lan.isPending} onClick={() => lan.mutate(false)}>
                       Turn off
                     </Button>
                   </>
                 ) : (
                   <Button
-                    size="sm"
-                    variant="primary"
+                   
+                    variant="default"
                     busy={lan.isPending}
                     disabled={!c.lan.hasPassword && password.length < 10}
                     onClick={async () => {
@@ -167,7 +167,7 @@ export function PreferencesPage() {
               </div>
             </>
           ) : (
-            <p className="text-[13px] text-muted">Change this from the computer the app runs on.</p>
+            <p className="text-[13px] text-muted-foreground">Change this from the computer the app runs on.</p>
           )}
         </Card>
 

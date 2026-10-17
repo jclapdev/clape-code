@@ -1,14 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { Check, Pencil, Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { api, ApiError, enc } from "@/lib/api";
 import { when } from "@/lib/format";
 import type { BacklogItem, Project, ProjectDetail } from "@/lib/types";
 import { FileEditor, fileQuery, openOnComputer } from "@/components/FileEditor";
 import { DetailHeader, ListGroup, TwoPane } from "@/components/Panes";
-import { Button, cn, Empty, ErrorNote, Md, Spinner, Tag, useToast } from "@/components/ui";
+import { EmptyState, ErrorNote, Loading, Md, Tag, cn } from "@/components/ui";
 import { LibraryList } from "./Library";
+import { IconButton } from "@/components/IconButton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -22,7 +30,7 @@ const TABS = [
 function ProjectList({ selected }: { selected: string | null }) {
   const q = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
   const [filter, setFilter] = useState("");
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const f = filter.toLowerCase();
   const list = (q.data ?? []).filter((p) => !f || p.name.toLowerCase().includes(f) || p.path.toLowerCase().includes(f));
@@ -37,7 +45,7 @@ function ProjectList({ selected }: { selected: string | null }) {
         <label htmlFor="pf" className="sr-only">
           Filter projects
         </label>
-        <input id="pf" data-filter value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter projects  /" className="h-9 w-full rounded-md border border-line-strong bg-surface px-3 outline-none focus:border-accent" />
+        <Input id="pf" data-filter value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter projects  /" className="w-full" />
       </div>
       {groups.map(([label, ps]) =>
         ps.length ? (
@@ -52,9 +60,9 @@ function ProjectList({ selected }: { selected: string | null }) {
               >
                 <span className="flex items-center gap-2">
                   <span className="flex-1 truncate text-[14px] font-medium">{p.name}</span>
-                  {p.backlog && p.backlog.open > 0 && <span className="text-xs text-muted">{p.backlog.open} open</span>}
+                  {p.backlog && p.backlog.open > 0 && <span className="text-xs text-muted-foreground">{p.backlog.open} open</span>}
                 </span>
-                <span className="flex gap-2 text-xs text-muted">
+                <span className="flex gap-2 text-xs text-muted-foreground">
                   {p.git ? <span className="font-mono">{p.git.branch}{p.git.dirty ? ` +${p.git.dirty}` : ""}</span> : p.group === "other" ? <span className="truncate font-mono">{p.path}</span> : <span>No git</span>}
                   {p.sessions > 0 && <span className="ml-auto">{when(p.lastSessionAt)}</span>}
                 </span>
@@ -69,7 +77,6 @@ function ProjectList({ selected }: { selected: string | null }) {
 
 function BacklogTab({ p }: { p: ProjectDetail }) {
   const qc = useQueryClient();
-  const toast = useToast();
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState<number | null>(null);
@@ -79,16 +86,16 @@ function BacklogTab({ p }: { p: ProjectDetail }) {
     mutationFn: ({ op, body }: { op: string; body: object }) => api.post(`/projects/${enc(p.id)}/backlog/${op}`, { ...body, hash: b!.hash }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["project", p.id] }),
     onError: (e: Error) => {
-      toast({ tone: "danger", text: e instanceof ApiError && e.status === 409 ? "BACKLOG.md changed on disk. It has been reloaded; try again." : e.message });
+      toast.error(e instanceof ApiError && e.status === 409 ? "BACKLOG.md changed on disk. It has been reloaded; try again." : e.message);
       qc.invalidateQueries({ queryKey: ["project", p.id] });
     },
   });
 
   if (!b) {
     return (
-      <Empty title="No BACKLOG.md in this project">
+      <EmptyState title="No BACKLOG.md in this project">
         A backlog is a markdown file of things left to do. Create <span className="font-mono">BACKLOG.md</span> in the project folder and it appears here.
-      </Empty>
+      </EmptyState>
     );
   }
   const all = b.sections.flatMap((s) => s.items);
@@ -106,7 +113,7 @@ function BacklogTab({ p }: { p: ProjectDetail }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-ink-2">
           {b.intro && <span>{b.intro} </span>}
-          {b.checkboxes && <span className="text-muted">{done} of {all.length} done.</span>}
+          {b.checkboxes && <span className="text-muted-foreground">{done} of {all.length} done.</span>}
         </p>
         <Link to="/file" search={{ path: b.path }} className="text-[13px]">
           Edit as text
@@ -118,27 +125,18 @@ function BacklogTab({ p }: { p: ProjectDetail }) {
           <section key={s.line} className="rounded-lg border border-line bg-surface px-4 py-2">
             <div className="flex items-baseline justify-between py-2">
               <h3 className="text-[15px] font-semibold">{s.name || "Items"}</h3>
-              {b.checkboxes && s.items.length > 0 && <span className="text-xs text-muted">{sd} of {s.items.length} done</span>}
+              {b.checkboxes && s.items.length > 0 && <span className="text-xs text-muted-foreground">{sd} of {s.items.length} done</span>}
             </div>
-            {s.intro && <p className="pb-2 text-[13px] text-muted">{s.intro}</p>}
+            {s.intro && <p className="pb-2 text-[13px] text-muted-foreground">{s.intro}</p>}
             <ul>
               {s.items.map((it) => (
                 <li key={it.line} className="group flex items-start gap-3 border-t border-line py-2">
                   {it.done !== null ? (
-                    <button
-                      type="button"
-                      role="checkbox"
-                      aria-checked={it.done}
-                      aria-label={`Mark ${it.n ?? ""} ${it.done ? "not done" : "done"}`}
-                      onClick={() => toggle(it)}
-                      className={cn("mt-0.5 grid size-[18px] flex-none place-items-center rounded border", it.done ? "border-accent bg-accent text-on-accent" : "border-line-strong bg-surface hover:border-accent")}
-                    >
-                      {it.done && <Check className="size-3" strokeWidth={3} />}
-                    </button>
+                    <Checkbox checked={it.done} onCheckedChange={() => toggle(it)} aria-label={`Mark ${it.n ?? ""} ${it.done ? "not done" : "done"}`} className="mt-1 flex-none" />
                   ) : (
                     <span className="mt-2 size-1.5 flex-none rounded-full bg-faint" aria-hidden />
                   )}
-                  {it.n !== null && <span className="w-6 flex-none pt-px font-mono text-[12.5px] text-muted">{it.n}.</span>}
+                  {it.n !== null && <span className="w-6 flex-none pt-px font-mono text-[12.5px] text-muted-foreground">{it.n}.</span>}
                   {editing === it.line ? (
                     <form
                       className="flex flex-1 gap-2"
@@ -148,27 +146,27 @@ function BacklogTab({ p }: { p: ProjectDetail }) {
                         setEditing(null);
                       }}
                     >
-                      <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setEditing(null)} className="h-8 flex-1 rounded border border-accent bg-surface px-2 outline-none" aria-label="Item text" />
-                      <Button size="sm" type="submit" variant="primary">
+                      <Input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setEditing(null)} className="flex-1" aria-label="Item text" />
+                      <Button type="submit" variant="default">
                         Save
                       </Button>
                     </form>
                   ) : (
                     <>
-                      <span className={cn("flex-1 leading-relaxed", it.done && "text-muted")}>
+                      <span className={cn("flex-1 leading-relaxed", it.done && "text-muted-foreground")}>
                         <Md className="[&_p]:m-0">{it.text}</Md>
                       </span>
-                      <button
-                        type="button"
-                        aria-label="Edit item"
+                      <IconButton
+                        label="Edit item"
+                        size="icon-sm"
                         onClick={() => {
                           setEditing(it.line);
                           setDraft(it.text);
                         }}
-                        className="invisible grid size-7 flex-none place-items-center rounded text-muted hover:bg-sunken group-hover:visible focus:visible"
+                        className="invisible flex-none text-muted-foreground group-hover:visible focus-visible:visible"
                       >
-                        <Pencil className="size-3.5" />
-                      </button>
+                        <Pencil />
+                      </IconButton>
                     </>
                   )}
                 </li>
@@ -185,46 +183,48 @@ function BacklogTab({ p }: { p: ProjectDetail }) {
                   setDraft("");
                 }}
               >
-                <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setAdding(null)} placeholder="What needs doing?" className="h-8 flex-1 rounded border border-accent bg-surface px-2 outline-none" aria-label="New item" />
-                <Button size="sm" type="submit" variant="primary">
+                <Input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setAdding(null)} placeholder="What needs doing?" className="flex-1" aria-label="New item" />
+                <Button type="submit" variant="default">
                   Add
                 </Button>
               </form>
             ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setAdding(s.line);
-                  setDraft("");
-                }}
-                className="flex h-9 w-full items-center gap-1.5 border-t border-line text-[13px] text-muted hover:text-accent"
-              >
-                <Plus className="size-3.5" aria-hidden /> Add item
-              </button>
+              <div className="border-t border-line py-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setAdding(s.line);
+                    setDraft("");
+                  }}
+                  className="text-muted-foreground"
+                >
+                  <Plus aria-hidden /> Add item
+                </Button>
+              </div>
             )}
           </section>
         );
       })}
-      <p className="text-xs text-muted">Changes edit only the line you touch. Every save keeps the previous file as a backup.</p>
+      <p className="text-xs text-muted-foreground">Changes edit only the line you touch. Every save keeps the previous file as a backup.</p>
     </div>
   );
 }
 
 function ChangelogTab({ p }: { p: ProjectDetail }) {
   const qc = useQueryClient();
-  const toast = useToast();
   const [text, setText] = useState("");
   const c = p.changelog;
   const add = useMutation({
     mutationFn: () => api.post(`/projects/${enc(p.id)}/changelog`, { text, hash: c!.hash }),
     onSuccess: () => {
       setText("");
-      toast({ tone: "ok", text: "Added to today's changes." });
+      toast.success("Added to today's changes.");
       qc.invalidateQueries({ queryKey: ["project", p.id] });
     },
-    onError: (e: Error) => toast({ tone: "danger", text: e.message }),
+    onError: (e: Error) => toast.error(e.message),
   });
-  if (!c) return <Empty title="No CHANGELOG.md in this project">Create <span className="font-mono">CHANGELOG.md</span> with dated sections and it appears here.</Empty>;
+  if (!c) return <EmptyState title="No CHANGELOG.md in this project">Create <span className="font-mono">CHANGELOG.md</span> with dated sections and it appears here.</EmptyState>;
   return (
     <div className="flex flex-col gap-4 p-6 md:pl-12">
       <form
@@ -237,12 +237,12 @@ function ChangelogTab({ p }: { p: ProjectDetail }) {
         <label htmlFor="cl" className="text-[13px] font-medium">
           Add a change for today
         </label>
-        <textarea id="cl" rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="What changed, in a sentence the reader will understand." className="resize-y rounded-md border border-line-strong bg-surface p-2.5 outline-none focus:border-accent" />
+        <Textarea id="cl" rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="What changed, in a sentence the reader will understand." className="resize-y" />
         <div className="flex justify-between">
           <Link to="/file" search={{ path: c.path }} className="self-center text-[13px]">
             Edit as text
           </Link>
-          <Button type="submit" variant="primary" size="sm" busy={add.isPending} disabled={!text.trim()}>
+          <Button type="submit" variant="default" busy={add.isPending} disabled={!text.trim()}>
             Add to today
           </Button>
         </div>
@@ -266,15 +266,17 @@ function ChangelogTab({ p }: { p: ProjectDetail }) {
 function DocsTab({ p }: { p: ProjectDetail }) {
   const docs = p.docs;
   const [sel, setSel] = useState<string | null>(docs.find((d) => d.name === "README.md")?.path ?? docs[0]?.path ?? null);
-  if (!docs.length) return <Empty title="No markdown files at the top of this project" />;
+  if (!docs.length) return <EmptyState title="No markdown files at the top of this project" />;
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-wrap gap-1.5 border-b border-line px-6 py-2 md:pl-12">
-        {docs.map((d) => (
-          <button key={d.path} type="button" onClick={() => setSel(d.path)} aria-pressed={sel === d.path} className={cn("h-8 rounded-md px-2.5 font-mono text-[12.5px]", sel === d.path ? "bg-accent-soft text-accent-strong" : "text-ink-2 hover:bg-sunken")}>
-            {d.name}
-          </button>
-        ))}
+      <div className="border-b border-line px-6 py-2 md:pl-12">
+        <ToggleGroup type="single" size="sm" value={sel ?? ""} onValueChange={(v) => v && setSel(v)} aria-label="Document" className="flex-wrap">
+          {docs.map((d) => (
+            <ToggleGroupItem key={d.path} value={d.path} className="font-mono text-[12.5px] data-[state=on]:bg-accent data-[state=on]:text-accent-foreground">
+              {d.name}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </div>
       <div className="min-h-[480px] flex-1">{sel && <FileEditor path={sel} />}</div>
     </div>
@@ -295,13 +297,13 @@ function OverviewTab({ p }: { p: ProjectDetail }) {
       <dl className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))]">
         {stats.map(([k, v]) => (
           <div key={k} className="rounded-lg border border-line bg-surface px-4 py-3">
-            <dt className="text-xs text-muted">{k}</dt>
+            <dt className="text-xs text-muted-foreground">{k}</dt>
             <dd className="mt-1 font-medium">{v}</dd>
           </div>
         ))}
       </dl>
       {p.git?.remote && (
-        <p className="text-[13px] text-muted">
+        <p className="text-[13px] text-muted-foreground">
           Remote <span className="font-mono">{p.git.remote}</span>, last commit {when(p.git.lastCommitAt)}
         </p>
       )}
@@ -327,7 +329,7 @@ function OverviewTab({ p }: { p: ProjectDetail }) {
 }
 
 function SessionsTab({ p }: { p: ProjectDetail }) {
-  if (!p.sessions.length) return <Empty title="No sessions in this project yet" />;
+  if (!p.sessions.length) return <EmptyState title="No sessions in this project yet" />;
   return (
     <ul className="p-4 md:pl-10">
       {p.sessions.map((s) => (
@@ -336,7 +338,7 @@ function SessionsTab({ p }: { p: ProjectDetail }) {
             <span className="min-w-0 flex-1 truncate">{s.displayTitle}</span>
             {s.worktree && <Tag>worktree</Tag>}
             {s.running && <Tag tone="accent">Running</Tag>}
-            <span className="w-20 text-right text-xs text-muted">{when(s.lastAt)}</span>
+            <span className="w-20 text-right text-xs text-muted-foreground">{when(s.lastAt)}</span>
           </Link>
         </li>
       ))}
@@ -347,8 +349,7 @@ function SessionsTab({ p }: { p: ProjectDetail }) {
 function ProjectDetailView({ id, tab }: { id: string; tab: string }) {
   const q = useQuery({ queryKey: ["project", id], queryFn: () => api.get<ProjectDetail>(`/projects/${enc(id)}`) });
   const navigate = useNavigate();
-  const toast = useToast();
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const p = q.data!;
   return (
@@ -363,30 +364,28 @@ function ProjectDetailView({ id, tab }: { id: string; tab: string }) {
         }
         actions={
           <>
-            <Button size="sm" onClick={() => openOnComputer(p.abs, false).then(() => {}, (e) => toast({ tone: "danger", text: e.message }))}>
+            <Button variant="outline" onClick={() => openOnComputer(p.abs, false).then(() => {}, (e) => toast.error(e.message))}>
               Open folder
             </Button>
-            <Link to="/live" search={{ new: "1", project: p.id }} className="inline-flex h-8 items-center rounded-md border border-accent bg-accent px-2.5 text-[13px] font-medium text-on-accent no-underline hover:bg-accent-strong">
+            <Button asChild className="no-underline">
+<Link to="/live" search={{ new: "1", project: p.id }}>
               New session here
             </Link>
+</Button>
           </>
         }
       >
-        <nav aria-label="Project" className="-mb-4 flex gap-5 overflow-x-auto">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => navigate({ to: "/projects/$id", params: { id }, search: { tab: t.id }, replace: true })}
-              aria-current={tab === t.id ? "page" : undefined}
-              className={cn("border-b-2 pb-2.5 text-[14px]", tab === t.id ? "border-accent font-semibold text-ink" : "border-transparent text-muted hover:text-ink")}
-            >
-              {t.label}
-              {t.id === "backlog" && p.backlog && <span className="ml-1.5 text-xs text-muted">{p.backlog.sections.flatMap((s) => s.items).filter((i) => i.done === false).length || ""}</span>}
-              {t.id === "sessions" && <span className="ml-1.5 text-xs text-muted">{p.sessions.length || ""}</span>}
-            </button>
-          ))}
-        </nav>
+        <Tabs value={tab} onValueChange={(v) => navigate({ to: "/projects/$id", params: { id }, search: { tab: v }, replace: true })} className="-mb-4">
+          <TabsList variant="line" className="overflow-x-auto">
+            {TABS.map((t) => (
+              <TabsTrigger key={t.id} value={t.id} className="flex-none">
+                {t.label}
+                {t.id === "backlog" && p.backlog && <span className="text-xs text-muted-foreground">{p.backlog.sections.flatMap((s) => s.items).filter((i) => i.done === false).length || ""}</span>}
+                {t.id === "sessions" && <span className="text-xs text-muted-foreground">{p.sessions.length || ""}</span>}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </DetailHeader>
       <div className="flex-1">
         {tab === "overview" && <OverviewTab p={p} />}
@@ -417,7 +416,7 @@ export function ProjectsPage() {
       hasSelection={!!id}
       onBack={() => navigate({ to: "/projects" })}
       list={<ProjectList selected={id} />}
-      detail={id ? <ProjectDetailView id={id} tab={tab} /> : <Empty title="Pick a project">Its backlog, changelog, docs and Claude configuration open here.</Empty>}
+      detail={id ? <ProjectDetailView id={id} tab={tab} /> : <EmptyState title="Pick a project">Its backlog, changelog, docs and Claude configuration open here.</EmptyState>}
     />
   );
 }

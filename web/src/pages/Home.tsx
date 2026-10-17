@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import { api, enc } from "@/lib/api";
 import { ago, when } from "@/lib/format";
 import { copy, resumeCommand } from "@/lib/resume";
 import type { Job, PendingRequest, Project } from "@/lib/types";
 import { Page } from "@/components/Panes";
-import { Button, Dot, ErrorNote, Spinner, useToast } from "@/components/ui";
+import { Dot, ErrorNote, Loading } from "@/components/ui";
 
 interface Overview {
   needsYou: (
@@ -23,18 +25,17 @@ const STATE_LABEL: Record<string, string> = { working: "Working", blocked: "Wait
 
 function NeedsYouCard({ item }: { item: Overview["needsYou"][number] }) {
   const qc = useQueryClient();
-  const toast = useToast();
   const respond = useMutation({
     mutationFn: (decision: "allow" | "deny") => api.post(`/live/${item.id}/respond`, { requestId: (item as any).request.requestId, decision }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["overview"] }),
-    onError: (e: Error) => toast({ tone: "danger", text: e.message }),
+    onError: (e: Error) => toast.error(e.message),
   });
   if (item.type === "live") {
     const r = item.request;
     const isQ = r.type === "question";
     return (
       <div className="flex flex-col gap-2.5 rounded-lg border border-attn-line bg-surface p-4">
-        <div className="flex justify-between gap-2 text-xs text-muted">
+        <div className="flex justify-between gap-2 text-xs text-muted-foreground">
           <span className="font-mono">{item.cwd}</span>
           <span>Live session, {ago(item.at)}</span>
         </div>
@@ -47,17 +48,19 @@ function NeedsYouCard({ item }: { item: Overview["needsYou"][number] }) {
         <div className="flex flex-wrap gap-2">
           {!isQ && (
             <>
-              <Button variant="primary" size="sm" busy={respond.isPending} onClick={() => respond.mutate("allow")}>
+              <Button variant="default" busy={respond.isPending} onClick={() => respond.mutate("allow")}>
                 Allow once
               </Button>
-              <Button size="sm" onClick={() => respond.mutate("deny")}>
+              <Button variant="outline" onClick={() => respond.mutate("deny")}>
                 Deny
               </Button>
             </>
           )}
-          <Link to="/live/$id" params={{ id: item.id }} className="inline-flex h-8 items-center rounded-md border border-line-strong px-2.5 text-[13px] font-medium text-ink no-underline hover:bg-sunken">
+          <Button asChild variant="outline" className="no-underline">
+<Link to="/live/$id" params={{ id: item.id }}>
             {isQ ? "Answer" : "Open"}
           </Link>
+</Button>
         </div>
       </div>
     );
@@ -65,7 +68,7 @@ function NeedsYouCard({ item }: { item: Overview["needsYou"][number] }) {
   const cmd = item.sessionId ? resumeCommand(item.cwd, item.sessionId) : null;
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border border-attn-line bg-surface p-4">
-      <div className="flex justify-between gap-2 text-xs text-muted">
+      <div className="flex justify-between gap-2 text-xs text-muted-foreground">
         <span className="font-mono">{item.cwd ?? ""}</span>
         <span>Background job, since {when(item.at)}</span>
       </div>
@@ -73,18 +76,22 @@ function NeedsYouCard({ item }: { item: Overview["needsYou"][number] }) {
       <p className="line-clamp-3 text-ink-2">{item.detail || "Stopped and waiting for an answer before it can go on."}</p>
       <div className="flex flex-wrap gap-2">
         {item.sessionId && (
-          <Link to="/live" search={{ new: "1", resume: item.sessionId }} className="inline-flex h-8 items-center rounded-md border border-accent bg-accent px-2.5 text-[13px] font-medium text-on-accent no-underline hover:bg-accent-strong">
+          <Button asChild className="no-underline">
+<Link to="/live" search={{ new: "1", resume: item.sessionId }}>
             Answer here
           </Link>
+</Button>
         )}
         {cmd && (
-          <Button size="sm" onClick={() => copy(cmd).then((ok) => toast({ tone: ok ? "ok" : "danger", text: ok ? "Resume command copied." : cmd }))}>
+          <Button variant="outline" onClick={() => copy(cmd).then((ok) => (ok ? toast.success : toast.error)(ok ? "Resume command copied." : cmd))}>
             Copy resume command
           </Button>
         )}
-        <Link to="/jobs/$id" params={{ id: item.id }} className="inline-flex h-8 items-center px-1 text-[13px]">
-          Details
-        </Link>
+        <Button asChild variant="link" size="sm">
+          <Link to="/jobs/$id" params={{ id: item.id }}>
+            Details
+          </Link>
+        </Button>
       </div>
     </div>
   );
@@ -106,7 +113,7 @@ const rowClass = "flex items-center gap-3 border-t border-line px-4 py-2.5 text-
 
 export function HomePage() {
   const q = useQuery({ queryKey: ["overview"], queryFn: () => api.get<Overview>("/overview") });
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const o = q.data!;
   const today = new Date().toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
@@ -117,9 +124,11 @@ export function HomePage() {
       title="Home"
       sub={today}
       actions={
-        <Link to="/live" search={{ new: "1" }} className="inline-flex h-9 items-center rounded-md border border-accent bg-accent px-3.5 text-[13.5px] font-medium text-on-accent no-underline hover:bg-accent-strong">
+        <Button asChild size="lg" className="no-underline">
+<Link to="/live" search={{ new: "1" }}>
           New session
         </Link>
+</Button>
       }
     >
       <div className="flex flex-col gap-6">
@@ -136,16 +145,16 @@ export function HomePage() {
           )}
         </section>
 
-        <Section title="Background jobs" aside={<span className="text-xs text-muted">{counts}</span>}>
+        <Section title="Background jobs" aside={<span className="text-xs text-muted-foreground">{counts}</span>}>
           {o.jobs.map((j) => (
             <Link key={j.id} to="/jobs/$id" params={{ id: j.id }} className={rowClass}>
               <Dot tone={STATE_TONE[j.state] ?? "muted"} />
               <span className="min-w-0 flex-1 truncate">{j.name ?? "Unnamed job"}</span>
-              <span className="hidden font-mono text-xs text-muted sm:inline">{j.cwd}</span>
-              <span className="w-28 text-right text-xs text-muted">{STATE_LABEL[j.state] ?? j.state}</span>
+              <span className="hidden font-mono text-xs text-muted-foreground sm:inline">{j.cwd}</span>
+              <span className="w-28 text-right text-xs text-muted-foreground">{STATE_LABEL[j.state] ?? j.state}</span>
             </Link>
           ))}
-          {!o.jobs.length && <p className="border-t border-line px-4 py-3 text-muted">No background jobs yet.</p>}
+          {!o.jobs.length && <p className="border-t border-line px-4 py-3 text-muted-foreground">No background jobs yet.</p>}
         </Section>
 
         <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(340px,1fr))]">
@@ -153,21 +162,21 @@ export function HomePage() {
             {o.projects.map((p) => (
               <Link key={p.id} to="/projects/$id" params={{ id: p.id }} search={{}} className={rowClass}>
                 <span className="flex-1">{p.name}</span>
-                {p.backlog && <span className="text-xs text-muted">{p.backlog.open} open</span>}
-                <span className="font-mono text-xs text-muted">{p.git?.branch ?? ""}</span>
-                <span className="w-20 text-right text-xs text-muted">{when(p.lastSessionAt)}</span>
+                {p.backlog && <span className="text-xs text-muted-foreground">{p.backlog.open} open</span>}
+                <span className="font-mono text-xs text-muted-foreground">{p.git?.branch ?? ""}</span>
+                <span className="w-20 text-right text-xs text-muted-foreground">{when(p.lastSessionAt)}</span>
               </Link>
             ))}
           </Section>
           <Section title="What changed">
             {o.changes.map((c, i) => (
               <Link key={i} to="/projects/$id" params={{ id: c.projectId }} search={{ tab: "changelog" }} className={rowClass + " items-start"}>
-                <span className="w-24 flex-none font-mono text-xs text-muted">{c.project}</span>
+                <span className="w-24 flex-none font-mono text-xs text-muted-foreground">{c.project}</span>
                 <span className="min-w-0 flex-1 text-[13.5px]">{c.text.replace(/\*\*/g, "")}</span>
-                <span className="flex-none text-xs text-muted">{c.date}</span>
+                <span className="flex-none text-xs text-muted-foreground">{c.date}</span>
               </Link>
             ))}
-            {!o.changes.length && <p className="border-t border-line px-4 py-3 text-muted">No changelog entries found in your projects.</p>}
+            {!o.changes.length && <p className="border-t border-line px-4 py-3 text-muted-foreground">No changelog entries found in your projects.</p>}
           </Section>
         </div>
       </div>

@@ -1,18 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { api } from "@/lib/api";
 import { when } from "@/lib/format";
 import { copy, resumeCommand } from "@/lib/resume";
 import type { Job } from "@/lib/types";
 import { DetailHeader, ListGroup, TwoPane } from "@/components/Panes";
-import { Button, cn, Dot, Empty, ErrorNote, Spinner, Tag, useToast } from "@/components/ui";
+import { Dot, EmptyState, ErrorNote, Loading, Tag, cn } from "@/components/ui";
 
 const TONE: Record<string, "accent" | "attn" | "ok" | "muted"> = { working: "accent", blocked: "attn", done: "ok" };
 const LABEL: Record<string, string> = { working: "Working", blocked: "Waiting for you", done: "Done" };
 
 function JobList({ selected }: { selected: string | null }) {
   const q = useQuery({ queryKey: ["jobs"], queryFn: () => api.get<{ jobs: Job[]; processes: { pid: number; sessionId: string; cwd: string | null; name: string | null; status: string | null }[] }>("/jobs") });
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const { jobs, processes } = q.data!;
   const order = ["blocked", "working", "done"];
@@ -25,7 +27,7 @@ function JobList({ selected }: { selected: string | null }) {
             <div key={p.pid} className="flex items-center gap-2 px-2.5 py-1.5 text-[13px]">
               <Dot tone={p.status === "busy" ? "accent" : "muted"} />
               <span className="min-w-0 flex-1 truncate">{p.name ?? p.cwd}</span>
-              <span className="text-xs text-muted">{p.status}</span>
+              <span className="text-xs text-muted-foreground">{p.status}</span>
             </div>
           ))}
         </ListGroup>
@@ -40,7 +42,7 @@ function JobList({ selected }: { selected: string | null }) {
                   <Dot tone={TONE[j.state] ?? "muted"} />
                   <span className="min-w-0 flex-1 truncate font-medium">{j.name ?? "Unnamed job"}</span>
                 </span>
-                <span className="flex gap-2 pl-4 text-xs text-muted">
+                <span className="flex gap-2 pl-4 text-xs text-muted-foreground">
                   <span className="truncate font-mono">{j.cwd}</span>
                   <span className="ml-auto flex-none">{when(j.updatedAt)}</span>
                 </span>
@@ -48,15 +50,14 @@ function JobList({ selected }: { selected: string | null }) {
             ))}
         </ListGroup>
       ))}
-      {!jobs.length && <p className="px-5 text-muted">No background jobs yet.</p>}
+      {!jobs.length && <p className="px-5 text-muted-foreground">No background jobs yet.</p>}
     </div>
   );
 }
 
 function JobDetail({ id }: { id: string }) {
   const q = useQuery({ queryKey: ["job", id], queryFn: () => api.get<Job>(`/jobs/${id}`) });
-  const toast = useToast();
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const j = q.data!;
   const cmd = j.sessionId ? resumeCommand(j.cwd, j.sessionId) : null;
@@ -74,19 +75,23 @@ function JobDetail({ id }: { id: string }) {
         actions={
           <>
             {cmd && (
-              <Button size="sm" onClick={() => copy(cmd).then((ok) => toast({ tone: ok ? "ok" : "danger", text: ok ? "Resume command copied." : cmd }))}>
+              <Button variant="outline" onClick={() => copy(cmd).then((ok) => (ok ? toast.success : toast.error)(ok ? "Resume command copied." : cmd))}>
                 Copy resume command
               </Button>
             )}
             {j.sessionId && (
-              <Link to="/sessions/$sid" params={{ sid: j.sessionId }} search={{}} className="inline-flex h-8 items-center rounded-md border border-line-strong px-2.5 text-[13px] font-medium text-ink no-underline hover:bg-sunken">
+              <Button asChild variant="outline" className="no-underline">
+<Link to="/sessions/$sid" params={{ sid: j.sessionId }} search={{}}>
                 Open transcript
               </Link>
+</Button>
             )}
             {j.state === "blocked" && j.sessionId && (
-              <Link to="/live" search={{ new: "1", resume: j.sessionId }} className="inline-flex h-8 items-center rounded-md border border-accent bg-accent px-2.5 text-[13px] font-medium text-on-accent no-underline">
+              <Button asChild className="no-underline">
+<Link to="/live" search={{ new: "1", resume: j.sessionId }}>
                 Answer here
               </Link>
+</Button>
             )}
           </>
         }
@@ -96,14 +101,14 @@ function JobDetail({ id }: { id: string }) {
       <ol className="mx-auto max-w-[820px] px-6 py-5 md:pl-12">
         {[...j.timeline].reverse().map((t, i) => (
           <li key={i} className="flex gap-4 border-l-2 border-line pb-4 pl-4">
-            <span className="w-20 flex-none text-xs text-muted">{when(t.at)}</span>
+            <span className="w-20 flex-none text-xs text-muted-foreground">{when(t.at)}</span>
             <div className="min-w-0">
               <div className="text-[13.5px] font-medium">{LABEL[t.state] ?? t.state}</div>
               {(t.detail || t.text) && <div className="whitespace-pre-wrap text-[13px] text-ink-2">{t.text ?? t.detail}</div>}
             </div>
           </li>
         ))}
-        {!j.timeline.length && <p className="text-muted">No timeline recorded.</p>}
+        {!j.timeline.length && <p className="text-muted-foreground">No timeline recorded.</p>}
       </ol>
     </div>
   );
@@ -119,7 +124,7 @@ export function JobsPage() {
       hasSelection={!!id}
       onBack={() => navigate({ to: "/jobs" })}
       list={<JobList selected={id ?? null} />}
-      detail={id ? <JobDetail id={id} /> : <Empty title="Background jobs">Jobs started in the background show their status and timeline here. Ones waiting for you are listed first.</Empty>}
+      detail={id ? <JobDetail id={id} /> : <EmptyState title="Background jobs">Jobs started in the background show their status and timeline here. Ones waiting for you are listed first.</EmptyState>}
     />
   );
 }

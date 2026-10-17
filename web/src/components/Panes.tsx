@@ -2,7 +2,7 @@ import { ChevronLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { layoutStorage, useMediaQuery } from "@/lib/prefs";
-import { IconButton } from "./ui";
+import { IconButton } from "./IconButton";
 
 // The page registers its list pane here so the `]` shortcut and the header buttons can toggle it.
 interface PaneApi {
@@ -47,7 +47,7 @@ export function TwoPane({ id, list, detail, hasSelection, onBack, listLabel }: {
     return (
       <div className="flex h-full flex-col">
         {onBack && (
-          <button type="button" onClick={onBack} className="flex h-11 flex-none items-center gap-1 border-b border-line px-3 text-left text-[13.5px] text-accent">
+          <button type="button" onClick={onBack} className="flex h-11 flex-none items-center gap-1 border-b border-line px-3 text-left text-[13.5px] text-primary">
             <ChevronLeft className="size-4" aria-hidden /> {listLabel}
           </button>
         )}
@@ -94,7 +94,7 @@ export function DetailHeader({ title, sub, actions, children }: { title: ReactNo
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="truncate text-[20px] font-semibold tracking-[-0.01em]">{title}</h1>
-          {sub && <div className="mt-1 text-[13px] text-muted">{sub}</div>}
+          {sub && <div className="mt-1 text-[13px] text-muted-foreground">{sub}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -111,7 +111,7 @@ export function Page({ title, sub, actions, children, wide }: { title: ReactNode
         <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-[24px] font-semibold tracking-[-0.01em]">{title}</h1>
-            {sub && <p className="mt-1 text-muted">{sub}</p>}
+            {sub && <p className="mt-1 text-muted-foreground">{sub}</p>}
           </div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </header>
@@ -125,7 +125,7 @@ export function Page({ title, sub, actions, children, wide }: { title: ReactNode
 export function ListGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="px-2 pb-2">
-      <div className="px-2.5 pb-1 pt-3 text-xs font-medium text-muted">{label}</div>
+      <div className="px-2.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{label}</div>
       {children}
     </div>
   );

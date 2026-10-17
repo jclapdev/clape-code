@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Kbd } from "./ui/kbd";
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Archive,
@@ -23,11 +24,16 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { api } from "@/lib/api";
 import { useLiveUpdates, useWaiting } from "@/lib/live";
-import { layoutStorage, useTheme, type Theme } from "@/lib/prefs";
+import { useTheme } from "next-themes";
+import { layoutStorage } from "@/lib/prefs";
 import { CommandPalette } from "./CommandPalette";
+import { IconButton } from "./IconButton";
 import { LoginGate } from "./LoginGate";
 import { useIsMobile, usePaneRegistry } from "./Panes";
-import { cn, Dialog, Kbd, Segmented } from "./ui";
+import { cn } from "./ui";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+import { Button } from "./ui/button";
 
 interface NavItem {
   to: string;
@@ -56,18 +62,19 @@ function useNavItems(): NavItem[] {
 }
 
 function ThemeSwitch() {
-  const [theme, setTheme] = useTheme();
+  const { theme, setTheme } = useTheme();
   return (
-    <Segmented<Theme>
-      label="Theme"
-      value={theme}
-      onChange={setTheme}
-      options={[
-        { value: "system", label: <Monitor className="size-3.5" />, title: "Match system" },
-        { value: "light", label: <Sun className="size-3.5" />, title: "Light" },
-        { value: "dark", label: <Moon className="size-3.5" />, title: "Dark" },
-      ]}
-    />
+    <ToggleGroup type="single" variant="outline" size="sm" value={theme ?? "system"} onValueChange={(v) => v && setTheme(v)} aria-label="Theme">
+      <ToggleGroupItem value="system" aria-label="Match system" title="Match system">
+        <Monitor />
+      </ToggleGroupItem>
+      <ToggleGroupItem value="light" aria-label="Light" title="Light">
+        <Sun />
+      </ToggleGroupItem>
+      <ToggleGroupItem value="dark" aria-label="Dark" title="Dark">
+        <Moon />
+      </ToggleGroupItem>
+    </ToggleGroup>
   );
 }
 
@@ -87,7 +94,7 @@ function NavList({ items, collapsed, onPick }: { items: NavItem[]; collapsed: bo
             aria-current={on ? "page" : undefined}
             className={cn(
               "relative flex h-9 items-center gap-2.5 rounded-md px-2.5 text-[14px] text-ink-2 no-underline hover:bg-sunken hover:text-ink",
-              on && "bg-accent-soft font-semibold text-accent-strong hover:bg-accent-soft hover:text-accent-strong",
+              on && "bg-accent font-semibold text-accent-foreground hover:bg-accent hover:text-accent-foreground",
               collapsed && "justify-center px-0",
             )}
           >
@@ -120,26 +127,20 @@ function NavBody({ collapsed, onToggle, onPick, onSearch, connected }: { collaps
           </Link>
         )}
         {onToggle && (
-          <button type="button" onClick={onToggle} aria-label={collapsed ? "Expand menu ([)" : "Collapse menu ([)"} title={collapsed ? "Expand menu ([)" : "Collapse menu ([)"} className="inline-grid size-8 place-items-center rounded-md text-muted hover:bg-sunken hover:text-ink">
-            {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
-          </button>
+          <IconButton label={collapsed ? "Expand menu ([)" : "Collapse menu ([)"} onClick={onToggle} className="text-muted-foreground">
+            {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+          </IconButton>
         )}
       </div>
-      <button
-        type="button"
-        onClick={onSearch}
-        title="Search (⌘K)"
-        aria-label="Search"
-        className={cn("mb-1 flex h-9 items-center gap-2 rounded-md border border-line bg-surface text-muted hover:border-line-strong", collapsed ? "justify-center" : "px-2.5")}
-      >
-        <Search className="size-4" aria-hidden />
+      <Button variant="outline" size="lg" onClick={onSearch} title="Search (⌘K)" aria-label="Search" className={cn("mb-1 text-muted-foreground", collapsed ? "justify-center px-0" : "justify-start")}>
+        <Search aria-hidden />
         {!collapsed && (
           <>
-            <span className="flex-1 text-left">Search…</span>
+            <span className="flex-1 text-left font-normal">Search…</span>
             <Kbd>⌘K</Kbd>
           </>
         )}
-      </button>
+      </Button>
       <NavList items={items} collapsed={collapsed} onPick={onPick} />
       <div className={cn("mt-auto flex flex-col gap-2 pt-3", collapsed && "items-center")}>
         <Link
@@ -152,7 +153,7 @@ function NavBody({ collapsed, onToggle, onPick, onSearch, connected }: { collaps
           {!collapsed && "Preferences"}
         </Link>
         {!collapsed && <ThemeSwitch />}
-        <div className={cn("flex items-center gap-2 px-1 text-xs text-muted", collapsed && "justify-center")} title={connected ? "Live: watching your files" : "Reconnecting…"}>
+        <div className={cn("flex items-center gap-2 px-1 text-xs text-muted-foreground", collapsed && "justify-center")} title={connected ? "Live: watching your files" : "Reconnecting…"}>
           <span className={cn("size-2 rounded-full", connected ? "bg-ok-dot" : "bg-attn-dot")} aria-hidden />
           {!collapsed && (connected ? "Watching your files" : "Reconnecting…")}
         </div>
@@ -225,23 +226,24 @@ export function Shell() {
       <LoginGate>
         <div className="flex h-full flex-col">
           <div className="flex h-12 flex-none items-center justify-between border-b border-line bg-panel px-2">
-            <button type="button" onClick={() => setDrawer(true)} aria-label="Open menu" className="inline-grid size-10 place-items-center rounded-md text-ink-2">
-              <Menu className="size-5" />
-            </button>
+            <IconButton label="Open menu" size="icon-lg" onClick={() => setDrawer(true)}>
+              <Menu />
+            </IconButton>
             <Link to="/" className="flex items-center gap-2 font-semibold text-ink no-underline">
               <img src="/favicon.svg" alt="" className="size-5" /> Control Center
             </Link>
-            <button type="button" onClick={() => setPaletteOpen(true)} aria-label="Search" className="inline-grid size-10 place-items-center rounded-md text-ink-2">
-              <Search className="size-5" />
-            </button>
+            <IconButton label="Search" size="icon-lg" onClick={() => setPaletteOpen(true)}>
+              <Search />
+            </IconButton>
           </div>
           <main className="min-h-0 flex-1">
             <Outlet />
           </main>
-          <Dialog open={drawer} onClose={() => setDrawer(false)} title="Menu">
-            <div className="-mx-5 -my-4 h-[70vh]">
+          <Dialog open={drawer} onOpenChange={setDrawer}>
+            <DialogContent className="h-[80vh] overflow-hidden p-0">
+              <DialogTitle className="sr-only">Menu</DialogTitle>
               <NavBody collapsed={false} onPick={() => setDrawer(false)} onSearch={() => (setDrawer(false), setPaletteOpen(true))} connected={connected} />
-            </div>
+            </DialogContent>
           </Dialog>
           <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onToggleNav={toggleNav} />
         </div>

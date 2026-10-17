@@ -1,7 +1,7 @@
 import { json } from "@codemirror/lang-json";
 import { markdown } from "@codemirror/lang-markdown";
 import { python } from "@codemirror/lang-python";
-import { yaml } from "@codemirror/lang-yaml";
+import { yaml, yamlFrontmatter } from "@codemirror/lang-yaml";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { MergeView } from "@codemirror/merge";
 import { tags as t } from "@lezer/highlight";
@@ -13,7 +13,8 @@ import { useEffect, useMemo, useRef } from "react";
 export function languageFor(path: string): Extension[] {
   const p = path.toLowerCase();
   if (p.endsWith(".json") || p.endsWith(".jsonl")) return [json()];
-  if (p.endsWith(".md") || p.endsWith(".mdx")) return [markdown()];
+  // Frontmatter is parsed as YAML; otherwise its closing --- turns the line above into a markdown heading.
+  if (p.endsWith(".md") || p.endsWith(".mdx")) return [yamlFrontmatter({ content: markdown() })];
   if (p.endsWith(".yaml") || p.endsWith(".yml")) return [yaml()];
   if (p.endsWith(".py")) return [python()];
   return [];
@@ -22,13 +23,13 @@ export function languageFor(path: string): Extension[] {
 // One theme for both modes: every colour comes from the app's CSS variables.
 export const ccTheme = EditorView.theme({
   "&": { backgroundColor: "var(--surface)", color: "var(--ink)", fontSize: "13px", height: "100%" },
-  ".cm-content": { fontFamily: "var(--font-mono)", caretColor: "var(--accent)", padding: "10px 0" },
+  ".cm-content": { fontFamily: "var(--font-mono)", caretColor: "var(--primary)", padding: "10px 0" },
   ".cm-gutters": { backgroundColor: "var(--surface)", color: "var(--faint)", border: "none" },
-  ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--accent-soft) 45%, transparent)" },
+  ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--accent) 45%, transparent)" },
   ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--ink-2)" },
   "&.cm-focused": { outline: "none" },
-  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": { backgroundColor: "var(--accent-soft) !important" },
-  ".cm-cursor": { borderLeftColor: "var(--accent)" },
+  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": { backgroundColor: "var(--accent) !important" },
+  ".cm-cursor": { borderLeftColor: "var(--primary)" },
   ".cm-scroller": { lineHeight: "1.6" },
   ".cm-panels": { backgroundColor: "var(--panel)", color: "var(--ink)", borderColor: "var(--line)" },
   ".cm-searchMatch": { backgroundColor: "var(--attn-soft)", outline: "1px solid var(--attn-line)" },
@@ -44,12 +45,12 @@ const ccHighlight = syntaxHighlighting(
     { tag: [t.heading1, t.heading2, t.heading3, t.heading4, t.heading], fontWeight: "600", color: "var(--ink)" },
     { tag: [t.strong], fontWeight: "600" },
     { tag: [t.emphasis], fontStyle: "italic" },
-    { tag: [t.link, t.url], color: "var(--accent)" },
+    { tag: [t.link, t.url], color: "var(--primary)" },
     { tag: [t.monospace], color: "var(--ink-2)" },
-    { tag: [t.keyword, t.atom, t.bool], color: "var(--accent-strong)" },
+    { tag: [t.keyword, t.atom, t.bool], color: "var(--primary-strong)" },
     { tag: [t.string, t.special(t.string)], color: "var(--ok)" },
     { tag: [t.number], color: "var(--attn)" },
-    { tag: [t.propertyName, t.definition(t.propertyName)], color: "var(--accent)" },
+    { tag: [t.propertyName, t.definition(t.propertyName)], color: "var(--primary)" },
     { tag: [t.comment, t.meta, t.processingInstruction, t.contentSeparator], color: "var(--faint)" },
     { tag: [t.list, t.quote], color: "var(--ink-2)" },
   ]),
@@ -102,7 +103,7 @@ export function DiffView({ before, after, path }: { before: string; after: strin
   }, [before, after, path]);
   return (
     <div>
-      <div className="mb-2 grid grid-cols-2 gap-2 text-xs text-muted">
+      <div className="mb-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
         <span>On disk</span>
         <span>Your version</span>
       </div>

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Copy, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ChevronDown, Copy, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { compact, dayGroup, modelName, money, plural, when } from "@/lib/format";
@@ -8,30 +10,36 @@ import { copy } from "@/lib/resume";
 import type { Project, Session, Turn } from "@/lib/types";
 import { DetailHeader, TwoPane } from "@/components/Panes";
 import { Transcript } from "@/components/Transcript";
-import { Button, cn, Dialog, Empty, ErrorNote, Spinner, Tag, useConfirm, useToast } from "@/components/ui";
+import { EmptyState, ErrorNote, Loading, Tag, cn, useConfirm } from "@/components/ui";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Toggle } from "@/components/ui/toggle";
+import { SimpleSelect } from "@/components/SimpleSelect";
+import { IconButton } from "@/components/IconButton";
 
 type Search = { archived?: string; project?: string };
 
 function useSessionActions() {
   const qc = useQueryClient();
-  const toast = useToast();
   const confirm = useConfirm();
   const archive = useMutation({
     mutationFn: ({ ids, archived }: { ids: string[]; archived: boolean }) => api.post("/sessions/archive", { ids, archived }),
     onSuccess: (_r, v) => {
       qc.invalidateQueries({ queryKey: ["sessions"] });
       qc.invalidateQueries({ queryKey: ["session"] });
-      toast({ tone: "ok", text: v.archived ? `Archived ${v.ids.length === 1 ? "the session" : `${v.ids.length} sessions`}. They can still be resumed.` : "Moved back to your sessions." });
+      toast.success(v.archived ? `Archived ${v.ids.length === 1 ? "the session" : `${v.ids.length} sessions`}. They can still be resumed.` : "Moved back to your sessions.");
     },
-    onError: (e: Error) => toast({ tone: "danger", text: e.message }),
+    onError: (e: Error) => toast.error(e.message),
   });
   const del = useMutation({
     mutationFn: (ids: string[]) => api.post<{ deleted: string[]; skipped: { id: string; reason: string }[] }>("/sessions/delete", { ids }),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["sessions"] });
-      toast({ tone: r.skipped.length ? "danger" : "ok", text: `Moved ${r.deleted.length} to the trash.${r.skipped.length ? ` Skipped ${r.skipped.length} that are still running.` : ""}` });
+      (r.skipped.length ? toast.error : toast.success)(`Moved ${r.deleted.length} to the trash.${r.skipped.length ? ` Skipped ${r.skipped.length} that are still running.` : ""}`);
     },
-    onError: (e: Error) => toast({ tone: "danger", text: e.message }),
+    onError: (e: Error) => toast.error(e.message),
   });
   const askDelete = async (ids: string[]) =>
     (await confirm({
@@ -80,77 +88,70 @@ function SessionList({ selected, search }: { selected: string | null; search: Se
     <div className="flex min-h-full flex-col">
       <div className="sticky top-0 z-10 flex flex-col gap-2 bg-panel px-4 pb-2 pt-4">
         <div className="flex gap-2">
-          <label htmlFor="sp" className="sr-only">
-            Project
-          </label>
-          <select id="sp" value={search.project ?? ""} onChange={(e) => setSearch({ project: e.target.value || undefined })} className="h-9 min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-2 text-[13.5px]">
-            <option value="">All projects</option>
-            {(projects.data ?? [])
-              .filter((p) => p.sessions > 0)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
-          <Button size="sm" className="h-9" onClick={() => setSearch({ archived: archivedView ? undefined : "1" })} aria-pressed={archivedView}>
+          <SimpleSelect
+            label="Project"
+            value={search.project ?? ""}
+            onChange={(v) => setSearch({ project: v || undefined })}
+            className="min-w-0 flex-1"
+            options={[{ value: "", label: "All projects" }, ...(projects.data ?? []).filter((p) => p.sessions > 0).map((p) => ({ value: p.id, label: p.name }))]}
+          />
+          <Button size="lg" variant="outline" onClick={() => setSearch({ archived: archivedView ? undefined : "1" })} aria-pressed={archivedView}>
             {archivedView ? "Back to sessions" : "Archived"}
           </Button>
         </div>
         <label htmlFor="sf" className="sr-only">
           Filter sessions
         </label>
-        <input id="sf" data-filter value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter by title or folder  /" className="h-9 rounded-md border border-line-strong bg-surface px-3 outline-none focus:border-accent" />
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-muted">
-          <span>Select:</span>
-          <button type="button" className="hover:text-accent" onClick={() => pickOlder(30)}>
+        <Input id="sf" data-filter value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter by title or folder  /" />
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[12.5px] text-muted-foreground">
+          <span className="mr-1">Select:</span>
+          <Button variant="link" size="xs" onClick={() => pickOlder(30)}>
             older than 30 days
-          </button>
-          <button type="button" className="hover:text-accent" onClick={() => pickOlder(7)}>
+          </Button>
+          <Button variant="link" size="xs" onClick={() => pickOlder(7)}>
             older than 7 days
-          </button>
+          </Button>
           {picked.size > 0 && (
-            <button type="button" className="hover:text-accent" onClick={() => setPicked(new Set())}>
+            <Button variant="link" size="xs" onClick={() => setPicked(new Set())}>
               none
-            </button>
+            </Button>
           )}
           <label className="ml-auto flex items-center gap-1.5">
-            <input type="checkbox" checked={empty} onChange={(e) => setEmpty(e.target.checked)} /> show empty
+            <Checkbox checked={empty} onCheckedChange={(v) => setEmpty(v === true)} /> show empty
           </label>
         </div>
         {picked.size > 0 && (
-          <div className="flex items-center gap-2 rounded-md border border-accent-line bg-accent-soft px-2.5 py-1.5">
-            <span className="flex-1 text-[13px] font-medium text-accent-strong">{picked.size} selected</span>
-            <Button size="sm" onClick={() => archive.mutate({ ids, archived: !archivedView }, { onSuccess: () => setPicked(new Set()) })}>
+          <div className="flex items-center gap-2 rounded-md border border-primary-line bg-accent px-2.5 py-1.5">
+            <span className="flex-1 text-[13px] font-medium text-accent-foreground">{picked.size} selected</span>
+            <Button variant="outline" onClick={() => archive.mutate({ ids, archived: !archivedView }, { onSuccess: () => setPicked(new Set()) })}>
               {archivedView ? "Unarchive" : "Archive"}
             </Button>
-            <Button size="sm" variant="danger" onClick={() => askDelete(ids).then(() => setPicked(new Set()))}>
+            <Button variant="destructive" onClick={() => askDelete(ids).then(() => setPicked(new Set()))}>
               Delete
             </Button>
           </div>
         )}
       </div>
-      {q.isLoading && <Spinner />}
+      {q.isLoading && <Loading />}
       <ErrorNote error={q.error} />
-      {!q.isLoading && !list.length && <p className="px-5 py-4 text-muted">{archivedView ? "No archived sessions." : "No sessions match."}</p>}
+      {!q.isLoading && !list.length && <p className="px-5 py-4 text-muted-foreground">{archivedView ? "No archived sessions." : "No sessions match."}</p>}
       {groups.map(([g, ss]) => (
         <div key={g} className="px-2 pb-1">
-          <div className="px-2.5 pb-1 pt-3 text-xs font-medium text-muted">{g}</div>
+          <div className="px-2.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{g}</div>
           {ss.map((s) => (
             <div key={s.sessionId} className={cn("group flex items-start gap-2 rounded-md px-1.5 hover:bg-sunken", selected === s.sessionId && "bg-surface shadow-[0_0_0_1px_var(--line-strong)]")}>
-              <input
-                type="checkbox"
+              <Checkbox
                 aria-label={`Select ${s.displayTitle}`}
                 checked={picked.has(s.sessionId)}
-                onChange={() => toggle(s.sessionId)}
-                className={cn("mt-3 size-4 flex-none accent-[var(--accent)]", !picked.size && "opacity-0 focus:opacity-100 group-hover:opacity-100")}
+                onCheckedChange={() => toggle(s.sessionId)}
+                className={cn("mt-3 flex-none", !picked.size && "opacity-0 focus-visible:opacity-100 group-hover:opacity-100")}
               />
               <Link to="/sessions/$sid" params={{ sid: s.sessionId }} search={search} className="flex min-w-0 flex-1 flex-col gap-0.5 py-2 text-ink no-underline">
                 <span className="flex items-center gap-2">
                   <span className={cn("min-w-0 flex-1 truncate text-[14px]", s.title ? "font-medium" : "text-ink-2")}>{s.displayTitle}</span>
                   {s.running && <Tag tone="accent">Running</Tag>}
                 </span>
-                <span className="flex gap-2 text-xs text-muted">
+                <span className="flex gap-2 text-xs text-muted-foreground">
                   <span className="truncate">{s.project?.split("/").pop() ?? s.cwd}</span>
                   <span className="ml-auto flex-none">{when(s.lastAt)}</span>
                 </span>
@@ -170,8 +171,13 @@ function SubagentDialog({ sid, agent, onClose }: { sid: string; agent: { agentId
     enabled: !!agent,
   });
   return (
-    <Dialog open={!!agent} onClose={onClose} title={`${agent?.type ?? "Subagent"}: ${agent?.description ?? ""}`} wide>
-      {q.isLoading ? <Spinner /> : q.error ? <ErrorNote error={q.error} /> : <Transcript turns={q.data?.turns ?? []} />}
+    <Dialog open={!!agent} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[88vh] overflow-auto sm:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>{`${agent?.type ?? "Subagent"}: ${agent?.description ?? ""}`}</DialogTitle>
+        </DialogHeader>
+        {q.isLoading ? <Loading /> : q.error ? <ErrorNote error={q.error} /> : <Transcript turns={q.data?.turns ?? []} />}
+      </DialogContent>
     </Dialog>
   );
 }
@@ -182,10 +188,9 @@ function SessionDetail({ sid, search }: { sid: string; search: Search }) {
   const [thinking, setThinking] = useState(false);
   const [raw, setRaw] = useState(false);
   const [sub, setSub] = useState<{ agentId: string; type: string | null; description: string | null } | null>(null);
-  const toast = useToast();
   const navigate = useNavigate();
   const { archive, askDelete } = useSessionActions();
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const s = q.data!;
   const prompts = s.turns.filter((t) => t.role === "user").length;
@@ -213,27 +218,23 @@ function SessionDetail({ sid, search }: { sid: string; search: Search }) {
         }
         actions={
           <>
-            <Button size="sm" onClick={() => copy(s.resumeCommand).then((ok) => toast({ tone: ok ? "ok" : "danger", text: ok ? "Resume command copied." : s.resumeCommand }))}>
+            <Button variant="outline" onClick={() => copy(s.resumeCommand).then((ok) => (ok ? toast.success : toast.error)(ok ? "Resume command copied." : s.resumeCommand))}>
               <Copy className="size-3.5" aria-hidden /> Copy resume command
             </Button>
             {!s.running && (
-              <Link to="/live" search={{ new: "1", resume: s.sessionId }} className="inline-flex h-8 items-center rounded-md border border-accent bg-accent px-2.5 text-[13px] font-medium text-on-accent no-underline hover:bg-accent-strong">
+              <Button asChild className="no-underline">
+<Link to="/live" search={{ new: "1", resume: s.sessionId }}>
                 Resume here
               </Link>
+</Button>
             )}
-            <Button size="sm" variant="ghost" aria-label={s.archivedAt ? "Unarchive" : "Archive"} title={s.archivedAt ? "Unarchive" : "Archive"} onClick={() => archive.mutate({ ids: [s.sessionId], archived: !s.archivedAt })}>
-              {s.archivedAt ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
-            </Button>
+            <IconButton label={s.archivedAt ? "Unarchive" : "Archive"} onClick={() => archive.mutate({ ids: [s.sessionId], archived: !s.archivedAt })}>
+              {s.archivedAt ? <ArchiveRestore /> : <Archive />}
+            </IconButton>
             {!s.running && (
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label="Delete"
-                title="Delete"
-                onClick={() => askDelete([s.sessionId]).then(() => navigate({ to: "/sessions", search }))}
-              >
-                <Trash2 className="size-4" />
-              </Button>
+              <IconButton label="Delete" onClick={() => askDelete([s.sessionId]).then(() => navigate({ to: "/sessions", search }))}>
+                <Trash2 />
+              </IconButton>
             )}
           </>
         }
@@ -244,37 +245,34 @@ function SessionDetail({ sid, search }: { sid: string; search: Search }) {
             ["Show thinking", thinking, setThinking],
             ["Raw JSON", raw, setRaw],
           ].map(([label, on, set]) => (
-            <button
-              key={label as string}
-              type="button"
-              aria-pressed={on as boolean}
-              onClick={() => (set as (v: boolean) => void)(!(on as boolean))}
-              className={cn("h-8 rounded-full border px-3 text-[12.5px]", on ? "border-accent-line bg-accent-soft text-accent-strong" : "border-line-strong text-ink-2 hover:bg-sunken")}
-            >
+            <Toggle key={label as string} variant="outline" size="sm" pressed={on as boolean} onPressedChange={(v) => (set as (v: boolean) => void)(v)} className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground">
               {label as string}
-            </button>
+            </Toggle>
           ))}
           {s.subagentList.length > 0 && (
-            <select
-              aria-label="Open a subagent run"
-              value=""
-              onChange={(e) => setSub(s.subagentList.find((a) => a.agentId === e.target.value) ?? null)}
-              className="h-8 rounded-full border border-line-strong bg-surface px-3 text-[12.5px] text-ink-2"
-            >
-              <option value="">Subagent runs ({s.subagentList.length})</option>
-              {s.subagentList.map((a) => (
-                <option key={a.agentId} value={a.agentId}>
-                  {a.type}: {a.description}
-                </option>
-              ))}
-            </select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Subagent runs ({s.subagentList.length}) <ChevronDown aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="max-w-[min(520px,90vw)]">
+                {s.subagentList.map((a) => (
+                  <DropdownMenuItem key={a.agentId} onSelect={() => setSub(a)}>
+                    <span className="truncate">
+                      <span className="font-medium">{a.type}</span>: {a.description}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-          <span className="ml-auto flex items-center gap-2 text-[12.5px] text-muted">
+          <span className="ml-auto flex items-center gap-2 text-[12.5px] text-muted-foreground">
             {plural(prompts, "prompt")}
-            <Button size="sm" variant="ghost" onClick={() => jumpPrompt(-1)} aria-label="Previous prompt">
+            <Button variant="ghost" onClick={() => jumpPrompt(-1)} aria-label="Previous prompt">
               ↑
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => jumpPrompt(1)} aria-label="Next prompt">
+            <Button variant="ghost" onClick={() => jumpPrompt(1)} aria-label="Next prompt">
               ↓
             </Button>
           </span>
@@ -282,7 +280,7 @@ function SessionDetail({ sid, search }: { sid: string; search: Search }) {
       </DetailHeader>
       <div className="mx-auto w-full max-w-[880px] px-6 py-5 md:pl-12">
         {raw ? <pre className="overflow-auto rounded-md bg-sunken p-3 font-mono text-xs">{JSON.stringify(s.turns, null, 2)}</pre> : <Transcript turns={s.turns} mineOnly={mine} showThinking={thinking} />}
-        <p className="mt-6 text-center text-xs text-muted">Transcripts belong to Claude Code and are shown read-only.</p>
+        <p className="mt-6 text-center text-xs text-muted-foreground">Transcripts belong to Claude Code and are shown read-only.</p>
       </div>
       <SubagentDialog sid={sid} agent={sub} onClose={() => setSub(null)} />
     </div>
@@ -300,7 +298,7 @@ export function SessionsPage() {
       hasSelection={!!sid}
       onBack={() => navigate({ to: "/sessions", search })}
       list={<SessionList selected={sid ?? null} search={search} />}
-      detail={sid ? <SessionDetail key={sid} sid={sid} search={search} /> : <Empty title="Pick a session">Its conversation opens here, with tool calls folded away until you need them.</Empty>}
+      detail={sid ? <SessionDetail key={sid} sid={sid} search={search} /> : <EmptyState title="Pick a session">Its conversation opens here, with tool calls folded away until you need them.</EmptyState>}
     />
   );
 }
