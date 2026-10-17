@@ -319,7 +319,15 @@ content.get("/settings", async (c) => {
 
 content.get("/map", async (c) => {
   const projects = (await listProjects()).filter((p) => p.group === "root" && !p.empty);
-  return c.json(await buildMap(projects.map((p) => ({ id: p.id, name: p.name, dir: untildify(p.id) }))));
+  const groups = await buildMap(projects.map((p) => ({ id: p.id, name: p.name, dir: untildify(p.id) })));
+  // Which settings file wins, highest first (command-line --settings is per launch and not on disk).
+  const precedence = [
+    { source: "managed", label: "Managed", path: managedSettingsPath(), note: "Set by an organization. Nothing overrides it.", exists: await Bun.file(managedSettingsPath()).exists() },
+    { source: "local", label: "Local", path: ".claude/settings.local.json", note: "Your settings for one project, not shared.", exists: true },
+    { source: "project", label: "Project", path: ".claude/settings.json", note: "Shared through the project's repository.", exists: true },
+    { source: "user", label: "User", path: tildify(join(claudeDir(), "settings.json")), note: "Your settings for every project.", exists: await Bun.file(join(claudeDir(), "settings.json")).exists() },
+  ];
+  return c.json({ groups, precedence });
 });
 
 content.get("/search", async (c) => {
