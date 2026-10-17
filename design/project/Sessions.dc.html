@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Control Center · Sessions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#F7F7F5}
+a{color:#2F52C7}a:hover{color:#203C99}
+.nav a{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border-radius:6px;color:#3F3F3B;text-decoration:none;font-size:14px}
+.nav a:hover{background:#EDEDEA;color:#1A1A19}
+.nav a.on{background:#E6EBFA;color:#203C99;font-weight:600}
+.cnt{font-size:12px;color:#6B6B66;font-family:'Geist Mono',ui-monospace,monospace}
+.bdg{font-size:11px;font-weight:600;color:#fff;background:#B4530A;border-radius:9px;padding:1px 7px}
+.mono{font-family:'Geist Mono',ui-monospace,monospace}
+.ses{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:6px;color:#1A1A19;text-decoration:none}
+.ses:hover{background:#EFEFEC;color:#1A1A19}
+.ses.on{background:#fff;box-shadow:0 0 0 1px #E0E0DC}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;border:1px solid #D9D9D5;background:#fff;color:#1A1A19;font:500 13px 'Geist',system-ui,sans-serif;text-decoration:none;cursor:pointer}
+.btn:hover{background:#F3F3F0;color:#1A1A19}
+.pill{display:inline-flex;align-items:center;min-height:30px;padding:0 10px;border-radius:15px;border:1px solid #D9D9D5;background:#fff;font:500 12.5px 'Geist',system-ui,sans-serif;color:#3F3F3B;cursor:pointer}
+.tool{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-top:1px solid #EEEEEB;font-size:12.5px}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Geist', system-ui, sans-serif; color: #1A1A19; background: #F7F7F5">
+<nav class="nav" aria-label="Main" style="flex: 1 0 220px; max-width: 100%; box-sizing: border-box; padding: 16px 12px; border-right: 1px solid #E6E6E3; background: #FBFBFA; display: flex; flex-direction: column; gap: 2px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 10px 14px">
+<span style="width: 24px; height: 24px; border-radius: 6px; background: #1A1A19; color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 600">CC</span>
+<span style="font-weight: 600; font-size: 14px">Control Center</span>
+</div>
+<a href="Search.dc.html" style="border: 1px solid #E0E0DC; background: #fff; margin-bottom: 10px; color: #6B6B66"><span>Search…</span><span class="cnt">⌘K</span></a>
+<a href="Main.dc.html"><span>Home</span><span class="bdg">2</span></a>
+<a href="Projects.dc.html"><span>Projects</span><span class="cnt">12</span></a>
+<a class="on" href="Sessions.dc.html"><span>Sessions</span><span class="cnt">378</span></a>
+<a href="Live.dc.html"><span>Live</span><span class="bdg">1</span></a>
+<a href="Main.dc.html#jobs"><span>Jobs</span><span class="cnt">21</span></a>
+<a href="Library.dc.html"><span>Library</span></a>
+<a href="Settings.dc.html"><span>Settings</span></a>
+<a href="Map.dc.html"><span>Map</span></a>
+<div style="margin-top: auto; padding: 14px 10px 4px; font-size: 12px; color: #6B6B66; display: flex; align-items: center; gap: 8px">
+<span style="width: 8px; height: 8px; border-radius: 50%; background: #1F8A4C"></span>
+<span>This machine · watching files</span>
+</div>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-wrap: wrap">
+<section aria-label="Sessions" style="flex: 1 0 300px; box-sizing: border-box; padding: 20px 12px; border-right: 1px solid #E6E6E3; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; gap: 6px; flex-wrap: wrap; padding: 0 4px 12px">
+<button class="pill" type="button">All projects</button><button class="pill" type="button">Any model</button><button class="pill" type="button">Hide empty</button>
+</div>
+<div style="font-size: 12px; color: #6B6B66; padding: 4px 12px">Today</div>
+<a class="ses on" href="Sessions.dc.html"><span style="font-size: 14px; font-weight: 500">conntrack-windows-root-fix</span><span class="cnt">cka-prep · 13:10 · 79 tool calls</span></a>
+<a class="ses" href="Sessions.dc.html"><span style="font-size: 14px; font-weight: 500">sharepoint-policies-hands-on-lab</span><span class="cnt">sharepoint · 13:02</span></a>
+<a class="ses" href="Sessions.dc.html"><span style="font-size: 14px; color: #6B6B66">Untitled session</span><span class="cnt">sharepoint · 09:34</span></a>
+<div style="font-size: 12px; color: #6B6B66; padding: 10px 12px 4px">Earlier</div>
+<a class="ses" href="Sessions.dc.html"><span style="font-size: 14px; font-weight: 500">header-naming-reader-fix</span><span class="cnt">cka-prep · 15 Oct</span></a>
+<a class="ses" href="Sessions.dc.html"><span style="font-size: 14px; font-weight: 500">grep-heavy-lesson-review</span><span class="cnt">cka-prep · 12 Oct</span></a>
+<a class="ses" href="Sessions.dc.html"><span style="font-size: 14px; font-weight: 500">kubernetes-busybox-plan-rules</span><span class="cnt">cka-prep · 12 Oct · blocked</span></a>
+<a class="ses" href="Sessions.dc.html"><span style="font-size: 14px; color: #6B6B66">Untitled session</span><span class="cnt">crypto · 12 Oct</span></a>
+</section>
+
+<main style="flex: 999 1 520px; min-width: 0; box-sizing: border-box; padding: 24px 32px 48px; display: flex; flex-direction: column; gap: 16px; max-width: 860px">
+<header style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-start">
+<div>
+<h1 style="margin: 0; font-size: 22px; font-weight: 600">conntrack-windows-root-fix</h1>
+<p class="cnt" style="margin: 6px 0 0">~/projects/cka-prep · claude-opus-5-5 · started 17 Oct</p>
+</div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><button class="btn" type="button" onClick="{{copy}}">{{copyLabel}}</button><a class="btn" href="Live.dc.html" style="background: #2F52C7; border-color: #2F52C7; color: #fff">Resume here</a></div>
+</div>
+<div style="display: flex; gap: 6px; flex-wrap: wrap">
+<button class="pill" type="button" onClick="{{toggleMine}}" aria-pressed="{{mineOn}}" style="{{mineStyle}}">My prompts only</button>
+<button class="pill" type="button">Subagents · 3</button>
+<button class="pill" type="button">Raw JSON</button>
+</div>
+</header>
+
+<article style="background: #fff; border: 1px solid #E6E6E3; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 12px; font-weight: 600; color: #2F52C7">You</div>
+<p style="margin: 0; font-size: 14.5px; line-height: 1.55">I pulled this repository to another computer that's using Windows 11 and the lab does not work on it. Nothing in troubleshooting.md helped either. I don't remember what the exact error was but the conntrack container was running into an issue. It seemed like it needed root permission…</p>
+</article>
+
+<sc-if value="{{showClaude}}" hint-placeholder-val="{{ true }}">
+<article style="background: #fff; border: 1px solid #E6E6E3; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+<div style="font-size: 12px; font-weight: 600; color: #3F3F3B">Claude</div>
+<button type="button" onClick="{{toggleTools}}" aria-expanded="{{toolsOn}}" style="display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid #E6E6E3; border-radius: 6px; background: #FAFAF8; font: 500 13px 'Geist', system-ui, sans-serif; color: #1A1A19; cursor: pointer">
+<span>Ran 9 commands · read 3 files</span><span class="cnt">{{toolsHint}}</span>
+</button>
+<sc-if value="{{toolsOpen}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 0 4px">
+<sc-for list="{{tools}}" as="t" hint-placeholder-count="5">
+<div class="tool"><span style="width: 44px; flex: none; color: #6B6B66">{{t.name}}</span><span class="mono" style="color: #3F3F3B; overflow-x: auto; white-space: nowrap">{{t.arg}}</span></div>
+</sc-for>
+</div>
+</sc-if>
+<p style="margin: 0; font-size: 14.5px; line-height: 1.55">[Claude's reply text appears here, with code blocks and file links rendered.]</p>
+</article>
+</sc-if>
+
+<div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12.5px; color: #6B6B66; padding: 4px 2px">
+<span>Message 2 of 214 · <a href="Sessions.dc.html">Next prompt ↓</a></span>
+<span>Read-only · Claude Code owns transcript files</span>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+constructor(props) {
+super(props);
+this.state = { tools: false, mine: false, copied: false };
+}
+renderVals() {
+const s = this.state;
+return {
+toolsOpen: s.tools, toolsOn: s.tools ? 'true' : 'false', toolsHint: s.tools ? 'Hide' : 'Show',
+toggleTools: () => this.setState({ tools: !this.state.tools }),
+showClaude: !s.mine, mineOn: s.mine ? 'true' : 'false',
+mineStyle: s.mine ? 'background: #E6EBFA; border-color: #A9B8EC; color: #203C99' : '',
+toggleMine: () => this.setState({ mine: !this.state.mine }),
+copyLabel: s.copied ? 'Copied' : 'Copy resume command',
+copy: () => this.setState({ copied: true }),
+tools: [
+{ name: 'Bash', arg: 'ls; ls lab lab/labs; cat lab/lab.sh | head -150' },
+{ name: 'Bash', arg: 'cat compose.yaml lab/Dockerfile lab/entrypoint.sh' },
+{ name: 'Bash', arg: 'grep -rln "kubeadm init\\|kube-proxy" --exclude-dir=node_modules' },
+{ name: 'Bash', arg: 'grep -n -i "kubeadm init\\|kube-proxy\\|lab:" 01-cluster-architecture/*/README.md' },
+{ name: 'Read', arg: '~/.claude/projects/…/memory/commit-to-main.md' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

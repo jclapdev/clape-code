@@ -1,0 +1,14 @@
+{
+  "name": "control-center",
+  "private": true,
+  "type": "module",
+  "workspaces": ["server", "web"],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "build": "bun run --filter web build",
+    "start": "bun run build && bun server/src/index.ts",
+    "test": "bun test server/test",
+    "typecheck": "bun run --filter '*' typecheck",
+    "compile": "bun run build && bun scripts/compile.ts"
+  }
+}

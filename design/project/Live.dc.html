@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Control Center · Live session</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#F7F7F5}
+a{color:#2F52C7}a:hover{color:#203C99}
+.nav a{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border-radius:6px;color:#3F3F3B;text-decoration:none;font-size:14px}
+.nav a:hover{background:#EDEDEA;color:#1A1A19}
+.nav a.on{background:#E6EBFA;color:#203C99;font-weight:600}
+.cnt{font-size:12px;color:#6B6B66;font-family:'Geist Mono',ui-monospace,monospace}
+.bdg{font-size:11px;font-weight:600;color:#fff;background:#B4530A;border-radius:9px;padding:1px 7px}
+.mono{font-family:'Geist Mono',ui-monospace,monospace}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;border-radius:6px;border:1px solid #D9D9D5;background:#fff;color:#1A1A19;font:500 13.5px 'Geist',system-ui,sans-serif;text-decoration:none;cursor:pointer}
+.btn:hover{background:#F3F3F0}
+.btn.pri{background:#2F52C7;border-color:#2F52C7;color:#fff}
+.btn.pri:hover{background:#203C99}
+.sel{min-height:36px;padding:0 10px;border:1px solid #D9D9D5;border-radius:6px;background:#fff;font:500 13px 'Geist',system-ui,sans-serif;color:#1A1A19}
+.opt{display:flex;flex-direction:column;gap:2px;text-align:left;padding:12px 14px;border-radius:8px;cursor:pointer;font-family:'Geist',system-ui,sans-serif;min-height:44px}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Geist', system-ui, sans-serif; color: #1A1A19; background: #F7F7F5">
+<nav class="nav" aria-label="Main" style="flex: 1 0 220px; max-width: 100%; box-sizing: border-box; padding: 16px 12px; border-right: 1px solid #E6E6E3; background: #FBFBFA; display: flex; flex-direction: column; gap: 2px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 10px 14px">
+<span style="width: 24px; height: 24px; border-radius: 6px; background: #1A1A19; color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 600">CC</span>
+<span style="font-weight: 600; font-size: 14px">Control Center</span>
+</div>
+<a href="Search.dc.html" style="border: 1px solid #E0E0DC; background: #fff; margin-bottom: 10px; color: #6B6B66"><span>Search…</span><span class="cnt">⌘K</span></a>
+<a href="Main.dc.html"><span>Home</span><span class="bdg">2</span></a>
+<a href="Projects.dc.html"><span>Projects</span><span class="cnt">12</span></a>
+<a href="Sessions.dc.html"><span>Sessions</span><span class="cnt">378</span></a>
+<a class="on" href="Live.dc.html"><span>Live</span><span class="bdg">1</span></a>
+<a href="Main.dc.html#jobs"><span>Jobs</span><span class="cnt">21</span></a>
+<a href="Library.dc.html"><span>Library</span></a>
+<a href="Settings.dc.html"><span>Settings</span></a>
+<a href="Map.dc.html"><span>Map</span></a>
+<div style="margin-top: auto; padding: 14px 10px 4px; font-size: 12px; color: #6B6B66; display: flex; align-items: center; gap: 8px">
+<span style="width: 8px; height: 8px; border-radius: 50%; background: #1F8A4C"></span>
+<span>This machine · watching files</span>
+</div>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 16px; max-width: 900px">
+<header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+<div>
+<div style="display: flex; align-items: center; gap: 10px"><h1 style="margin: 0; font-size: 22px; font-weight: 600">Live session</h1><span style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #6B6B66; border: 1px solid #D9D9D5; border-radius: 4px; padding: 2px 6px">EXAMPLE DATA</span></div>
+<p class="cnt" style="margin: 6px 0 0">~/projects/cka-prep · claude-opus-5-5 · {{statusText}}</p>
+</div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+<label for="pm" style="font-size: 12.5px; color: #6B6B66">Permissions</label>
+<select id="pm" class="sel"><option>Ask before changes</option><option>Accept edits</option><option>Plan only</option><option>Auto</option></select>
+<button class="btn" type="button">Interrupt</button>
+</div>
+</header>
+
+<article style="background: #fff; border: 1px solid #E6E6E3; border-radius: 10px; padding: 14px 18px">
+<div style="font-size: 12px; font-weight: 600; color: #2F52C7; margin-bottom: 4px">You</div>
+<p style="margin: 0; font-size: 14.5px; line-height: 1.55">Start the lab and check the conntrack container comes up without root.</p>
+</article>
+
+<section aria-label="Approval" style="{{approvalStyle}}">
+<div style="display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap"><span style="font-weight: 600; font-size: 15px">Claude wants to run a command</span><span class="cnt">Bash</span></div>
+<div class="mono" style="font-size: 13px; background: #F5F5F2; border-radius: 6px; padding: 10px 12px; overflow-x: auto; white-space: nowrap">docker compose up -d lab</div>
+<p style="margin: 0; font-size: 13px; color: #3F3F3B">Starts the lab container defined in compose.yaml.</p>
+<sc-if value="{{approvalPending}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; gap: 8px; flex-wrap: wrap">
+<button class="btn pri" type="button" onClick="{{allowOnce}}">Allow once</button>
+<button class="btn" type="button" onClick="{{allowAlways}}">Always allow in this project</button>
+<button class="btn" type="button" onClick="{{deny}}">Deny with a reason…</button>
+</div>
+</sc-if>
+<sc-if value="{{approvalDone}}" hint-placeholder-val="{{ false }}">
+<div style="font-size: 13px; font-weight: 500; color: #1F6B3D">{{approvalResult}}</div>
+</sc-if>
+</section>
+
+<section aria-label="Question" style="background: #fff; border: 1px solid #C9D3F2; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap"><span style="font-weight: 600; font-size: 15px">Claude asks</span><span class="cnt">Lab setup</span></div>
+<p style="margin: 0; font-size: 14.5px">The fix needs a different kube-proxy setting on Windows. Where should it go?</p>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px">
+<sc-for list="{{options}}" as="o" hint-placeholder-count="3">
+<button class="opt" type="button" onClick="{{o.pick}}" aria-pressed="{{o.on}}" style="{{o.style}}">
+<span style="font-size: 14px; font-weight: 600; color: #1A1A19">{{o.label}}</span>
+<span style="font-size: 12.5px; color: #3F3F3B">{{o.desc}}</span>
+</button>
+</sc-for>
+</div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+<label for="other" style="font-size: 12.5px; color: #6B6B66">Or type your own answer</label>
+<input id="other" style="flex: 1 1 220px; min-height: 40px; padding: 0 12px; border: 1px solid #D9D9D5; border-radius: 6px; font: 400 14px 'Geist', system-ui, sans-serif">
+<button class="btn pri" type="button">Send answer</button>
+</div>
+</section>
+
+<div style="margin-top: auto; background: #fff; border: 1px solid #D9D9D5; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px">
+<label for="msg" style="font-size: 12px; color: #6B6B66">Message Claude</label>
+<textarea id="msg" rows="2" placeholder="Send a follow-up while it works…" style="border: 0; resize: vertical; font: 400 14.5px/1.5 'Geist', system-ui, sans-serif; color: #1A1A19; outline: none"></textarea>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap">
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><select class="sel" aria-label="Model"><option>Opus 5.5</option><option>Sonnet 5.5</option><option>Haiku 5.5</option></select></div>
+<button class="btn pri" type="button">Send</button>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+constructor(props) {
+super(props);
+this.state = { approval: null, pick: null };
+}
+renderVals() {
+const s = this.state;
+const pending = s.approval === null;
+const results = { once: 'Allowed once. Running…', always: 'Allowed. Saved as a rule in .claude/settings.local.json.', deny: 'Denied. Claude was told why.' };
+const opts = [
+{ id: 'a', label: 'Lab compose file', desc: 'Only the lab changes. Nothing else in the course moves.' },
+{ id: 'b', label: 'kubeadm config', desc: 'Applies to every cluster the lab builds.' },
+{ id: 'c', label: 'Troubleshooting page', desc: 'Document the fix and leave the lab as it is.' }
+];
+return {
+statusText: pending ? 'waiting for you' : 'working',
+approvalPending: pending, approvalDone: !pending,
+approvalResult: pending ? '' : results[s.approval],
+approvalStyle: 'background: #fff; border: 1px solid ' + (pending ? '#E9C9A3' : '#E6E6E3') + '; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px',
+allowOnce: () => this.setState({ approval: 'once' }),
+allowAlways: () => this.setState({ approval: 'always' }),
+deny: () => this.setState({ approval: 'deny' }),
+options: opts.map((o) => ({
+...o, on: s.pick === o.id ? 'true' : 'false',
+style: s.pick === o.id ? 'background: #E6EBFA; border: 1px solid #2F52C7' : 'background: #fff; border: 1px solid #D9D9D5',
+pick: () => this.setState({ pick: o.id })
+}))
+};
+}
+}
+</script>
+</body>
+</html>

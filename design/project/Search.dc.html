@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Control Center · Search</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#F7F7F5}
+a{color:#2F52C7}a:hover{color:#203C99}
+.mono{font-family:'Geist Mono',ui-monospace,monospace}
+.res{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:6px;color:#1A1A19;text-decoration:none;font-size:14px;min-height:24px}
+.res:hover{background:#EEF1FB;color:#1A1A19}
+.kind{font-size:11.5px;font-weight:600;color:#6B6B66;width:76px;flex:none}
+kbd{font:500 11.5px 'Geist Mono',ui-monospace,monospace;border:1px solid #D9D9D5;border-bottom-width:2px;border-radius:4px;padding:1px 5px;background:#fff;color:#3F3F3B}
+</style>
+</helmet>
+<div style="min-height: 900px; box-sizing: border-box; font-family: 'Geist', system-ui, sans-serif; color: #1A1A19; background: rgba(26, 26, 25, 0.42); display: flex; justify-content: center; align-items: flex-start; padding: 96px 16px 48px">
+<div role="dialog" aria-label="Search" style="width: 100%; max-width: 680px; background: #fff; border-radius: 12px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25); overflow: hidden; display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #EEEEEB">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B6B66" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+<label for="q" style="position: absolute; left: -9999px">Search everything</label>
+<input id="q" value="{{q}}" onInput="{{onQ}}" placeholder="Search projects, sessions, config, memory…" style="flex: 1; min-width: 0; border: 0; outline: none; font: 400 17px 'Geist', system-ui, sans-serif; color: #1A1A19; min-height: 32px">
+<a href="Main.dc.html" style="text-decoration: none"><kbd>esc</kbd></a>
+</div>
+<div style="padding: 8px; display: flex; flex-direction: column; gap: 2px; max-height: 560px; overflow-y: auto">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+<div style="font-size: 12px; color: #6B6B66; padding: 10px 14px 4px">{{g.name}}</div>
+<sc-for list="{{g.items}}" as="it" hint-placeholder-count="2">
+<a class="res" href="{{it.href}}"><span class="kind">{{it.kind}}</span><span style="flex: 1; min-width: 0">{{it.title}}</span><span class="mono" style="font-size: 12px; color: #6B6B66">{{it.where}}</span></a>
+</sc-for>
+</sc-for>
+<sc-if value="{{empty}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 24px 14px; font-size: 14px; color: #6B6B66">Nothing matches. Try a project, file or session name.</div>
+</sc-if>
+</div>
+<div style="display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid #EEEEEB; font-size: 12px; color: #6B6B66">
+<span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>⌘</kbd> <kbd>↵</kbd> open in editor</span>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+constructor(props) {
+super(props);
+this.state = { q: 'backlog' };
+}
+renderVals() {
+const all = [
+{ g: 'Actions', kind: 'Action', title: 'Add a backlog item to cka-prep', where: '', href: 'Projects.dc.html' },
+{ g: 'Actions', kind: 'Action', title: 'Start a new session', where: '', href: 'Live.dc.html' },
+{ g: 'Files', kind: 'Backlog', title: 'Backlog', where: 'cka-prep/BACKLOG.md', href: 'Projects.dc.html' },
+{ g: 'Files', kind: 'Backlog', title: 'Backlog', where: 'sharepoint/BACKLOG.md', href: 'Projects.dc.html' },
+{ g: 'Files', kind: 'Changelog', title: "What's new", where: 'cka-prep/CHANGELOG.md', href: 'Projects.dc.html' },
+{ g: 'Config', kind: 'Skill', title: 'build-exercise', where: 'cka-prep/.claude/skills', href: 'Library.dc.html' },
+{ g: 'Config', kind: 'Command', title: '/create-command', where: '~/.claude/commands', href: 'Library.dc.html' },
+{ g: 'Config', kind: 'Setting', title: 'enabledPlugins', where: '~/.claude/settings.json', href: 'Settings.dc.html' },
+{ g: 'Memory', kind: 'Note', title: 'apply-agreed-standards-everywhere', where: 'cka-prep memory', href: 'Library.dc.html' },
+{ g: 'Sessions', kind: 'Session', title: 'conntrack-windows-root-fix', where: 'cka-prep · today', href: 'Sessions.dc.html' },
+{ g: 'Sessions', kind: 'Session', title: 'kubernetes-busybox-plan-rules', where: 'cka-prep · 12 Oct', href: 'Sessions.dc.html' }
+];
+const q = (this.state.q || '').toLowerCase().trim();
+const hit = all.filter((x) => !q || (x.title + ' ' + x.where + ' ' + x.kind).toLowerCase().includes(q));
+const names = ['Actions', 'Files', 'Config', 'Memory', 'Sessions'];
+const groups = names.map((n) => ({ name: n, items: hit.filter((x) => x.g === n) })).filter((g) => g.items.length);
+return {
+q: this.state.q, groups, empty: groups.length === 0,
+onQ: (e) => this.setState({ q: e.target.value })
+};
+}
+}
+</script>
+</body>
+</html>

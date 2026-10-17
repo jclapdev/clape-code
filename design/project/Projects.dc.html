@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Control Center · cka-prep backlog</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#F7F7F5}
+a{color:#2F52C7}a:hover{color:#203C99}
+.nav a{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border-radius:6px;color:#3F3F3B;text-decoration:none;font-size:14px}
+.nav a:hover{background:#EDEDEA;color:#1A1A19}
+.nav a.on{background:#E6EBFA;color:#203C99;font-weight:600}
+.cnt{font-size:12px;color:#6B6B66;font-family:'Geist Mono',ui-monospace,monospace}
+.bdg{font-size:11px;font-weight:600;color:#fff;background:#B4530A;border-radius:9px;padding:1px 7px}
+.mono{font-family:'Geist Mono',ui-monospace,monospace}
+.li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:6px;font-size:14px;color:#1A1A19;text-decoration:none}
+.li:hover{background:#EFEFEC;color:#1A1A19}
+.li.on{background:#fff;box-shadow:0 0 0 1px #E0E0DC}
+.tab{padding:10px 2px;font-size:14px;color:#6B6B66;text-decoration:none;border-bottom:2px solid transparent}
+.tab:hover{color:#1A1A19}
+.tab.on{color:#1A1A19;font-weight:600;border-bottom-color:#2F52C7}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:0 14px;border-radius:6px;border:1px solid #D9D9D5;background:#fff;color:#1A1A19;font:500 13px 'Geist',system-ui,sans-serif;text-decoration:none;cursor:pointer}
+.btn:hover{background:#F3F3F0;color:#1A1A19}
+.btn.pri{background:#2F52C7;border-color:#2F52C7;color:#fff}
+.item{display:flex;align-items:flex-start;gap:12px;padding:10px 4px;border-top:1px solid #EEEEEB;width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;font:400 14px/1.45 'Geist',system-ui,sans-serif;color:#1A1A19;cursor:pointer}
+.item:hover{background:#FAFAF8}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; font-family: 'Geist', system-ui, sans-serif; color: #1A1A19; background: #F7F7F5">
+<nav class="nav" aria-label="Main" style="flex: 1 0 220px; max-width: 100%; box-sizing: border-box; padding: 16px 12px; border-right: 1px solid #E6E6E3; background: #FBFBFA; display: flex; flex-direction: column; gap: 2px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 10px 14px">
+<span style="width: 24px; height: 24px; border-radius: 6px; background: #1A1A19; color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 600">CC</span>
+<span style="font-weight: 600; font-size: 14px">Control Center</span>
+</div>
+<a href="Search.dc.html" style="border: 1px solid #E0E0DC; background: #fff; margin-bottom: 10px; color: #6B6B66"><span>Search…</span><span class="cnt">⌘K</span></a>
+<a href="Main.dc.html"><span>Home</span><span class="bdg">2</span></a>
+<a class="on" href="Projects.dc.html"><span>Projects</span><span class="cnt">12</span></a>
+<a href="Sessions.dc.html"><span>Sessions</span><span class="cnt">378</span></a>
+<a href="Live.dc.html"><span>Live</span><span class="bdg">1</span></a>
+<a href="Main.dc.html#jobs"><span>Jobs</span><span class="cnt">21</span></a>
+<a href="Library.dc.html"><span>Library</span></a>
+<a href="Settings.dc.html"><span>Settings</span></a>
+<a href="Map.dc.html"><span>Map</span></a>
+<div style="margin-top: auto; padding: 14px 10px 4px; font-size: 12px; color: #6B6B66; display: flex; align-items: center; gap: 8px">
+<span style="width: 8px; height: 8px; border-radius: 50%; background: #1F8A4C"></span>
+<span>This machine · watching files</span>
+</div>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-wrap: wrap">
+<section aria-label="Projects" style="flex: 1 0 260px; box-sizing: border-box; padding: 20px 12px; border-right: 1px solid #E6E6E3; display: flex; flex-direction: column; gap: 2px">
+<label for="pf" style="font-size: 12px; color: #6B6B66; padding: 0 12px 6px">Filter projects</label>
+<input id="pf" placeholder="Type to filter" style="margin: 0 4px 12px; min-height: 36px; padding: 0 10px; border: 1px solid #D9D9D5; border-radius: 6px; font: 400 14px 'Geist', system-ui, sans-serif; background: #fff">
+<a class="li on" href="Projects.dc.html"><span style="flex: 1">cka-prep</span><span class="cnt">main</span></a>
+<a class="li" href="Projects.dc.html"><span style="flex: 1">sharepoint</span><span class="cnt">no git</span></a>
+<a class="li" href="Projects.dc.html"><span style="flex: 1">sdlc-workforce</span><span class="cnt">plugin</span></a>
+<a class="li" href="Projects.dc.html"><span style="flex: 1">reflect</span><span class="cnt">main</span></a>
+<a class="li" href="Projects.dc.html"><span style="flex: 1">agents</span><span class="cnt"></span></a>
+<a class="li" href="Projects.dc.html"><span style="flex: 1">claude-test</span><span class="cnt"></span></a>
+<a class="li" href="Projects.dc.html"><span style="flex: 1">practice</span><span class="cnt"></span></a>
+<a class="li" href="Projects.dc.html"><span style="flex: 1">productivity</span><span class="cnt"></span></a>
+<a class="li" href="Projects.dc.html"><span style="flex: 1">subscriptions</span><span class="cnt"></span></a>
+<div style="font-size: 12px; color: #6B6B66; padding: 14px 12px 4px">Empty folders</div>
+<a class="li" href="Projects.dc.html" style="color: #6B6B66"><span style="flex: 1">brainstorming · crypto · superpower</span></a>
+</section>
+
+<main style="flex: 999 1 520px; min-width: 0; box-sizing: border-box; padding: 24px 32px 48px; display: flex; flex-direction: column; gap: 18px">
+<header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px">
+<div>
+<h1 style="margin: 0; font-size: 24px; font-weight: 600">cka-prep</h1>
+<p class="mono" style="margin: 6px 0 0; font-size: 12.5px; color: #6B6B66">~/projects/cka-prep · main · github.com/jclapdev/cka-study · last commit 15 Oct</p>
+</div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><a class="btn" href="Projects.dc.html">Open folder</a><a class="btn pri" href="Live.dc.html">New session here</a></div>
+</header>
+<nav aria-label="Project" style="display: flex; gap: 22px; flex-wrap: wrap; border-bottom: 1px solid #E6E6E3">
+<a class="tab" href="Projects.dc.html">Overview</a>
+<a class="tab on" href="Projects.dc.html">Backlog</a>
+<a class="tab" href="Projects.dc.html">Changelog</a>
+<a class="tab" href="Projects.dc.html">Docs</a>
+<a class="tab" href="Library.dc.html">Config</a>
+<a class="tab" href="Projects.dc.html">Memory</a>
+<a class="tab" href="Sessions.dc.html">Sessions <span class="cnt">142</span></a>
+</nav>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+<p style="margin: 0; font-size: 14px; color: #3F3F3B"><span class="mono" style="font-size: 12.5px">BACKLOG.md</span> · Fix these in order before building more topics.</p>
+<div style="display: flex; gap: 8px"><button class="btn" type="button">Edit as text</button><button class="btn pri" type="button">Add item</button></div>
+</div>
+
+<sc-for list="{{sections}}" as="s" hint-placeholder-count="4">
+<section style="background: #fff; border: 1px solid #E6E6E3; border-radius: 10px; padding: 6px 16px 6px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 10px 4px 8px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600">{{s.name}}</h2>
+<span class="cnt">{{s.tally}}</span>
+</div>
+<sc-for list="{{s.items}}" as="it" hint-placeholder-count="3">
+<button class="item" type="button" onClick="{{it.toggle}}" aria-pressed="{{it.done}}">
+<span style="{{it.boxStyle}}" aria-hidden="true">{{it.mark}}</span>
+<span class="mono" style="font-size: 12.5px; color: #6B6B66; width: 22px; flex: none; padding-top: 1px">{{it.n}}.</span>
+<span style="{{it.textStyle}}">{{it.text}}</span>
+</button>
+</sc-for>
+</section>
+</sc-for>
+<p style="margin: 0; font-size: 12.5px; color: #6B6B66">Ticking an item changes only that line in the file. The old file is kept as a backup.</p>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+constructor(props) {
+super(props);
+this.state = { done: { 1: true, 2: true, 3: true, 4: true, 10: true, 11: true, 12: true } };
+}
+renderVals() {
+const raw = [
+{ name: 'Structure', items: [
+[1, 'Split each topic into short lessons in the sidebar, followed by Quiz and Practice.'],
+[2, 'Replace the four tabs (Learn, Lab, Exercise, References) with one path.'],
+[3, 'Take domain and topic names from the README table instead of folder names.'],
+[4, 'Make "Mock Exams" its own section at the bottom of the sidebar.']
+] },
+{ name: 'App', items: [[10, 'A button to hide and show the sidebar.']] },
+{ name: 'Then', items: [
+[11, 'Apply 1–9 to the 6 finished topics, their Learn pages and their references.'],
+[12, 'Update the build-exercise skill and CLAUDE.md so new topics come out this way.'],
+[13, 'Build the remaining 22 topics, then the mock exams.']
+] }
+];
+const done = this.state.done;
+const sections = raw.map((s) => {
+const items = s.items.map(([n, text]) => {
+const d = !!done[n];
+return {
+n, text, done: d ? 'true' : 'false', mark: d ? '✓' : '',
+boxStyle: 'width: 18px; height: 18px; flex: none; margin-top: 1px; border-radius: 4px; display: grid; place-items: center; font-size: 12px; color: #fff; ' + (d ? 'background: #2F52C7; border: 1px solid #2F52C7' : 'background: #fff; border: 1px solid #B9B9B4'),
+textStyle: d ? 'color: #6B6B66; text-decoration: line-through; text-decoration-color: #B9B9B4' : 'color: #1A1A19',
+toggle: () => this.setState({ done: { ...this.state.done, [n]: !this.state.done[n] } })
+};
+});
+const c = items.filter((i) => i.done === 'true').length;
+return { name: s.name, items, tally: c + ' of ' + items.length + ' done' };
+});
+return { sections };
+}
+}
+</script>
+</body>
+</html>

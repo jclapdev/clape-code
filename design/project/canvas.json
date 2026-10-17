@@ -1,0 +1,22 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-17T17:45:00Z"},
+  "title": "Claude Control Center prototype",
+  "launch": {"view": "focused", "file": "Main.dc.html"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 900, "title": "Home", "expand": "fill", "is_interactive": true},
+    "Projects.dc.html": {"x": 1520, "y": 0, "w": 1440, "h": 900, "title": "Project · Backlog", "expand": "fill", "is_interactive": true},
+    "Sessions.dc.html": {"x": 3040, "y": 0, "w": 1440, "h": 900, "title": "Sessions · Transcript", "expand": "fill", "is_interactive": true},
+    "Live.dc.html": {"x": 4560, "y": 0, "w": 1440, "h": 900, "title": "Live session", "expand": "fill", "is_interactive": true},
+    "Library.dc.html": {"x": 0, "y": 1020, "w": 1440, "h": 900, "title": "Library · Editor", "expand": "fill", "is_interactive": true},
+    "Settings.dc.html": {"x": 1520, "y": 1020, "w": 1440, "h": 900, "title": "Effective settings", "expand": "fill", "is_interactive": true},
+    "Map.dc.html": {"x": 3040, "y": 1020, "w": 1440, "h": 900, "title": "Map", "expand": "fill", "is_interactive": true},
+    "Search.dc.html": {"x": 4560, "y": 1020, "w": 1440, "h": 900, "title": "Search (⌘K)", "expand": "fill", "is_interactive": true}
+  },
+  "order": ["Main.dc.html", "Projects.dc.html", "Sessions.dc.html", "Live.dc.html", "Library.dc.html", "Settings.dc.html", "Map.dc.html", "Search.dc.html"],
+  "notes": {
+    "t1": {"x": 0, "y": -300, "text": "Claude Control Center — MVP screens", "kind": "title1", "maxW": 6000}
+  },
+  "designSystems": []
+}
