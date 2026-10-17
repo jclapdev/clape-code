@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
@@ -20,6 +20,8 @@ import { SimpleSelect } from "@/components/SimpleSelect";
 import { IconButton } from "@/components/IconButton";
 
 type Search = { archived?: string; project?: string };
+
+const TURNS_PER_PAGE = 200;
 
 function useSessionActions() {
   const qc = useQueryClient();
@@ -183,7 +185,13 @@ function SubagentDialog({ sid, agent, onClose }: { sid: string; agent: { agentId
 }
 
 function SessionDetail({ sid, search }: { sid: string; search: Search }) {
-  const q = useQuery({ queryKey: ["session", sid], queryFn: () => api.get<Session & { turns: Turn[]; subagentList: { agentId: string; type: string | null; description: string | null }[] }>(`/sessions/${sid}`) });
+  type Page = Session & { turns: Turn[]; totalTurns: number; offset: number; subagentList: { agentId: string; type: string | null; description: string | null }[] };
+  const q = useInfiniteQuery({
+    queryKey: ["session", sid],
+    queryFn: ({ pageParam }) => api.get<Page>(`/sessions/${sid}?offset=${pageParam}&limit=${TURNS_PER_PAGE}`),
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.offset + last.turns.length < last.totalTurns ? last.offset + last.turns.length : undefined),
+  });
   const [mine, setMine] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [raw, setRaw] = useState(false);
@@ -192,7 +200,8 @@ function SessionDetail({ sid, search }: { sid: string; search: Search }) {
   const { archive, askDelete } = useSessionActions();
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
-  const s = q.data!;
+  const first = q.data!.pages[0];
+  const s = { ...first, turns: q.data!.pages.flatMap((p) => p.turns) };
   const prompts = s.turns.filter((t) => t.role === "user").length;
   const tokens = s.usage.input + s.usage.output + s.usage.cacheRead + s.usage.cacheWrite;
 
@@ -280,6 +289,16 @@ function SessionDetail({ sid, search }: { sid: string; search: Search }) {
       </DetailHeader>
       <div className="mx-auto w-full max-w-[880px] px-6 py-5 md:pl-12">
         {raw ? <pre className="overflow-auto rounded-md bg-sunken p-3 font-mono text-xs">{JSON.stringify(s.turns, null, 2)}</pre> : <Transcript turns={s.turns} mineOnly={mine} showThinking={thinking} />}
+        {q.hasNextPage && (
+          <div className="mt-4 flex items-center justify-center gap-3 text-[13px] text-muted-foreground">
+            <span>
+              Showing {s.turns.length} of {first.totalTurns} turns
+            </span>
+            <Button variant="outline" busy={q.isFetchingNextPage} onClick={() => q.fetchNextPage()}>
+              Load more
+            </Button>
+          </div>
+        )}
         <p className="mt-6 text-center text-xs text-muted-foreground">Transcripts belong to Claude Code and are shown read-only.</p>
       </div>
       <SubagentDialog sid={sid} agent={sub} onClose={() => setSub(null)} />

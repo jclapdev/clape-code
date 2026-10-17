@@ -2,10 +2,11 @@ import { Database } from "bun:sqlite";
 import { mkdirSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { claudeDir, indexDbPath } from "../fs/paths";
-import { summarize, type SessionSummary } from "../parsers/transcript";
+import { readLines } from "../fs/lines";
+import { Summarizer, type SessionSummary } from "../parsers/transcript";
 
 // A rebuildable cache. Files on disk are the truth; deleting index.sqlite only costs a re-scan.
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3; // 3: search text includes Claude's replies
 
 let db: Database | null = null;
 
@@ -37,7 +38,7 @@ export function getDb(): Database {
   return db;
 }
 
-export interface IndexedSession extends Omit<SessionSummary, "promptText"> {
+export interface IndexedSession extends Omit<SessionSummary, "searchText"> {
   file: string;
   projectDir: string;
   subagents: number;
@@ -101,12 +102,13 @@ export async function indexSessions(): Promise<number> {
       const prev = known.get(file);
       const subagents = countSubagents(file);
       if (prev && prev.size === st.size && prev.mtime === st.mtimeMs) continue;
-      const text = await Bun.file(file).text();
-      const s = summarize(text, f.replace(/\.jsonl$/, ""));
-      const { promptText, ...rest } = s;
+      const sum = new Summarizer(f.replace(/\.jsonl$/, ""));
+      for await (const line of readLines(file)) sum.push(line);
+      const s = sum.result();
+      const { searchText, ...rest } = s;
       upsert.run(file, st.size, st.mtimeMs, s.sessionId, dir, subagents, JSON.stringify(rest));
       delDoc.run(file);
-      addDoc.run(file, s.title ?? untitled(s.firstPrompt), s.cwd ?? dir, promptText);
+      addDoc.run(file, s.title ?? untitled(s.firstPrompt), s.cwd ?? dir, searchText);
       changed++;
     }
   }

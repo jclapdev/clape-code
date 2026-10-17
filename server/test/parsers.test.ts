@@ -128,6 +128,30 @@ describe("transcript", () => {
     expect(s.cwd).toBe("/p/a");
   });
 
+  test("search text holds prompts and Claude's replies in order", () => {
+    expect(summarize(TRANSCRIPT, "f").searchText).toBe("Fix the lab\n\nLooking.");
+  });
+
+  test("streaming lines gives the same summary as reading the whole file", async () => {
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { readLines } = await import("../src/fs/lines");
+    const { Summarizer } = await import("../src/parsers/transcript");
+    const dir = await mkdtemp(join(tmpdir(), "cc-lines-"));
+    // Long multi-byte lines so characters straddle the stream's chunk boundaries.
+    const big = [TRANSCRIPT, ...Array.from({ length: 400 }, (_, i) => line({ type: "user", message: { role: "user", content: `ünïcødé ${"é".repeat(3000)} ${i}` } }))].join("\n");
+    const file = join(dir, "t.jsonl");
+    await writeFile(file, big);
+    const lines: string[] = [];
+    for await (const l of readLines(file)) lines.push(l);
+    expect(lines).toEqual(big.split("\n"));
+    const sum = new Summarizer("f");
+    for (const l of lines) sum.push(l);
+    expect(sum.result()).toEqual(summarize(big, "f"));
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test("turns attach tool results to their calls", () => {
     const t = toTurns(TRANSCRIPT);
     expect(t.map((x) => x.role)).toEqual(["user", "assistant"]);

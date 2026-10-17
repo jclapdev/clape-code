@@ -7,7 +7,8 @@ import { readState, trashItem, writeState } from "../fs/archive";
 import { isInside, tildify, untildify } from "../fs/paths";
 import { WriteError } from "../fs/safeWrite";
 import { parseChangelog } from "../parsers/changelog";
-import { toTurns } from "../parsers/transcript";
+import { TurnBuilder } from "../parsers/transcript";
+import { readLines } from "../fs/lines";
 import { getSession, listLive, removeSession, startSession, waitingCount } from "../live/sessions";
 import { listJobs, listLiveProcesses } from "../scan/jobs";
 import { listProjects, projectDir, projectPathOf } from "../scan/projects";
@@ -59,14 +60,24 @@ sessions.get("/sessions/:sid", async (c) => {
   const s = sessionById(sid);
   if (!s) throw new WriteError(404, "No such session.");
   const { archived, running, projectOf } = await context();
-  const text = await readFile(s.file, "utf8");
+  // Turns come in pages so long sessions open quickly; the client asks for more with ?offset=.
+  const offset = Math.max(0, Number(c.req.query("offset") ?? 0) || 0);
+  const limit = Math.min(1000, Math.max(1, Number(c.req.query("limit") ?? 200) || 200));
+  const builder = new TurnBuilder();
+  for await (const line of readLines(s.file)) builder.push(line);
   const subDir = join(s.file.replace(/\.jsonl$/, ""), "subagents");
   const subagents = [];
   for (const f of (await ls(subDir)).filter((f) => f.endsWith(".meta.json"))) {
     const meta = await readJson<Record<string, any>>(join(subDir, f));
     subagents.push({ agentId: f.replace(/^agent-/, "").replace(/\.meta\.json$/, ""), type: meta?.agentType ?? null, description: meta?.description ?? null });
   }
-  return c.json({ ...publicSession(s, archived, running, projectOf), turns: toTurns(text), subagentList: subagents });
+  return c.json({
+    ...publicSession(s, archived, running, projectOf),
+    turns: builder.turns.slice(offset, offset + limit),
+    totalTurns: builder.turns.length,
+    offset,
+    subagentList: subagents,
+  });
 });
 
 sessions.get("/sessions/:sid/subagents/:agentId", async (c) => {
@@ -74,10 +85,12 @@ sessions.get("/sessions/:sid/subagents/:agentId", async (c) => {
   if (!UUID.test(sid) || !/^[\w-]+$/.test(agentId)) throw new WriteError(400, "Bad id.");
   const s = sessionById(sid);
   if (!s) throw new WriteError(404, "No such session.");
-  const text = await readFile(join(s.file.replace(/\.jsonl$/, ""), "subagents", `agent-${agentId}.jsonl`), "utf8").catch(() => null);
-  if (text === null) throw new WriteError(404, "No such subagent run.");
+  const file = join(s.file.replace(/\.jsonl$/, ""), "subagents", `agent-${agentId}.jsonl`);
+  if (!(await Bun.file(file).exists())) throw new WriteError(404, "No such subagent run.");
   // Subagent transcripts mark every line as a sidechain; show them as a normal conversation.
-  return c.json({ turns: toTurns(text.replace(/"isSidechain":true/g, '"isSidechain":false')) });
+  const builder = new TurnBuilder(true);
+  for await (const line of readLines(file)) builder.push(line);
+  return c.json({ turns: builder.turns });
 });
 
 sessions.post("/sessions/archive", async (c) => {

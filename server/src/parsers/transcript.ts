@@ -1,6 +1,7 @@
 // Claude Code session transcripts: one JSON object per line.
 // Assistant replies are split across several lines that share `message.id`,
 // each repeating the same `usage`, so usage is counted once per message id.
+// Both readers below take one line at a time so large transcripts can be streamed.
 
 export interface Usage {
   input: number;
@@ -27,8 +28,11 @@ export interface SessionSummary {
   costUSD: number | null;
   continuedIn: string | null;
   kind: string | null; // e.g. "bg" for background jobs
-  promptText: string; // user prompts, joined, for search
+  searchText: string; // prompts and Claude's replies in conversation order, capped, for search
 }
+
+/** Per-session cap on text sent to the search index. */
+export const SEARCH_TEXT_CAP = 20000;
 
 const emptyUsage = (): Usage => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
 
@@ -49,42 +53,57 @@ export function promptTextOf(line: any): string | null {
   return t;
 }
 
-export function summarize(text: string, fallbackId: string): SessionSummary {
-  const s: SessionSummary = {
-    sessionId: fallbackId,
-    cwd: null,
-    gitBranch: null,
-    title: null,
-    agentName: null,
-    firstPrompt: null,
-    firstAt: null,
-    lastAt: null,
-    model: null,
-    version: null,
-    prompts: 0,
-    assistantMessages: 0,
-    toolCalls: 0,
-    usage: emptyUsage(),
-    costUSD: null,
-    continuedIn: null,
-    kind: null,
-    promptText: "",
-  };
-  const seen = new Set<string>();
-  let aiTitle: string | null = null;
-  let customTitle: string | null = null;
-  const prompts: string[] = [];
-  let promptChars = 0;
+const parse = (raw: string): any => {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
 
-  for (const raw of text.split("\n")) {
-    if (!raw) continue;
-    let d: any;
-    try {
-      d = JSON.parse(raw);
-    } catch {
-      continue;
-    }
-    if (d.sessionId && s.sessionId === fallbackId) s.sessionId = d.sessionId;
+export class Summarizer {
+  private s: SessionSummary;
+  private seen = new Set<string>();
+  private aiTitle: string | null = null;
+  private customTitle: string | null = null;
+  private text: string[] = [];
+  private chars = 0;
+
+  constructor(private fallbackId: string) {
+    this.s = {
+      sessionId: fallbackId,
+      cwd: null,
+      gitBranch: null,
+      title: null,
+      agentName: null,
+      firstPrompt: null,
+      firstAt: null,
+      lastAt: null,
+      model: null,
+      version: null,
+      prompts: 0,
+      assistantMessages: 0,
+      toolCalls: 0,
+      usage: emptyUsage(),
+      costUSD: null,
+      continuedIn: null,
+      kind: null,
+      searchText: "",
+    };
+  }
+
+  private addText(t: string) {
+    if (this.chars >= SEARCH_TEXT_CAP) return;
+    this.text.push(t);
+    this.chars += t.length + 2;
+  }
+
+  push(raw: string) {
+    const d = parse(raw);
+    if (!d) return;
+    const s = this.s;
+    if (d.sessionId && s.sessionId === this.fallbackId) s.sessionId = d.sessionId;
     if (d.cwd && !s.cwd) s.cwd = d.cwd;
     if (d.gitBranch) s.gitBranch = d.gitBranch;
     if (d.version) s.version = d.version;
@@ -95,10 +114,10 @@ export function summarize(text: string, fallbackId: string): SessionSummary {
     }
     switch (d.type) {
       case "ai-title":
-        aiTitle = d.aiTitle ?? aiTitle;
+        this.aiTitle = d.aiTitle ?? this.aiTitle;
         break;
       case "custom-title":
-        customTitle = d.customTitle ?? customTitle;
+        this.customTitle = d.customTitle ?? this.customTitle;
         break;
       case "agent-name":
         s.agentName = d.agentName ?? s.agentName;
@@ -114,10 +133,7 @@ export function summarize(text: string, fallbackId: string): SessionSummary {
         if (p) {
           s.prompts++;
           if (!s.firstPrompt) s.firstPrompt = p.slice(0, 500);
-          if (promptChars < 20000) {
-            prompts.push(p);
-            promptChars += p.length;
-          }
+          this.addText(p);
         }
         break;
       }
@@ -125,10 +141,13 @@ export function summarize(text: string, fallbackId: string): SessionSummary {
         const m = d.message;
         if (!m || m.model === "<synthetic>") break;
         if (m.model) s.model = m.model;
-        if (Array.isArray(m.content)) s.toolCalls += m.content.filter((b: any) => b.type === "tool_use").length;
+        if (Array.isArray(m.content)) {
+          s.toolCalls += m.content.filter((b: any) => b.type === "tool_use").length;
+          if (!d.isSidechain) for (const b of m.content) if (b.type === "text" && b.text?.trim()) this.addText(b.text.trim());
+        }
         const key = m.id ?? d.requestId ?? d.uuid;
-        if (key && !seen.has(key)) {
-          seen.add(key);
+        if (key && !this.seen.has(key)) {
+          this.seen.add(key);
           s.assistantMessages++;
           const u = m.usage;
           if (u) {
@@ -142,9 +161,16 @@ export function summarize(text: string, fallbackId: string): SessionSummary {
       }
     }
   }
-  s.title = customTitle ?? aiTitle;
-  s.promptText = prompts.join("\n\n").slice(0, 20000);
-  return s;
+
+  result(): SessionSummary {
+    return { ...this.s, title: this.customTitle ?? this.aiTitle, searchText: this.text.join("\n\n").slice(0, SEARCH_TEXT_CAP) };
+  }
+}
+
+export function summarize(text: string, fallbackId: string): SessionSummary {
+  const sum = new Summarizer(fallbackId);
+  for (const raw of text.split("\n")) sum.push(raw);
+  return sum.result();
 }
 
 // ---- Transcript viewer ----
@@ -176,46 +202,40 @@ const resultText = (c: any): string => {
   return "";
 };
 
-/** Turn a transcript into display turns: merged assistant blocks, tool results attached to their calls. */
-export function toTurns(text: string): Turn[] {
-  const turns: Turn[] = [];
-  const toolIndex = new Map<string, Extract<TurnBlock, { kind: "tool" }>>();
-  let current: Turn | null = null;
-  let currentMsgId: string | null = null;
+/** Builds display turns line by line: merged assistant blocks, tool results attached to their calls. */
+export class TurnBuilder {
+  turns: Turn[] = [];
+  private toolIndex = new Map<string, Extract<TurnBlock, { kind: "tool" }>>();
+  private current: Turn | null = null;
 
-  for (const raw of text.split("\n")) {
-    if (!raw) continue;
-    let d: any;
-    try {
-      d = JSON.parse(raw);
-    } catch {
-      continue;
-    }
-    if (d.isSidechain) continue;
+  constructor(private includeSidechain = false) {}
+
+  push(raw: string) {
+    const d = parse(raw);
+    if (!d || (d.isSidechain && !this.includeSidechain)) return;
     if (d.type === "assistant" && d.message) {
       const m = d.message;
-      if (m.model === "<synthetic>" && !Array.isArray(m.content)) continue;
+      if (m.model === "<synthetic>" && !Array.isArray(m.content)) return;
       // Consecutive assistant lines form one turn until a person speaks.
-      if (!current || current.role !== "assistant") {
-        current = { uuid: d.uuid, role: "assistant", at: d.timestamp ?? null, model: m.model, blocks: [] };
-        turns.push(current);
+      if (!this.current || this.current.role !== "assistant") {
+        this.current = { uuid: d.uuid, role: "assistant", at: d.timestamp ?? null, model: m.model, blocks: [] };
+        this.turns.push(this.current);
       }
-      currentMsgId = m.id ?? currentMsgId;
       for (const b of m.content ?? []) {
-        if (b.type === "text" && b.text?.trim()) current.blocks.push({ kind: "text", text: b.text });
-        else if (b.type === "thinking" && b.thinking?.trim()) current.blocks.push({ kind: "thinking", text: b.thinking });
+        if (b.type === "text" && b.text?.trim()) this.current.blocks.push({ kind: "text", text: b.text });
+        else if (b.type === "thinking" && b.thinking?.trim()) this.current.blocks.push({ kind: "thinking", text: b.thinking });
         else if (b.type === "tool_use") {
           const blk = { kind: "tool" as const, id: b.id, name: b.name, summary: toolSummary(b.name, b.input), input: b.input };
-          toolIndex.set(b.id, blk);
-          current.blocks.push(blk);
+          this.toolIndex.set(b.id, blk);
+          this.current.blocks.push(blk);
         }
       }
     } else if (d.type === "user" && d.message) {
       const c = d.message.content;
       if (Array.isArray(c)) {
         for (const b of c) {
-          if (b.type === "tool_result" && toolIndex.has(b.tool_use_id)) {
-            const t = toolIndex.get(b.tool_use_id)!;
+          const t = b.type === "tool_result" ? this.toolIndex.get(b.tool_use_id) : undefined;
+          if (t) {
             t.result = resultText(b.content).slice(0, 20000);
             t.isError = !!b.is_error;
           }
@@ -223,14 +243,18 @@ export function toTurns(text: string): Turn[] {
       }
       const p = promptTextOf(d);
       if (p) {
-        current = { uuid: d.uuid, role: "user", at: d.timestamp ?? null, blocks: [{ kind: "text", text: p }] };
-        turns.push(current);
+        this.current = { uuid: d.uuid, role: "user", at: d.timestamp ?? null, blocks: [{ kind: "text", text: p }] };
+        this.turns.push(this.current);
       }
     } else if (d.type === "system" && d.subtype === "compact_boundary") {
-      turns.push({ uuid: d.uuid, role: "system", at: d.timestamp ?? null, blocks: [{ kind: "text", text: "Conversation compacted" }] });
-      current = null;
+      this.turns.push({ uuid: d.uuid, role: "system", at: d.timestamp ?? null, blocks: [{ kind: "text", text: "Conversation compacted" }] });
+      this.current = null;
     }
   }
-  void currentMsgId;
-  return turns;
+}
+
+export function toTurns(text: string, includeSidechain = false): Turn[] {
+  const b = new TurnBuilder(includeSidechain);
+  for (const raw of text.split("\n")) b.push(raw);
+  return b.turns;
 }
