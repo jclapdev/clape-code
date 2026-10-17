@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SimpleSelect } from "@/components/SimpleSelect";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const KIND_LABEL: Record<Kind, [string, string]> = {
   skill: ["Skill", "Skills"],
@@ -298,6 +299,9 @@ export function LibraryPage() {
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const qc = useQueryClient();
+  const confirm = useConfirm();
   const kind = (s.kind as Kind | undefined) ?? null;
 
   const items = lib.data?.items ?? [];
@@ -310,6 +314,55 @@ export function LibraryPage() {
   const shown = items.filter((i) => (!kind || i.kind === kind) && (!f || i.name.toLowerCase().includes(f) || i.description.toLowerCase().includes(f)));
   const selected = s.path ? items.find((i) => i.path === s.path && String(i.line ?? "") === (s.line ?? "")) : undefined;
   const creatable = (["skill", "agent", "command", "rule"] as Kind[]).includes(kind ?? "skill") ? (kind ?? "skill") : null;
+
+  // ---- Bulk archive / delete ----
+  const isSelectable = (i: LibraryItem) => i.access === "edit" && !NO_DELETE.includes(i.kind);
+  const selectable = shown.filter(isSelectable);
+  const pickedItems = items.filter((i) => picked.has(itemKey(i)));
+  const togglePick = (i: LibraryItem) =>
+    setPicked((p) => {
+      const n = new Set(p);
+      if (n.has(itemKey(i))) n.delete(itemKey(i));
+      else n.add(itemKey(i));
+      return n;
+    });
+  const pickOlder = (days: number) => {
+    const cut = Date.now() - days * 86400000;
+    setPicked(new Set(selectable.filter((i) => i.mtime && i.mtime < cut).map(itemKey)));
+  };
+  const bulk = useMutation({
+    mutationFn: async (op: "archive" | "delete") => {
+      const targets = op === "archive" ? pickedItems.filter((i) => ARCHIVABLE.includes(i.kind)) : pickedItems;
+      const failed: string[] = [];
+      for (const i of targets) {
+        try {
+          await api.post(`/library/${op}`, { path: i.path, kind: i.kind });
+        } catch (e) {
+          failed.push(`${i.name}: ${(e as Error).message}`);
+        }
+      }
+      return { done: targets.length - failed.length, skipped: pickedItems.length - targets.length, failed };
+    },
+    onSuccess: (r, op) => {
+      setPicked(new Set());
+      qc.invalidateQueries({ queryKey: ["library"] });
+      qc.invalidateQueries({ queryKey: ["memory"] });
+      const verb = op === "archive" ? "Archived" : "Moved to the trash:";
+      const extra = [r.skipped ? `${r.skipped} can't be archived and were left alone` : "", r.failed.length ? `${r.failed.length} failed` : ""].filter(Boolean).join("; ");
+      (r.failed.length ? toast.error : toast.success)(`${verb} ${r.done}.${extra ? ` ${extra}.` : ""}`, r.failed.length ? { description: r.failed.join("\n") } : undefined);
+      if (selected && pickedItems.some((i) => itemKey(i) === itemKey(selected))) navigate({ to: "/library", search: { scope, kind: kind ?? undefined } });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const runBulk = async (op: "archive" | "delete") => {
+    const n = op === "archive" ? pickedItems.filter((i) => ARCHIVABLE.includes(i.kind)).length : pickedItems.length;
+    const ok = await confirm(
+      op === "archive"
+        ? { title: `Archive ${n} ${n === 1 ? "item" : "items"}?`, body: "Claude Code stops loading them. You can restore each one from Archive.", confirm: "Archive" }
+        : { title: `Delete ${n} ${n === 1 ? "item" : "items"}?`, body: "They move to your computer's trash, where you can still recover them.", confirm: "Move to trash", danger: true },
+    );
+    if (ok) bulk.mutate(op);
+  };
 
   const list = (
     <div className="flex flex-col pb-6">
@@ -354,25 +407,67 @@ export function LibraryPage() {
         </label>
         <Input id="lf" data-filter value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter  /" />
       </div>
+      {selectable.length > 0 && (
+        <div className="flex flex-col gap-1.5 px-4 pb-1">
+          <div className="flex flex-wrap items-center gap-x-1 text-[12.5px] text-muted-foreground">
+            <span className="mr-1">Select:</span>
+            <Button variant="link" size="xs" onClick={() => pickOlder(30)}>
+              unchanged for 30 days
+            </Button>
+            <Button variant="link" size="xs" onClick={() => pickOlder(90)}>
+              90 days
+            </Button>
+            {picked.size > 0 && (
+              <Button variant="link" size="xs" onClick={() => setPicked(new Set())}>
+                none
+              </Button>
+            )}
+          </div>
+          {picked.size > 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-primary-line bg-accent px-2.5 py-1.5">
+              <span className="flex-1 text-[13px] font-medium text-accent-foreground">{picked.size} selected</span>
+              <Button variant="outline" busy={bulk.isPending && bulk.variables === "archive"} disabled={!pickedItems.some((i) => ARCHIVABLE.includes(i.kind))} onClick={() => runBulk("archive")}>
+                Archive
+              </Button>
+              <Button variant="destructive" busy={bulk.isPending && bulk.variables === "delete"} onClick={() => runBulk("delete")}>
+                Delete
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
       {lib.isLoading && <Loading />}
       <ErrorNote error={lib.error} />
       <ul className="px-2">
-        {shown.map((i) => (
-          <li key={itemKey(i)}>
-            <Link
-              to="/library"
-              search={{ scope, kind: kind ?? undefined, path: i.path, line: i.line ? String(i.line) : undefined }}
-              className={cn("flex flex-col gap-0.5 rounded-md px-2.5 py-2 text-ink no-underline hover:bg-sunken", selected && itemKey(selected) === itemKey(i) && "bg-surface shadow-[0_0_0_1px_var(--line-strong)]", i.state === "off" && "opacity-70")}
-            >
-              <span className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate font-medium">{i.name}</span>
-                {stateTag(i)}
-                {sourceTag(i)}
-              </span>
-              {i.description && <span className="line-clamp-1 text-[12.5px] text-muted-foreground">{i.description}</span>}
-            </Link>
-          </li>
-        ))}
+        {shown.map((i) => {
+          const canPick = isSelectable(i);
+          return (
+            <li key={itemKey(i)} className="group flex items-start gap-1.5">
+              {canPick ? (
+                <Checkbox
+                  aria-label={`Select ${i.name}`}
+                  checked={picked.has(itemKey(i))}
+                  onCheckedChange={() => togglePick(i)}
+                  className={cn("ml-1 mt-2.5 flex-none", !picked.size && "opacity-0 focus-visible:opacity-100 group-hover:opacity-100")}
+                />
+              ) : (
+                <span className="ml-1 w-4 flex-none" />
+              )}
+              <Link
+                to="/library"
+                search={{ scope, kind: kind ?? undefined, path: i.path, line: i.line ? String(i.line) : undefined }}
+                className={cn("flex min-w-0 flex-1 flex-col gap-0.5 rounded-md px-2.5 py-2 text-ink no-underline hover:bg-sunken", selected && itemKey(selected) === itemKey(i) && "bg-surface shadow-[0_0_0_1px_var(--line-strong)]", i.state === "off" && "opacity-70")}
+              >
+                <span className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate font-medium">{i.name}</span>
+                  {stateTag(i)}
+                  {sourceTag(i)}
+                </span>
+                {i.description && <span className="line-clamp-1 text-[12.5px] text-muted-foreground">{i.description}</span>}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
       {!lib.isLoading && !shown.length && <p className="px-5 py-4 text-muted-foreground">Nothing matches.</p>}
     </div>

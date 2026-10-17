@@ -64,7 +64,7 @@ export function Loading({ label = "Loading" }: { label?: string }) {
 
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <Empty className="items-start text-left">
+    <Empty className="items-start text-left md:pl-12">
       <EmptyHeader className="items-start text-left">
         <EmptyTitle>{title}</EmptyTitle>
         {children && <EmptyDescription>{children}</EmptyDescription>}
