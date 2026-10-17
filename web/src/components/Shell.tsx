@@ -207,6 +207,14 @@ export function Shell() {
         (document.querySelector("[data-filter]") as HTMLInputElement | null)?.focus();
         return;
       }
+      if (e.key === "e") {
+        const editor = document.querySelector<HTMLElement>(".cm-content[contenteditable=true]");
+        if (editor) {
+          e.preventDefault();
+          editor.focus();
+        }
+        return;
+      }
       if (e.key === "g") {
         gPressed.current = Date.now();
         return;

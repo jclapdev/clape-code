@@ -33,6 +33,7 @@ const SHORTCUTS: [string[], string][] = [
   [["["], "Hide or show the menu"],
   [["]"], "Hide or show the list pane"],
   [["/"], "Filter the current list"],
+  [["e"], "Edit the open file"],
   [["g", "h"], "Go to Home (also g p, g s, g l, g j, g i, g t, g m, g a)"],
   [["⌘", "S"], "Save the open file"],
 ];
