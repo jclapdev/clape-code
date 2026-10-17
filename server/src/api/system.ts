@@ -8,6 +8,7 @@ import { canRead } from "../fs/policy";
 import { untildify } from "../fs/paths";
 import { WriteError } from "../fs/safeWrite";
 import { waitingCount } from "../live/sessions";
+import { addFeedback, bump, getMetrics, readFeedback } from "../metrics";
 import type { Env } from "./env";
 
 export const system = new Hono<Env>();
@@ -63,6 +64,19 @@ system.post("/lan", async (c) => {
   await saveConfig({ ...cfg, lan: { enabled: !!enabled, passwordHash } });
   setTimeout(() => void restart(), 200);
   return c.json(publicConfig(await getConfig()));
+});
+
+system.post("/metrics/view", async (c) => {
+  const { view } = await c.req.json();
+  if (typeof view === "string" && /^[a-z]{1,20}$/.test(view)) await bump(`view.${view}`);
+  return c.json({ ok: true });
+});
+system.get("/metrics", async (c) => c.json({ counts: await getMetrics(), feedback: await readFeedback() }));
+system.post("/feedback", async (c) => {
+  const { text } = await c.req.json();
+  if (!String(text ?? "").trim()) throw new WriteError(400, "Write something first.");
+  await addFeedback(String(text).slice(0, 2000));
+  return c.json({ ok: true });
 });
 
 /** Open a file or folder in the editor or file manager on the computer running the app. */

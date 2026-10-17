@@ -6,8 +6,19 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["bun"],
-    "lib": ["ESNext"]
+    "types": [
+      "bun"
+    ],
+    "lib": [
+      "ESNext"
+    ]
   },
-  "include": ["src", "test"]
+  "include": [
+    "src",
+    "test"
+  ],
+  "exclude": [
+    "src/compile-entry.ts",
+    "src/assets.gen.ts"
+  ]
 }

@@ -26,7 +26,7 @@ export function managedSettingsPath(): string {
   return "/etc/claude-code/managed-settings.json";
 }
 
-type Def = [rel: string, what: string, format: string, link: string | null, count?: "dir" | "file" | "lines" | "md" | number];
+type Def = [rel: string, what: string, format: string, link: string | null, count?: "dir" | "file" | "lines" | "md" | "skills" | "synced" | number];
 
 const GLOBAL: Def[] = [
   ["settings.json", "Your settings for every project: model, permissions, hooks, plugins", "JSON", "/settings", "file"],
@@ -34,13 +34,13 @@ const GLOBAL: Def[] = [
   ["CLAUDE.md", "Instructions Claude reads in every project", "Markdown", "/library?kind=claude-md", "file"],
   ["keybindings.json", "Keyboard shortcuts", "JSON", null, "file"],
   ["commands", "Slash commands", "Markdown + frontmatter", "/library?kind=command", "md"],
-  ["skills", "Your skills (one folder each, with SKILL.md)", "Folders", "/library?kind=skill", "dir"],
+  ["skills", "Your skills (one folder each, with SKILL.md)", "Folders", "/library?kind=skill", "skills"],
   ["agents", "Your subagents", "Markdown + frontmatter", "/library?kind=agent", "md"],
   ["rules", "Rules that apply to matching paths", "Markdown + frontmatter", "/library?kind=rule", "md"],
   ["output-styles", "Output styles", "Markdown + frontmatter", "/library?kind=output-style", "md"],
   ["hooks", "Scripts your hooks run", "Scripts", "/library?kind=hook", "dir"],
   ["plans", "Plans written in plan mode", "Markdown", "/library?kind=plan", "md"],
-  ["skills/synced", "Skills synced from claude.ai", "Folders", "/library?kind=skill", "dir"],
+  ["skills/synced", "Skills synced from claude.ai", "Folders", "/library?kind=skill", "synced"],
   ["history.jsonl", "Every prompt you typed, newest last", "JSON lines", null, "lines"],
   ["jobs", "Background jobs and their timelines", "JSON", "/jobs", "dir"],
   ["sessions", "Claude Code processes running now", "JSON", "/jobs", "dir"],
@@ -94,6 +94,12 @@ async function countOf(abs: string, how: Def[4]): Promise<{ exists: boolean; cou
   }
   if (!(await isDir(abs))) return { exists: false, count: 0 };
   const names = await ls(abs);
+  if (how === "skills") return { exists: true, count: names.filter((n) => n !== "synced").length };
+  if (how === "synced") {
+    let n = 0;
+    for (const bucket of names) n += (await ls(join(abs, bucket))).filter((x) => x !== "manifest.json").length;
+    return { exists: true, count: n };
+  }
   return { exists: true, count: how === "md" ? names.filter((n) => n.endsWith(".md")).length : names.length };
 }
 

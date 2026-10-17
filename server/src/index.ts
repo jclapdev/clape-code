@@ -14,13 +14,27 @@ import { claudeDir, untildify } from "./fs/paths";
 import { WriteError } from "./fs/safeWrite";
 import { startWatching } from "./fs/watch";
 import { stopAll } from "./live/sessions";
+import { bump } from "./metrics";
 import { globalLibrary, projectLibrary } from "./scan/library";
 import { listProjects } from "./scan/projects";
 
 const app = new Hono<Env>();
 
 app.use("*", guard((c) => getConnInfo(c).remote.address));
+app.use("/api/*", async (c, next) => {
+  await next();
+  if (c.res.status < 300) {
+    const p = new URL(c.req.url).pathname;
+    if (c.req.method === "PUT" && p === "/api/file") void bump("edits.saved");
+    else if (/^\/api\/projects\/.+\/(backlog|changelog)/.test(p)) void bump("edits.saved");
+    else if (/^\/api\/live\/[^/]+\/respond$/.test(p)) void bump("live.answered");
+    else if (c.req.method === "POST" && p === "/api/live") void bump("live.started");
+    else if (/^\/api\/(library\/archive|sessions\/archive)$/.test(p)) void bump("items.archived");
+    else if (/^\/api\/(library|sessions)\/delete$/.test(p)) void bump("items.deleted");
+  }
+});
 app.onError((err, c) => {
+  if (err instanceof WriteError && err.status === 409) void bump("edits.conflictsCaught");
   if (err instanceof WriteError) return c.json({ error: err.message, current: err.current ?? null }, err.status);
   console.error(err);
   return c.json({ error: err.message || "Something went wrong." }, 500);

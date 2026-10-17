@@ -70,6 +70,7 @@ class AsyncQueue<T> implements AsyncIterable<T> {
 }
 
 const now = () => new Date().toISOString();
+const compiled = import.meta.path.includes("$bunfs") || /^[A-Z]:[\\/]~BUN/.test(import.meta.path);
 
 class LiveSession {
   id = crypto.randomUUID();
@@ -98,6 +99,8 @@ class LiveSession {
         resume: resume ?? undefined,
         abortController: this.abort,
         settingSources: ["user", "project", "local"],
+        // Inside a compiled executable there is no node_modules copy of Claude Code; use the installed one.
+        pathToClaudeCodeExecutable: compiled ? (Bun.which("claude") ?? undefined) : undefined,
         canUseTool: (toolName, input, opts) => this.ask(toolName, input, opts as any),
       },
     });
