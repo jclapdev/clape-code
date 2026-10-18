@@ -10,6 +10,23 @@ Where Control Center stands, for whoever picks it up next. Read this first; upda
 - [x] Create skills, commands, agents, rules, output styles, memory notes, instructions, hooks, permission rules and MCP servers from forms with the official guide beside them (2026-10-18).
 - [x] Slash command list in sessions, visible search in the menu, Guides page (2026-10-18).
 
+## Waiting for John
+
+Things done or skipped while John was away on 2026-10-18, for him to check. Each says what to do if he disagrees.
+
+- **Done by the step 2–3 agent without asking (all reversible, commit 7b2badb):**
+  1. Delete on the project and Setup pages now moves items to Archived items instead of the computer's trash, because they share one component with the new pages.
+  2. `/settings` shows the Setup page directly instead of redirecting to `/setup`.
+  3. Deleting a CLAUDE.md or a hook script is now allowed and archives it as a file. Before, the project page didn't offer delete for those.
+  4. On Slash commands, "Run in a new session" starts the session in the item's own project when it belongs to one.
+- **The Sessions menu entry shows Projects** until step 9 builds the Sessions page.
+- **The dev server gets stopped every few minutes under `bun run dev`.** Something sends it a stop signal and Vite goes down with it. Cause not found yet. Running the server and Vite as two separate processes stays up.
+- **Backup copies of the agent's test files** are in `~/.config/control-center/backups/2026-10-18/projects/claude-test/`. The agent's attempt to delete them was blocked by the permission check, so they were left in place. Delete that folder if you want it gone.
+- **Skipped until you're back:**
+  - the cka-prep and sharepoint backlog move (it deletes files in other projects);
+  - installing or uninstalling a real plugin to test the Plugins page;
+  - creating a scheduled task for the Desktop app (it needs a test with the app open).
+
 ## In progress
 
 Reorganising the app around Claude Code's features. The approved plan is `~/.claude/plans/encapsulated-mixing-clarke.md`; follow it step by step. The 2026-10-18 overhaul is committed as 7412c68; work since then is in the "WIP" commit after it.
