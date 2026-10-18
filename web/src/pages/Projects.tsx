@@ -376,7 +376,7 @@ function ProjectDetailView({ id, tab }: { id: string; tab: string }) {
         }
       >
         <Tabs value={tab} onValueChange={(v) => navigate({ to: "/projects/$id", params: { id }, search: { tab: v }, replace: true })} className="-mb-4">
-          <TabsList variant="line" className="overflow-x-auto">
+          <TabsList variant="line" className="h-auto flex-wrap justify-start">
             {TABS.map((t) => (
               <TabsTrigger key={t.id} value={t.id} className="flex-none">
                 {t.label}

@@ -122,7 +122,7 @@ function NavBody({ collapsed, onToggle, onPick, onSearch, connected }: { collaps
       <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between pl-1.5")}>
         {!collapsed && (
           <Link to="/" className="flex items-center gap-2 text-ink no-underline" onClick={onPick}>
-            <img src="/favicon.svg" alt="" className="size-6" />
+            <img src="/favicon.svg" alt="" className="size-6 rounded-md dark:ring-1 dark:ring-white/25" />
             <span className="text-[14px] font-semibold">Control Center</span>
           </Link>
         )}
@@ -238,7 +238,7 @@ export function Shell() {
               <Menu />
             </IconButton>
             <Link to="/" className="flex items-center gap-2 font-semibold text-ink no-underline">
-              <img src="/favicon.svg" alt="" className="size-5" /> Control Center
+              <img src="/favicon.svg" alt="" className="size-5 rounded-md dark:ring-1 dark:ring-white/25" /> Control Center
             </Link>
             <IconButton label="Search" size="icon-lg" onClick={() => setPaletteOpen(true)}>
               <Search />

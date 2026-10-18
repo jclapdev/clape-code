@@ -106,12 +106,12 @@ function SessionList({ selected, search }: { selected: string | null; search: Se
         </label>
         <Input id="sf" data-filter value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter by title or folder  /" />
         <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[12.5px] text-muted-foreground">
-          <span className="mr-1">Select:</span>
+          <span className="mr-1">Select older than:</span>
           <Button variant="link" size="xs" onClick={() => pickOlder(30)}>
-            older than 30 days
+            30 days
           </Button>
           <Button variant="link" size="xs" onClick={() => pickOlder(7)}>
-            older than 7 days
+            7 days
           </Button>
           {picked.size > 0 && (
             <Button variant="link" size="xs" onClick={() => setPicked(new Set())}>

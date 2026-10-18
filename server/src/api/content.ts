@@ -10,7 +10,7 @@ import { readWithHash, safeWrite, WriteError } from "../fs/safeWrite";
 import { addItem, editItemText, parseBacklog, toggleItem } from "../parsers/backlog";
 import { addEntry, parseChangelog } from "../parsers/changelog";
 import { effective, type Source } from "../parsers/settings";
-import { search as searchDocs, listSessions } from "../db/index";
+import { search as searchDocs, listSessions, untitled } from "../db/index";
 import { globalLibrary, memoryItems, projectLibrary } from "../scan/library";
 import { buildMap, managedSettingsPath } from "../scan/map";
 import { listProjects, projectDir, projectPathOf } from "../scan/projects";
@@ -49,7 +49,7 @@ content.get("/projects/:id", async (c) => {
   const sessions = listSessions()
     .filter((s) => s.cwd && isInside(projectPathOf(s.cwd), dir))
     .slice(0, 100)
-    .map(({ file, ...s }) => ({ ...s, worktree: s.cwd !== projectPathOf(s.cwd!) }));
+    .map(({ file, ...s }) => ({ ...s, displayTitle: s.title ?? untitled(s.firstPrompt), worktree: s.cwd !== projectPathOf(s.cwd!) }));
   return c.json({
     ...summary,
     abs: dir,

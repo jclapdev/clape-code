@@ -1,5 +1,5 @@
-import matter from "gray-matter";
 import { readFile, readdir, stat } from "node:fs/promises";
+import { parseFrontmatter } from "../parsers/frontmatter";
 import { join } from "node:path";
 
 export interface MdFile {
@@ -15,12 +15,7 @@ export async function readMd(abs: string): Promise<MdFile | null> {
   } catch {
     return null;
   }
-  try {
-    const m = matter(text, {});
-    return { data: m.data ?? {}, body: m.content, error: null };
-  } catch (e: any) {
-    return { data: {}, body: text, error: `Frontmatter is not valid YAML: ${e.reason ?? e.message}` };
-  }
+  return parseFrontmatter(text);
 }
 
 export async function readJson<T = any>(abs: string): Promise<T | null> {

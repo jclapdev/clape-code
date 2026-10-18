@@ -61,6 +61,24 @@ describe("backlog", () => {
   });
 });
 
+describe("frontmatter", async () => {
+  const { parseFrontmatter } = await import("../src/parsers/frontmatter");
+  test("strict YAML", () => {
+    expect(parseFrontmatter("---\nname: a\npaths:\n  - x\n---\nbody")).toEqual({ data: { name: "a", paths: ["x"] }, body: "body", error: null });
+  });
+  test("values YAML rejects are read the way Claude Code reads them", () => {
+    const f = parseFrontmatter("---\ndescription: Create a skill\nargument-hint: [skill-name] [--project | --personal]\n---\n\n# Body\n");
+    expect(f.error).toBeNull();
+    expect(f.data).toEqual({ description: "Create a skill", "argument-hint": "[skill-name] [--project | --personal]" });
+    expect(f.body).toBe("\n# Body\n");
+  });
+  test("broken frontmatter is reported", () => {
+    expect(parseFrontmatter("---\nname: a\nno fence").error).toContain("closing");
+    expect(parseFrontmatter("---\n: : :\n  [\n---\n").error).not.toBeNull();
+    expect(parseFrontmatter("no frontmatter").error).toBeNull();
+  });
+});
+
 const CHANGELOG = `# What's new
 
 Changes to the app, newest first.

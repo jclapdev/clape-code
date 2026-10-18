@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative } from "node:path";
-import matter from "gray-matter";
+import { parseFrontmatter } from "../parsers/frontmatter";
 import { backupsDir, home, isInside } from "./paths";
 import { canWrite, classify } from "./policy";
 
@@ -37,13 +37,9 @@ export function validate(abs: string, content: string) {
       throw new WriteError(400, `Not valid JSON: ${e.message}`);
     }
   }
-  if (ext === ".md" && content.startsWith("---")) {
-    try {
-      // gray-matter caches by content; pass an options object to force a fresh parse.
-      matter(content, {});
-    } catch (e: any) {
-      throw new WriteError(400, `The frontmatter is not valid YAML: ${e.reason ?? e.message}`);
-    }
+  if (ext === ".md") {
+    const { error } = parseFrontmatter(content);
+    if (error) throw new WriteError(400, error);
   }
 }
 

@@ -33,6 +33,7 @@ export const ccTheme = EditorView.theme({
   ".cm-scroller": { lineHeight: "1.6" },
   ".cm-panels": { backgroundColor: "var(--panel)", color: "var(--ink)", borderColor: "var(--line)" },
   ".cm-searchMatch": { backgroundColor: "var(--attn-soft)", outline: "1px solid var(--attn-line)" },
+  ".cm-selectionMatch": { backgroundColor: "color-mix(in srgb, var(--accent) 80%, transparent)" },
   ".cm-tooltip": { backgroundColor: "var(--surface)", border: "1px solid var(--line)" },
   ".cm-changedLine": { backgroundColor: "color-mix(in srgb, var(--ok-soft) 70%, transparent) !important" },
   ".cm-deletedChunk": { backgroundColor: "var(--danger-soft) !important" },

@@ -36,8 +36,8 @@ function NeedsYouCard({ item }: { item: Overview["needsYou"][number] }) {
     return (
       <div className="flex flex-col gap-2.5 rounded-lg border border-attn-line bg-surface p-4">
         <div className="flex justify-between gap-2 text-xs text-muted-foreground">
-          <span className="font-mono">{item.cwd}</span>
-          <span>Live session, {ago(item.at)}</span>
+          <span className="min-w-0 truncate font-mono">{item.cwd}</span>
+          <span className="flex-none">Live session, {ago(item.at)}</span>
         </div>
         <div className="text-[15px] font-semibold">{isQ ? "Claude has a question" : `Claude wants to use ${r.toolName}`}</div>
         {isQ ? (
@@ -69,8 +69,8 @@ function NeedsYouCard({ item }: { item: Overview["needsYou"][number] }) {
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border border-attn-line bg-surface p-4">
       <div className="flex justify-between gap-2 text-xs text-muted-foreground">
-        <span className="font-mono">{item.cwd ?? ""}</span>
-        <span>Background job, since {when(item.at)}</span>
+        <span className="min-w-0 truncate font-mono">{item.cwd ?? ""}</span>
+        <span className="flex-none">Background job, since {when(item.at)}</span>
       </div>
       <div className="text-[15px] font-semibold">{item.name ?? "Unnamed job"}</div>
       <p className="line-clamp-3 text-ink-2">{item.detail || "Stopped and waiting for an answer before it can go on."}</p>

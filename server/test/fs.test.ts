@@ -69,7 +69,10 @@ describe("safeWrite", async () => {
     expect((await safeWrite(file(), "{nope", h).catch((e) => e)).status).toBe(400);
     const cmd = join(claude, "commands", "hello.md");
     const ch = (await readWithHash(cmd))!.hash;
-    expect((await safeWrite(cmd, "---\ndescription: [unclosed\n---\n", ch).catch((e) => e)).status).toBe(400);
+    expect((await safeWrite(cmd, "---\ndescription: no closing fence\nbody\n", ch).catch((e) => e)).status).toBe(400);
+    // Values YAML rejects but Claude Code accepts must still save.
+    const ok = await safeWrite(cmd, "---\ndescription: hi\nargument-hint: [name] [--project | --personal]\n---\nbody\n", ch);
+    expect(ok.hash).toBeTruthy();
   });
 
   test("refuses files Claude Code owns and files outside", async () => {
