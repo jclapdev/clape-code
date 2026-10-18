@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useTheme } from "next-themes";
 import { Page } from "@/components/Panes";
-import { Loading, useConfirm } from "@/components/ui";
+import { ErrorNote, Loading, useConfirm } from "@/components/ui";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -93,7 +93,7 @@ function UsageCard() {
     .map(([k, n]) => `${k.slice(5)} ${n}`)
     .join(", ");
   return (
-    <Card title="How you use this app">
+    <Card title="Usage statistics">
       <p className="text-[13px] text-muted-foreground">Counted on this computer only, for reviewing what to build next. Save feedback from the search box (⌘K): type a note and choose “Save as feedback”.</p>
       <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-[13.5px]">
         {Object.entries(METRIC_LABEL).map(([k, label]) => (
@@ -141,9 +141,10 @@ export function PreferencesPage() {
   });
 
   if (q.isLoading) return <Loading />;
-  const c = q.data!;
+  if (!q.data) return <ErrorNote error={q.error ?? new Error("Your preferences couldn't be loaded.")} onRetry={() => q.refetch()} />;
+  const c = q.data;
   return (
-    <Page title="Preferences">
+    <Page title="App preferences">
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(340px,1fr))]">
         <Card title="Appearance">
           <div className="flex items-center justify-between gap-3">
@@ -213,7 +214,7 @@ export function PreferencesPage() {
 
         <UsageCard />
 
-        <Card title="Keyboard">
+        <Card title="Keyboard shortcuts">
           <ul className="flex flex-col gap-2">
             {SHORTCUTS.map(([keys, what]) => (
               <li key={what} className="flex items-center justify-between gap-3 text-[13.5px]">

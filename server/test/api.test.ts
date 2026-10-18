@@ -89,3 +89,32 @@ describe("login rate limit", () => {
     await saveConfig({ ...cfg, lan: { enabled: false, passwordHash: null } });
   });
 });
+
+describe("errors", () => {
+  test("permission errors are reworded", async () => {
+    if (process.platform === "win32") return;
+    const { chmod } = await import("node:fs/promises");
+    const f = join(root, "projects", "demo", "locked.md");
+    await writeFile(f, "x");
+    await chmod(f, 0o000);
+    const res = await request(`/api/file?path=${encodeURIComponent(f)}`);
+    await chmod(f, 0o644);
+    const body = await res.json();
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("The app doesn't have permission to open this file.");
+    expect(JSON.stringify(body)).not.toContain("EACCES");
+  });
+  test("missing-file errors are reworded", async () => {
+    const res = await request(`/api/file?path=${encodeURIComponent(join(root, "projects", "demo", "gone.md"))}`);
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe("This file no longer exists. It may have been moved or deleted.");
+    const { errorResponse } = await import("../src/errors");
+    const raw = Object.assign(new Error("ENOENT: no such file or directory, open '/x'"), { code: "ENOENT" });
+    expect(errorResponse(raw)).toEqual({ status: 404, error: "This file no longer exists. It may have been moved or deleted." });
+  });
+  test("unknown errors hide internals", async () => {
+    const { errorResponse } = await import("../src/errors");
+    const r = errorResponse(new Error("Cannot read properties of undefined (reading 'x') at /Users/john/secret.ts"));
+    expect(r).toEqual({ status: 500, error: "Something went wrong on the server. Try again." });
+  });
+});

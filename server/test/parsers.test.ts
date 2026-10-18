@@ -92,16 +92,44 @@ describe("changelog", () => {
   test("adds a new day above the newest", () => {
     const out = addEntry(CHANGELOG, "A new thing.", new Date(2026, 9, 17));
     expect(out).toContain("first.\n\n## 17 October 2026\n\n- A new thing.\n\n## 15 October 2026");
-    expect(parseChangelog(out).days[0]).toEqual({ date: "17 October 2026", line: 4, entries: ["A new thing."] });
+    expect(parseChangelog(out).days[0]).toEqual({ date: "17 October 2026", line: 4, entries: ["A new thing."], kinds: [null] });
   });
 
   test("appends under an existing day", () => {
     const out = addEntry(CHANGELOG, "Second.", new Date(2026, 9, 15));
     expect(out.endsWith("- The lab now starts reliably.\n- Second.\n")).toBe(true);
   });
+
+  const KEEP = "# Changelog\n\nIntro.\n\n## Unreleased\n\n### Added\n\n- Search.\n\n### Fixed\n\n- Home count.\n\n## 2026-10-17\n\n### Added\n\n- First version.\n\n\n\n- odd spacing kept\n";
+
+  test("Keep a Changelog: a change joins its group under Unreleased", () => {
+    const out = addEntry(KEEP, "Guides.", new Date(2026, 9, 18), "Added");
+    expect(out).toBe(KEEP.replace("- Search.\n", "- Search.\n- Guides.\n"));
+    const un = parseChangelog(out).days[0]!;
+    expect(un.date).toBe("Unreleased");
+    expect(un.entries).toEqual(["Search.", "Guides.", "Home count."]);
+    expect(un.kinds).toEqual(["Added", "Added", "Fixed"]);
+  });
+
+  test("Keep a Changelog: a missing group is created in the standard order, other lines untouched", () => {
+    const out = addEntry(KEEP, "Menu.", new Date(2026, 9, 18), "Changed");
+    expect(out).toBe(KEEP.replace("### Fixed", "### Changed\n\n- Menu.\n\n### Fixed"));
+    const removed = addEntry(KEEP, "Palette.", new Date(2026, 9, 18), "Security");
+    expect(removed).toBe(KEEP.replace("- Home count.\n\n## 2026", "- Home count.\n\n### Security\n\n- Palette.\n\n## 2026"));
+  });
 });
 
 describe("settings", () => {
+  test("invalid JSON names the line", async () => {
+    const { validate } = await import("../src/fs/safeWrite");
+    let msg = "";
+    try {
+      validate("/x/settings.json", '{\n  "a": 1,\n  "b": }\n');
+    } catch (e: any) {
+      msg = e.message;
+    }
+    expect(msg).toBe('This isn\'t valid JSON. Line 3 has a mistake near: "b": }');
+  });
   const eff = effective({
     user: { model: "opus", permissions: { allow: ["Read"] }, hooks: { Stop: [{ a: 1 }] } },
     project: { permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [{ b: 2 }], PreToolUse: [{ c: 3 }] } },

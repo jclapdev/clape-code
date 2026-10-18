@@ -28,6 +28,7 @@ export interface SessionSummary {
   costUSD: number | null;
   continuedIn: string | null;
   kind: string | null; // e.g. "bg" for background jobs
+  plans: string[]; // plan files this session wrote in plan mode, oldest first
   searchText: string; // prompts and Claude's replies in conversation order, capped, for search
 }
 
@@ -89,6 +90,7 @@ export class Summarizer {
       costUSD: null,
       continuedIn: null,
       kind: null,
+      plans: [],
       searchText: "",
     };
   }
@@ -103,6 +105,11 @@ export class Summarizer {
     const d = parse(raw);
     if (!d) return;
     const s = this.s;
+    // Plan mode records the plan file on the ExitPlanMode result as planFilePath.
+    for (const m of raw.matchAll(/"planFilePath":"((?:[^"\\]|\\.)+)"/g)) {
+      const p = JSON.parse(`"${m[1]}"`) as string;
+      if (!s.plans.includes(p)) s.plans.push(p);
+    }
     if (d.sessionId && s.sessionId === this.fallbackId) s.sessionId = d.sessionId;
     if (d.cwd && !s.cwd) s.cwd = d.cwd;
     if (d.gitBranch) s.gitBranch = d.gitBranch;

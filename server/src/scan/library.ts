@@ -189,6 +189,14 @@ export async function globalLibrary(): Promise<{ items: LibraryItem[]; plugins: 
   }
   items.push(...(await hookScripts(join(cd, "hooks"), "user", null)));
   items.push(...(await hookDefs([join(cd, "settings.json"), join(cd, "settings.local.json")], "user", null)));
+  for (const [f, description] of [
+    ["settings.json", "Your settings for every project"],
+    ["settings.local.json", "Your personal settings for every project, not shared"],
+    ["keybindings.json", "Your keyboard shortcuts in Claude Code"],
+  ] as const) {
+    const p = join(cd, f);
+    if (await Bun.file(p).exists()) items.push(await item({ kind: "settings", name: f, description, path: p, source: "user" }));
+  }
   return { items, plugins };
 }
 

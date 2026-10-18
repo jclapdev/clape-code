@@ -83,10 +83,13 @@ export interface Turn {
 
 export interface ProjectDetail extends Omit<Project, "sessions" | "backlog" | "docs"> {
   abs: string;
-  backlog: { title: string | null; intro: string; sections: BacklogSection[]; numbered: boolean; checkboxes: boolean; hash: string; path: string } | null;
-  changelog: { title: string | null; days: { date: string; line: number; entries: string[] }[]; hash: string; path: string } | null;
+  backlog: { title: string | null; intro: string; sections: BacklogSection[]; numbered: boolean; checkboxes: boolean; hash: string; path: string; file: "PROGRESS.md" | "BACKLOG.md" } | null;
+  changelog: { title: string | null; days: { date: string; line: number; entries: string[]; kinds: (string | null)[] }[]; keep: boolean; hash: string; path: string } | null;
   docs: { name: string; path: string }[];
   library: LibraryItem[];
+  plans: { path: string; title: string; sessionId: string; sessionTitle: string; at: string | null; open: string[] }[];
+  memory: LibraryItem[];
+  mcpServers: { path: string; servers: { name: string; type: string; runs: string }[]; error?: string | null };
   worktrees: { name: string; path: string }[];
   sessions: (Session & { worktree: boolean })[];
 }
@@ -151,6 +154,13 @@ export interface LiveSession {
   startedAt: string;
   events: LiveEvent[];
   pending: PendingRequest[];
+  commands: SlashCommand[];
+}
+
+export interface SlashCommand {
+  name: string;
+  description: string;
+  argumentHint: string;
 }
 
 export interface FileData {

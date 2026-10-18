@@ -19,6 +19,16 @@ export function LoginGate({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("cc:login-required", onNeed);
   }, [qc]);
 
+  if (status.isError && !status.data)
+    return (
+      <div className="grid h-full place-items-center p-4">
+        <div className="flex max-w-sm flex-col gap-3 rounded-xl border border-line bg-surface p-6">
+          <h1 className="text-[18px] font-semibold">Connection lost</h1>
+          <p className="text-ink-2">The app's server isn't answering. If you closed the terminal it runs in, start it again, then try again.</p>
+          <Button onClick={() => status.refetch()}>Try again</Button>
+        </div>
+      </div>
+    );
   if (!status.data || status.data.loggedIn) return <>{children}</>;
 
   const submit = async (e: FormEvent) => {

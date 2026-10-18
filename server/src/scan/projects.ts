@@ -70,12 +70,21 @@ export function projectPathOf(cwd: string): string {
   return i >= 0 ? cwd.slice(0, i) : cwd;
 }
 
-async function backlogCounts(dir: string) {
+/** The project's handoff note: PROGRESS.md (Done / In progress / Next / Notes), or an older BACKLOG.md. */
+export function handoffName(entries: string[]): "PROGRESS.md" | "BACKLOG.md" | null {
+  return entries.includes("PROGRESS.md") ? "PROGRESS.md" : entries.includes("BACKLOG.md") ? "BACKLOG.md" : null;
+}
+
+/** Sections whose items count as still to do; Done and Notes don't. */
+export const isOpenSection = (name: string) => !/^(done|notes?)\b/i.test(name.trim());
+
+async function backlogCounts(dir: string, file: string) {
   try {
-    const b = parseBacklog(await readFile(join(dir, "BACKLOG.md"), "utf8"));
-    const items = b.sections.flatMap((s) => s.items);
-    const done = items.filter((i) => i.done === true).length;
-    return { open: items.length - done, done, total: items.length };
+    const b = parseBacklog(await readFile(join(dir, file), "utf8"));
+    const items = b.sections.filter((s) => isOpenSection(s.name)).flatMap((s) => s.items);
+    const open = items.filter((i) => i.done === false || i.done === null).length;
+    const done = b.sections.flatMap((s) => s.items).filter((i) => i.done === true).length;
+    return { open, done, total: open + done };
   } catch {
     return null;
   }
@@ -122,7 +131,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
         hasClaudeDir: entries.includes(".claude"),
         isPlugin: entries.includes(".claude-plugin"),
         docs: entries.filter((e) => /\.md$/i.test(e)).sort(),
-        backlog: entries.includes("BACKLOG.md") ? await backlogCounts(dir) : null,
+        backlog: handoffName(entries) ? await backlogCounts(dir, handoffName(entries)!) : null,
         sessions: mine.length,
         lastSessionAt: mine[0]?.lastAt ?? null,
         git: await gitInfo(dir),

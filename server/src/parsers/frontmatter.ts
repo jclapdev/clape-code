@@ -34,13 +34,13 @@ function lenient(block: string): Record<string, any> | null {
 export function parseFrontmatter(text: string): Frontmatter {
   if (!text.startsWith("---")) return { data: {}, body: text, error: null };
   const fence = FENCE.exec(text);
-  if (!fence) return { data: {}, body: text, error: "The frontmatter has no closing --- line." };
+  if (!fence) return { data: {}, body: text, error: "The header at the top of the file starts with --- but has no closing --- line." };
   try {
     const m = matter(text, {}); // options object: gray-matter caches by content otherwise
     return { data: m.data ?? {}, body: m.content, error: null };
   } catch (e: any) {
     const data = lenient(fence[1]);
     if (data) return { data, body: text.slice(fence[0].length), error: null };
-    return { data: {}, body: text, error: `The frontmatter can't be read: ${e.reason ?? e.message}` };
+    return { data: {}, body: text, error: `The header at the top of the file (between the --- lines) has a mistake${e.mark?.line != null ? ` on line ${e.mark.line + 1}` : ""}: ${e.reason ?? "it can't be read"}.` };
   }
 }

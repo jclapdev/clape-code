@@ -1,6 +1,7 @@
 // App-level pieces composed from shadcn/ui components. The primitives themselves live in ./ui/.
 import { ThemeProvider } from "next-themes";
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Component, createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "./ui/empty";
 import { Toaster } from "./ui/sonner";
 import { Spinner } from "./ui/spinner";
@@ -74,19 +76,71 @@ export function EmptyState({ title, children, action }: { title: string; childre
   );
 }
 
-export function ErrorNote({ error }: { error: unknown }) {
+/** A failed request, in words, with a way to try again. */
+export function ErrorNote({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  const qc = useQueryClient();
   if (!error) return null;
+  const retry = onRetry ?? (() => void qc.refetchQueries({ type: "active" }));
   return (
     <Alert variant="destructive" className="m-4 w-auto">
-      <AlertDescription>{(error as Error).message ?? String(error)}</AlertDescription>
+      <AlertDescription className="flex flex-wrap items-center gap-3">
+        <span className="flex-1">{(error as Error).message || "Something went wrong."}</span>
+        <Button size="sm" variant="outline" onClick={retry}>
+          Try again
+        </Button>
+      </AlertDescription>
     </Alert>
   );
 }
 
-export function Md({ children, className }: { children: string; className?: string }) {
+/** Catches a page that fails while drawing, so the menu stays usable. */
+export class PageErrorBoundary extends Component<{ children: ReactNode; resetKey: string }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error) {
+    console.error(error);
+  }
+  componentDidUpdate(prev: { resetKey: string }) {
+    if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="p-6 md:p-10">
+        <div className="flex max-w-lg flex-col gap-3 rounded-lg border border-line bg-surface p-5">
+          <h2 className="text-[17px] font-semibold">This page hit a problem</h2>
+          <p className="text-ink-2">Something on this page failed while it was being shown. Your files weren't changed.</p>
+          <div className="flex gap-2">
+            <Button onClick={() => this.setState({ error: null })}>Try again</Button>
+            <Button variant="outline" asChild>
+              <a href="/" className="no-underline">Go home</a>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+/** Dev only: ?crash=1 makes the page throw, to check the boundary above. */
+export function CrashForTesting(): never {
+  throw new Error("Test crash");
+}
+
+/** Headings one level per step deeper, so a document shown inside a section sits under the section's heading. */
+const nestedHeadings = Object.fromEntries(
+  ([1, 2, 3, 4, 5, 6] as const).map((n) => {
+    const Tag = `h${Math.min(n + 2, 6)}` as "h3";
+    return [`h${n}`, ({ children }: { children?: ReactNode }) => <Tag>{children}</Tag>];
+  }),
+);
+
+export function Md({ children, className, nested }: { children: string; className?: string; nested?: boolean }) {
   return (
     <div className={cn("prose-cc", className)}>
-      <Markdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a> }}>
+      <Markdown remarkPlugins={[remarkGfm]} components={{ ...(nested ? nestedHeadings : {}), a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a> }}>
         {children}
       </Markdown>
     </div>

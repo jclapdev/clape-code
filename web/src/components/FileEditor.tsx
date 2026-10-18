@@ -7,6 +7,7 @@ import { api, ApiError, enc } from "@/lib/api";
 import { bytes, when } from "@/lib/format";
 import type { FileData } from "@/lib/types";
 import { DiffView, Editor } from "./Editor";
+import { MarkdownEditor } from "./MarkdownEditor";
 import { AccessTag, ErrorNote, Loading } from "./ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 
@@ -64,6 +65,7 @@ export function FileEditor({ path, header, onSaved, line }: { path: string; head
   const dirty = text !== null && base !== null && text !== base.content;
 
   const isSkill = /[\\/]SKILL\.md$/.test(path);
+  const isMarkdown = /\.(md|markdown)$/i.test(path);
 
   const save = async (overHash?: string | null, opts: { skipCheck?: boolean } = {}) => {
     if (text === null || !base) return;
@@ -108,7 +110,11 @@ export function FileEditor({ path, header, onSaved, line }: { path: string; head
         <div className="p-6 text-muted-foreground">This file is too large to open here.</div>
       ) : (
         <div className="min-h-0 flex-1 overflow-hidden">
-          <Editor value={text ?? ""} onChange={setText} path={path} line={line} readOnly={!editable} onSave={() => editable && dirty && save()} />
+          {isMarkdown ? (
+            text !== null && <MarkdownEditor value={text} onChange={setText} path={path} readOnly={!editable} onSave={() => editable && save()} />
+          ) : (
+            <Editor value={text ?? ""} onChange={setText} path={path} line={line} readOnly={!editable} onSave={() => editable && dirty && save()} />
+          )}
         </div>
       )}
       {editable && (

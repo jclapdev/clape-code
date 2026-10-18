@@ -192,16 +192,25 @@ export function MapPage() {
   const [hideMissing, setHideMissing] = useState(true);
   const [view, setView] = useState<"table" | "tree">("table");
   const navigate = useNavigate();
+  // Entries point at where each thing is shown: a section of Settings, or a project page.
+  const SECTION: Record<string, string> = { skill: "skills", agent: "agents", command: "commands", rule: "rules", "output-style": "output-styles", hook: "hooks", plan: "plans", "claude-md": "instructions", memory: "plans" };
   const open = (link: string) => {
     const [pathname, query = ""] = link.split("?");
-    navigate({ to: pathname, search: Object.fromEntries(new URLSearchParams(query)) } as any);
+    const params = Object.fromEntries(new URLSearchParams(query));
+    if (pathname === "/library" || pathname === "/settings") {
+      const hash = pathname === "/settings" ? "settings" : SECTION[params.kind ?? ""] ?? "";
+      if (params.scope && params.scope !== "global") navigate({ to: "/projects/$id", params: { id: params.scope }, search: {}, hash });
+      else navigate({ to: "/setup", hash });
+      return;
+    }
+    navigate({ to: pathname, search: params } as any);
   };
   const groups = (q.data?.groups ?? [])
     .map((g) => ({ ...g, entries: g.entries.filter((e) => (f === "all" || e.access === f) && (!hideMissing || e.exists || e.access === "secret")) }))
     .filter((g) => g.entries.length);
 
   return (
-    <Page title="Map" sub="Every file and folder Claude Code uses on this machine: what it is, its format, and whether you can edit it." wide>
+    <Page title="File locations" sub="Each file and folder Claude Code reads on this computer: what it is, its format, and whether you can change it here." wide>
       {q.data && <PrecedenceStrip items={q.data.precedence} />}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <ToggleGroup type="single" variant="outline" size="sm" value={f} onValueChange={(v) => v && setF(v as typeof f)} aria-label="Filter by access" className="flex-wrap">

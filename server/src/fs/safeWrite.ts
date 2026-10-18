@@ -4,10 +4,11 @@ import { basename, dirname, extname, join, relative } from "node:path";
 import { parseFrontmatter } from "../parsers/frontmatter";
 import { backupsDir, home, isInside } from "./paths";
 import { canWrite, classify } from "./policy";
+import { jsonProblem } from "../errors";
 
 export class WriteError extends Error {
   constructor(
-    public status: 400 | 403 | 404 | 409,
+    public status: 400 | 403 | 404 | 409 | 502,
     message: string,
     public current?: { content: string; hash: string | null },
   ) {
@@ -31,11 +32,8 @@ export async function readWithHash(abs: string): Promise<{ content: string; hash
 export function validate(abs: string, content: string) {
   const ext = extname(abs).toLowerCase();
   if (ext === ".json") {
-    try {
-      JSON.parse(content);
-    } catch (e: any) {
-      throw new WriteError(400, `Not valid JSON: ${e.message}`);
-    }
+    const problem = jsonProblem(content);
+    if (problem) throw new WriteError(400, problem);
   }
   if (ext === ".md") {
     const { error } = parseFrontmatter(content);

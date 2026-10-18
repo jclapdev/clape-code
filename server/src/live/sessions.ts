@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { emit } from "../events";
-import { tildify } from "../fs/paths";
+import { appDir, tildify } from "../fs/paths";
 import { toolSummary } from "../parsers/transcript";
 
 // Sessions started from the browser. Each one runs the Agent SDK in streaming-input mode so
@@ -45,6 +45,7 @@ export interface LiveSessionView {
   startedAt: string;
   events: LiveEvent[];
   pending: PendingRequest[];
+  commands: { name: string; description: string; argumentHint: string }[];
 }
 
 class AsyncQueue<T> implements AsyncIterable<T> {
@@ -108,6 +109,9 @@ class LiveSession {
   q: Query;
   abort = new AbortController();
   toolIndex = new Map<string, Extract<LiveEvent, { kind: "tool" }>>();
+  // Slash commands this session accepts, from Claude Code itself. Terminal-only ones (exit, statusline…) are left out.
+  commands: LiveSessionView["commands"] = [];
+  terminalOnly = new Set<string>();
 
   constructor(
     public cwd: string,
@@ -142,7 +146,17 @@ class LiveSession {
       startedAt: this.startedAt,
       events: this.events,
       pending: [...this.waiters.values()].map((w) => w.req),
+      commands: this.commands,
     };
+  }
+
+  setCommands(list: { name: string; description: string; argumentHint: string }[]) {
+    this.commands = list
+      .filter((c) => !this.terminalOnly.has(c.name))
+      .map((c) => ({ name: c.name, description: c.description ?? "", argumentHint: c.argumentHint ?? "" }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    rememberCommands(this.commands);
+    this.changed();
   }
 
   private changed() {
@@ -225,8 +239,17 @@ class LiveSession {
   private handle(m: SDKMessage) {
     const at = now();
     if ("session_id" in m && m.session_id && !this.sessionId) this.sessionId = m.session_id;
+    if (m.type === "system" && (m as any).subtype === "commands_changed") {
+      this.setCommands((m as any).commands ?? []);
+      return;
+    }
     if (m.type === "system" && (m as any).subtype === "init") {
       this.model = (m as any).model ?? this.model;
+      this.terminalOnly = new Set((m as any).terminal_slash_commands ?? []);
+      this.q.supportedCommands().then(
+        (c) => this.setCommands(c),
+        () => {},
+      );
       this.setStatus(this.waiters.size ? "waiting" : "working");
       return;
     }
@@ -298,4 +321,23 @@ export function removeSession(id: string) {
 
 export function stopAll() {
   for (const s of sessions.values()) if (s.status !== "stopped") s.stop();
+}
+
+// The last full command list a session reported, kept so a new session's first message can offer them too.
+const knownPath = () => join(appDir(), "commands.json");
+let known: LiveSessionView["commands"] | null = null;
+
+function rememberCommands(list: LiveSessionView["commands"]) {
+  known = list;
+  void Bun.write(knownPath(), JSON.stringify(list)).catch(() => {});
+}
+
+export async function knownCommands(): Promise<LiveSessionView["commands"]> {
+  if (known) return known;
+  try {
+    known = JSON.parse(await Bun.file(knownPath()).text());
+  } catch {
+    known = [];
+  }
+  return known ?? [];
 }

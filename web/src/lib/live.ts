@@ -24,12 +24,23 @@ export function useWaiting() {
   return n;
 }
 
+// The tab shows how many sessions wait for you, then the page you're on: "(1) cka-prep – Control Center".
+let pageName = "";
+function applyTitle() {
+  const base = pageName ? `${pageName} – Control Center` : "Control Center";
+  document.title = waitingNow ? `(${waitingNow}) ${base}` : base;
+}
+export function setPageTitle(name: string) {
+  pageName = name;
+  applyTitle();
+}
+
 function notify(n: number) {
   if (n > waitingNow && document.hidden && "Notification" in window && Notification.permission === "granted") {
     new Notification("Claude needs you", { body: n === 1 ? "A session is waiting for your answer." : `${n} sessions are waiting for your answer.` });
   }
   waitingNow = n;
-  document.title = n ? `(${n}) Control Center` : "Control Center";
+  applyTitle();
   for (const l of waitingListeners) l(n);
 }
 

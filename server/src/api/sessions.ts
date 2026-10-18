@@ -9,7 +9,8 @@ import { WriteError } from "../fs/safeWrite";
 import { parseChangelog } from "../parsers/changelog";
 import { TurnBuilder } from "../parsers/transcript";
 import { readLines } from "../fs/lines";
-import { getSession, listLive, removeSession, startSession, waitingCount } from "../live/sessions";
+import { getSession, knownCommands, listLive, removeSession, startSession, waitingCount } from "../live/sessions";
+import { globalLibrary, projectLibrary } from "../scan/library";
 import { listJobs, listLiveProcesses } from "../scan/jobs";
 import { listProjects, projectDir, projectPathOf } from "../scan/projects";
 import { ls, readJson } from "../scan/md";
@@ -56,7 +57,7 @@ sessions.get("/sessions", async (c) => {
 
 sessions.get("/sessions/:sid", async (c) => {
   const sid = c.req.param("sid");
-  if (!UUID.test(sid)) throw new WriteError(400, "Bad session id.");
+  if (!UUID.test(sid)) throw new WriteError(400, "That isn't a valid session link.");
   const s = sessionById(sid);
   if (!s) throw new WriteError(404, "No such session.");
   const { archived, running, projectOf } = await context();
@@ -82,7 +83,7 @@ sessions.get("/sessions/:sid", async (c) => {
 
 sessions.get("/sessions/:sid/subagents/:agentId", async (c) => {
   const { sid, agentId } = c.req.param();
-  if (!UUID.test(sid) || !/^[\w-]+$/.test(agentId)) throw new WriteError(400, "Bad id.");
+  if (!UUID.test(sid) || !/^[\w-]+$/.test(agentId)) throw new WriteError(400, "That isn't a valid link to a helper run.");
   const s = sessionById(sid);
   if (!s) throw new WriteError(404, "No such session.");
   const file = join(s.file.replace(/\.jsonl$/, ""), "subagents", `agent-${agentId}.jsonl`);
@@ -145,13 +146,22 @@ sessions.get("/jobs/:id", async (c) => {
 
 // ---- Overview ----
 
+/** A background session stopped by a usage limit more than a day ago; limits reset within hours. */
+export function isStaleLimit(j: { detail: string | null; updatedAt: string | null }, now = Date.now()) {
+  return /limit/i.test(j.detail ?? "") && !!j.updatedAt && now - Date.parse(j.updatedAt) > 24 * 3600_000;
+}
+
 sessions.get("/overview", async (c) => {
   const [jobs, projects] = await Promise.all([listJobs(false), listProjects()]);
   const live = listLive();
+  const named = (j: (typeof jobs)[number]) => j.name ?? `Session in ${j.cwd ? j.cwd.split(/[\\/]/).filter(Boolean).pop() : "an unknown folder"}`;
+  const blocked = jobs.filter((j) => j.state === "blocked");
   const needsYou = [
     ...live.filter((l) => l.pending.length).map((l) => ({ type: "live" as const, id: l.id, cwd: l.cwd, request: l.pending[0], at: l.pending[0].at })),
-    ...jobs.filter((j) => j.state === "blocked").map((j) => ({ type: "job" as const, id: j.id, name: j.name, cwd: j.cwd, detail: j.detail, sessionId: j.sessionId, at: j.updatedAt })),
+    ...blocked.filter((j) => !isStaleLimit(j)).map((j) => ({ type: "job" as const, id: j.id, name: named(j), cwd: j.cwd, detail: j.detail, sessionId: j.sessionId, at: j.updatedAt })),
   ];
+  // Stopped by a usage limit that has long since reset: nothing to answer, just something to continue.
+  const paused = blocked.filter((j) => isStaleLimit(j)).map((j) => ({ id: j.id, name: named(j), cwd: j.cwd, sessionId: j.sessionId, at: j.updatedAt }));
   const changes: { project: string; projectId: string; date: string; text: string }[] = [];
   for (const p of projects.filter((p) => p.group === "root" && p.docs.includes("CHANGELOG.md"))) {
     try {
@@ -159,12 +169,15 @@ sessions.get("/overview", async (c) => {
       for (const d of days.slice(0, 1)) for (const e of d.entries.slice(0, 2)) changes.push({ project: p.name, projectId: p.id, date: d.date, text: e });
     } catch {}
   }
-  changes.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  // "Unreleased" (Keep a Changelog) is newer than any dated section.
+  const when = (d: string) => (/^unreleased$/i.test(d) ? Infinity : Date.parse(d) || 0);
+  changes.sort((a, b) => when(b.date) - when(a.date));
   const counts: Record<string, number> = {};
   for (const j of jobs) counts[j.state] = (counts[j.state] ?? 0) + 1;
   return c.json({
     needsYou,
-    jobs: jobs.slice(0, 6),
+    paused,
+    jobs: jobs.slice(0, 6).map((j) => ({ ...j, name: named(j) })),
     jobCounts: counts,
     live: live.filter((l) => l.status !== "stopped").length,
     projects: projects.filter((p) => p.group === "root" && !p.empty).slice(0, 6),
@@ -176,6 +189,22 @@ sessions.get("/overview", async (c) => {
 // ---- Live sessions ----
 
 sessions.get("/live", (c) => c.json(listLive()));
+
+/** Commands a new session will accept: your skills and commands, plus Claude Code's own from the last session that ran. */
+sessions.get("/live-commands", async (c) => {
+  const proj = c.req.query("project");
+  const dir = proj ? await projectDir(proj) : null;
+  const lib = [...(await globalLibrary()).items, ...(dir ? await projectLibrary(dir) : [])];
+  const out = new Map<string, { name: string; description: string; argumentHint: string }>();
+  for (const k of await knownCommands()) out.set(k.name, k);
+  for (const i of lib) {
+    if ((i.kind !== "skill" && i.kind !== "command") || i.state === "off") continue;
+    const base = (i.folder ? i.folder.split(/[\\/]/).filter(Boolean).pop()! : i.name).replace(/\.md$/, "");
+    const name = i.source === "plugin" ? `${i.sourceName}:${base}` : base;
+    if (!out.has(name)) out.set(name, { name, description: i.description, argumentHint: String(i.meta?.["argument-hint"] ?? "") });
+  }
+  return c.json([...out.values()].sort((a, b) => a.name.localeCompare(b.name)));
+});
 
 sessions.post("/live", async (c) => {
   const body = await c.req.json();

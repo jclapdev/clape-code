@@ -1,10 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { api } from "@/lib/api";
 import { when } from "@/lib/format";
-import { copy, resumeCommand } from "@/lib/resume";
+import { copyCommand, resumeCommand } from "@/lib/resume";
 import type { Job } from "@/lib/types";
 import { DetailHeader, ListGroup, TwoPane } from "@/components/Panes";
 import { Dot, EmptyState, ErrorNote, Loading, Tag, cn } from "@/components/ui";
@@ -40,7 +39,7 @@ function JobList({ selected }: { selected: string | null }) {
               <Link key={j.id} to="/jobs/$id" params={{ id: j.id }} className={cn("flex flex-col gap-0.5 rounded-md px-2.5 py-2 text-ink no-underline hover:bg-sunken", selected === j.id && "bg-surface shadow-[0_0_0_1px_var(--line-strong)]")}>
                 <span className="flex items-center gap-2">
                   <Dot tone={TONE[j.state] ?? "muted"} />
-                  <span className="min-w-0 flex-1 truncate font-medium">{j.name ?? "Unnamed job"}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{j.name ?? "Background session"}</span>
                 </span>
                 <span className="flex gap-2 pl-4 text-xs text-muted-foreground">
                   <span className="truncate font-mono">{j.cwd}</span>
@@ -50,7 +49,7 @@ function JobList({ selected }: { selected: string | null }) {
             ))}
         </ListGroup>
       ))}
-      {!jobs.length && <p className="px-5 text-muted-foreground">No background jobs yet.</p>}
+      {!jobs.length && <p className="px-5 text-muted-foreground">No background sessions yet.</p>}
     </div>
   );
 }
@@ -64,7 +63,7 @@ function JobDetail({ id }: { id: string }) {
   return (
     <div>
       <DetailHeader
-        title={j.name ?? "Unnamed job"}
+        title={j.name ?? "Background session"}
         sub={
           <span className="flex flex-wrap items-center gap-2">
             <Tag tone={j.state === "blocked" ? "attn" : j.state === "done" ? "ok" : "accent"}>{LABEL[j.state] ?? j.state}</Tag>
@@ -75,7 +74,7 @@ function JobDetail({ id }: { id: string }) {
         actions={
           <>
             {cmd && (
-              <Button variant="outline" onClick={() => copy(cmd).then((ok) => (ok ? toast.success : toast.error)(ok ? "Resume command copied." : cmd))}>
+              <Button variant="outline" onClick={() => copyCommand(cmd)}>
                 Copy resume command
               </Button>
             )}
@@ -124,7 +123,7 @@ export function JobsPage() {
       hasSelection={!!id}
       onBack={() => navigate({ to: "/jobs" })}
       list={<JobList selected={id ?? null} />}
-      detail={id ? <JobDetail id={id} /> : <EmptyState title="Background jobs">Jobs started in the background show their status and timeline here. Ones waiting for you are listed first.</EmptyState>}
+      detail={id ? <JobDetail id={id} /> : <EmptyState title="No background sessions">Sessions running in the background show their status and timeline here, with ones waiting for you first.</EmptyState>}
     />
   );
 }

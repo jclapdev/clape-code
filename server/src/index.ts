@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { content } from "./api/content";
 import type { Env } from "./api/env";
+import { guides } from "./api/guides";
 import { sessions } from "./api/sessions";
 import { onRestart, system } from "./api/system";
 import { guard, tlsFiles } from "./auth";
@@ -11,6 +12,7 @@ import { getConfig } from "./config";
 import { indexSessions, replaceDocs, type Doc } from "./db/index";
 import { emit } from "./events";
 import { claudeDir, untildify } from "./fs/paths";
+import { errorResponse } from "./errors";
 import { WriteError } from "./fs/safeWrite";
 import { startWatching } from "./fs/watch";
 import { stopAll } from "./live/sessions";
@@ -37,12 +39,14 @@ app.onError((err, c) => {
   if (err instanceof WriteError && err.status === 409) void bump("edits.conflictsCaught");
   if (err instanceof WriteError) return c.json({ error: err.message, current: err.current ?? null }, err.status);
   console.error(err);
-  return c.json({ error: err.message || "Something went wrong." }, 500);
+  const r = errorResponse(err);
+  return c.json({ error: r.error }, r.status as 500);
 });
 
 app.route("/api", system);
 app.route("/api", content);
 app.route("/api", sessions);
+app.route("/api", guides);
 app.all("/api/*", (c) => c.json({ error: "Not found." }, 404));
 
 // ---- The web app: embedded in the compiled executable, or read from web/dist ----

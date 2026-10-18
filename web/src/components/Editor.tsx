@@ -1,5 +1,5 @@
 import { json } from "@codemirror/lang-json";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { python } from "@codemirror/lang-python";
 import { yaml, yamlFrontmatter } from "@codemirror/lang-yaml";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -9,6 +9,7 @@ import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import CodeMirror, { basicSetup } from "@uiw/react-codemirror";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { livePreview } from "./livePreview";
 
 export function languageFor(path: string): Extension[] {
   const p = path.toLowerCase();
@@ -57,18 +58,18 @@ const ccHighlight = syntaxHighlighting(
   ]),
 );
 
-export function Editor({ value, onChange, path, readOnly, onSave, line }: { value: string; onChange: (v: string) => void; path: string; readOnly?: boolean; onSave?: () => void; line?: number }) {
+export function Editor({ value, onChange, path, readOnly, onSave, line, preview }: { value: string; onChange: (v: string) => void; path: string; readOnly?: boolean; onSave?: () => void; line?: number; preview?: boolean }) {
   const saveRef = useRef(onSave);
   saveRef.current = onSave;
   const extensions = useMemo(
     () => [
-      ...languageFor(path),
+      ...(preview ? [yamlFrontmatter({ content: markdown({ base: markdownLanguage }) }), livePreview()] : languageFor(path)),
       ccTheme,
       ccHighlight,
       EditorView.lineWrapping,
       keymap.of([{ key: "Mod-s", preventDefault: true, run: () => (saveRef.current?.(), true) }]),
     ],
-    [path],
+    [path, preview],
   );
   const [view, setView] = useState<EditorView | null>(null);
   const jumped = useRef<string | null>(null);
@@ -92,7 +93,7 @@ export function Editor({ value, onChange, path, readOnly, onSave, line }: { valu
       theme="none"
       height="100%"
       className="h-full"
-      basicSetup={{ foldGutter: false, highlightActiveLine: !readOnly, autocompletion: false }}
+      basicSetup={{ foldGutter: false, highlightActiveLine: !readOnly && !preview, autocompletion: false, lineNumbers: !preview, highlightActiveLineGutter: !preview }}
       aria-label={`Contents of ${path}`}
     />
   );

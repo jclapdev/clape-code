@@ -8,14 +8,16 @@ import { claudeDir, isInside, tildify, untildify } from "../fs/paths";
 import { canRead, classify } from "../fs/policy";
 import { readWithHash, safeWrite, WriteError } from "../fs/safeWrite";
 import { addItem, editItemText, parseBacklog, toggleItem } from "../parsers/backlog";
-import { addEntry, parseChangelog } from "../parsers/changelog";
+import { addEntry, isKeepAChangelog, parseChangelog } from "../parsers/changelog";
 import { effective, type Source } from "../parsers/settings";
 import { search as searchDocs, listSessions, untitled } from "../db/index";
 import { globalLibrary, memoryItems, projectLibrary } from "../scan/library";
 import { buildMap, managedSettingsPath } from "../scan/map";
-import { listProjects, projectDir, projectPathOf } from "../scan/projects";
+import { handoffName, listProjects, projectDir, projectPathOf } from "../scan/projects";
 import { isDir, ls, readMd } from "../scan/md";
 import type { Env } from "./env";
+import { findClaude } from "../live/sessions";
+import { jsonProblem, MISSING_FILE } from "../errors";
 
 export const content = new Hono<Env>();
 
@@ -43,24 +45,77 @@ content.get("/projects", async (c) => c.json(await listProjects()));
 content.get("/projects/:id", async (c) => {
   const dir = await requireProject(c.req.param("id"));
   const summary = (await listProjects()).find((p) => untildify(p.id) === dir)!;
-  const backlogFile = await readWithHash(join(dir, "BACKLOG.md"));
+  const handoff = handoffName(await readdir(dir).catch(() => [] as string[])) ?? "BACKLOG.md";
+  const backlogFile = await readWithHash(join(dir, handoff));
   const changelogFile = await readWithHash(join(dir, "CHANGELOG.md"));
   const worktrees = (await ls(join(dir, ".claude", "worktrees"))).map((n) => ({ name: n, path: tildify(join(dir, ".claude", "worktrees", n)) }));
-  const sessions = listSessions()
-    .filter((s) => s.cwd && isInside(projectPathOf(s.cwd), dir))
+  const all = listSessions().filter((s) => s.cwd && isInside(projectPathOf(s.cwd), dir));
+  const sessions = all
     .slice(0, 100)
     .map(({ file, ...s }) => ({ ...s, displayTitle: s.title ?? untitled(s.firstPrompt), worktree: s.cwd !== projectPathOf(s.cwd!) }));
   return c.json({
     ...summary,
     abs: dir,
-    backlog: backlogFile ? { ...parseBacklog(backlogFile.content), hash: backlogFile.hash, path: join(dir, "BACKLOG.md") } : null,
-    changelog: changelogFile ? { ...parseChangelog(changelogFile.content), hash: changelogFile.hash, path: join(dir, "CHANGELOG.md") } : null,
+    backlog: backlogFile ? { ...parseBacklog(backlogFile.content), hash: backlogFile.hash, path: join(dir, handoff), file: handoff } : null,
+    changelog: changelogFile ? { ...parseChangelog(changelogFile.content), keep: isKeepAChangelog(changelogFile.content), hash: changelogFile.hash, path: join(dir, "CHANGELOG.md") } : null,
     docs: summary.docs.map((d) => ({ name: d, path: join(dir, d) })),
     library: await projectLibrary(dir),
+    plans: await projectPlans(all),
+    memory: (await memoryItems()).filter((m) => m.sourceName && isMemoryOf(m.sourceName, dir)),
+    mcpServers: await mcpServersIn(join(dir, ".mcp.json")),
     worktrees,
     sessions,
   });
 });
+
+/** Plans the project's sessions wrote, newest first, each with the session that wrote it. */
+async function projectPlans(sessions: ReturnType<typeof listSessions>) {
+  const seen = new Map<string, { path: string; title: string; sessionId: string; sessionTitle: string; at: string | null; open: string[] }>();
+  for (const s of sessions) {
+    for (const p of s.plans ?? []) {
+      if (seen.has(p) || !canRead(p) || !(await Bun.file(p).exists())) continue;
+      const md = await readMd(p);
+      const body = md?.body ?? "";
+      const title = body.split("\n").find((l) => l.trim())?.replace(/^#+\s*/, "").trim() || basename(p);
+      // Unticked checklist lines are the plan's unfinished work; they fill Backlog when there's no BACKLOG.md.
+      const open = [...body.matchAll(/^\s*[-*] \[ \] (.+)$/gm)].map((m) => m[1]!.replace(/\s+—\s+check:.*$/, "").trim());
+      seen.set(p, { path: p, title, sessionId: s.sessionId, sessionTitle: s.title ?? untitled(s.firstPrompt), at: s.lastAt, open });
+    }
+  }
+  return [...seen.values()].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
+}
+
+/** Claude Code names a memory folder after the working directory with every other character turned into "-". */
+function isMemoryOf(folder: string, dir: string) {
+  const enc = dir.replace(/[^A-Za-z0-9]/g, "-");
+  return folder === enc || folder.startsWith(`${enc}--claude-worktrees-`);
+}
+
+/** Server names and how each runs, from an .mcp.json. Environment and headers can hold keys, so they're left out. */
+async function mcpServersIn(path: string) {
+  const f = await readWithHash(path).catch(() => null);
+  if (!f) return { path, servers: [] };
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(f.content);
+  } catch {
+    return { path, servers: [], error: jsonProblem(f.content) };
+  }
+  const servers = Object.entries<any>(parsed?.mcpServers ?? {}).map(([name, s]) => ({
+    name,
+    type: String(s?.type ?? (s?.url ? "http" : "stdio")),
+    runs: s?.url
+      ? String(s.url).split("?")[0]
+      : [s?.command, ...(Array.isArray(s?.args) ? s.args : []).filter((a: unknown) => typeof a === "string" && !/key|token|secret|passw|=/i.test(a))]
+          .filter(Boolean)
+          .join(" "),
+  }));
+  return { path, servers };
+}
+
+async function handoffOf(id: string) {
+  return handoffName(await readdir(await requireProject(id)).catch(() => [] as string[])) ?? "BACKLOG.md";
+}
 
 async function editProjectFile(id: string, file: string, hash: string, change: (text: string) => string) {
   const dir = await requireProject(id);
@@ -81,19 +136,19 @@ async function editProjectFile(id: string, file: string, hash: string, change: (
 
 content.post("/projects/:id/backlog/toggle", async (c) => {
   const { line, hash } = await c.req.json();
-  return c.json(await editProjectFile(c.req.param("id"), "BACKLOG.md", hash, (t) => toggleItem(t, line)));
+  return c.json(await editProjectFile(c.req.param("id"), await handoffOf(c.req.param("id")), hash, (t) => toggleItem(t, line)));
 });
 content.post("/projects/:id/backlog/edit", async (c) => {
   const { line, text, hash } = await c.req.json();
-  return c.json(await editProjectFile(c.req.param("id"), "BACKLOG.md", hash, (t) => editItemText(t, line, text)));
+  return c.json(await editProjectFile(c.req.param("id"), await handoffOf(c.req.param("id")), hash, (t) => editItemText(t, line, text)));
 });
 content.post("/projects/:id/backlog/add", async (c) => {
   const { sectionLine, text, hash } = await c.req.json();
-  return c.json(await editProjectFile(c.req.param("id"), "BACKLOG.md", hash, (t) => addItem(t, sectionLine, text)));
+  return c.json(await editProjectFile(c.req.param("id"), await handoffOf(c.req.param("id")), hash, (t) => addItem(t, sectionLine, text)));
 });
 content.post("/projects/:id/changelog", async (c) => {
-  const { text, hash } = await c.req.json();
-  return c.json(await editProjectFile(c.req.param("id"), "CHANGELOG.md", hash, (t) => addEntry(t, text)));
+  const { text, hash, kind } = await c.req.json();
+  return c.json(await editProjectFile(c.req.param("id"), "CHANGELOG.md", hash, (t) => addEntry(t, text, new Date(), kind)));
 });
 
 // ---- Files ----
@@ -102,7 +157,7 @@ content.get("/file", async (c) => {
   const abs = untildify(c.req.query("path") ?? "");
   if (!canRead(abs)) throw new WriteError(403, classify(abs) === "secret" ? "This file holds secrets and is never shown." : "The app can't open files here.");
   const st = await stat(abs).catch(() => null);
-  if (!st) throw new WriteError(404, "File not found.");
+  if (!st) throw new WriteError(404, MISSING_FILE);
   if (st.isDirectory()) {
     const names = await readdir(abs);
     return c.json({ path: abs, display: tildify(abs), dir: true, entries: names.filter((n) => !n.startsWith(".")).sort() });
@@ -140,7 +195,7 @@ content.get("/library", async (c) => {
 
 content.post("/library/skill-state", async (c) => {
   const { key, state, scope } = await c.req.json();
-  if (!["on", "off", "name-only", "user-invocable-only"].includes(state)) throw new WriteError(400, "Unknown state.");
+  if (!["on", "off", "name-only", "user-invocable-only"].includes(state)) throw new WriteError(400, "Pick one of: on, name only, only me, or off.");
   // Matches Claude Code's /skills menu: project changes go to settings.local.json.
   const file = scope && scope !== "global" ? join(await requireProject(scope), ".claude", "settings.local.json") : join(claudeDir(), "settings.json");
   const r = await updateJson(file, (o) => {
@@ -208,9 +263,178 @@ async function runSkillsRef(dir: string) {
   }
 }
 
+// ---- Create anything Claude Code reads from a file ----
+
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const AGENT_MODELS = ["inherit", "sonnet", "opus", "haiku", "fable"];
+export const CREATABLE = ["skill", "command", "agent", "rule", "output-style", "memory", "instructions"] as const;
+type NewForm = { kind: string; name?: string; description?: string; body?: string; manualOnly?: boolean; tools?: string[]; model?: string; paths?: string[]; keepCoding?: boolean };
+
+const yamlStr = (v: string) => JSON.stringify(v.replace(/\s+/g, " ").trim());
+
+/** The file a new item becomes, following agentskills.io for skills and Claude Code's documented formats for the rest. */
+export function newItemFile(f: NewForm): string {
+  const name = String(f.name ?? "").trim();
+  const description = String(f.description ?? "").replace(/\s+/g, " ").trim();
+  const body = String(f.body ?? "").trim();
+  const needsName = f.kind !== "instructions";
+  if (needsName && (!SLUG.test(name) || name.length > 64)) throw new WriteError(400, "Use a name of up to 64 lowercase letters, numbers and single hyphens, such as review-pr.");
+  if (description.length > 1024) throw new WriteError(400, `The description is ${description.length} characters; keep it to 1024.`);
+  const front: string[] = [];
+  switch (f.kind) {
+    case "skill":
+    case "command":
+      if (!description) throw new WriteError(400, "Describe what it does and when to use it.");
+      front.push(`name: ${name}`, `description: ${yamlStr(description)}`);
+      if (f.kind === "command" || f.manualOnly) front.push("disable-model-invocation: true");
+      break;
+    case "agent": {
+      if (!description) throw new WriteError(400, "Describe when Claude should hand work to this agent.");
+      front.push(`name: ${name}`, `description: ${yamlStr(description)}`);
+      const tools = (f.tools ?? []).filter((t) => /^[A-Za-z]\w*$/.test(t));
+      if (tools.length) front.push(`tools: ${tools.join(", ")}`);
+      if (f.model && f.model !== "inherit") {
+        if (!AGENT_MODELS.includes(f.model)) throw new WriteError(400, "Pick one of the listed models.");
+        front.push(`model: ${f.model}`);
+      }
+      break;
+    }
+    case "rule": {
+      const paths = (f.paths ?? []).map((x) => x.trim()).filter(Boolean);
+      if (paths.length) front.push("paths:", ...paths.map((x) => `  - ${JSON.stringify(x)}`));
+      if (!body) throw new WriteError(400, "Write the rule.");
+      break;
+    }
+    case "output-style":
+      front.push(`name: ${name}`);
+      if (description) front.push(`description: ${yamlStr(description)}`);
+      if (f.keepCoding) front.push("keep-coding-instructions: true");
+      break;
+    case "memory":
+      if (!body) throw new WriteError(400, "Write the note.");
+      front.push(`name: ${name}`);
+      if (description) front.push(`description: ${yamlStr(description)}`);
+      break;
+    case "instructions":
+      return `${body}\n`;
+    default:
+      throw new WriteError(400, `You can create: ${CREATABLE.join(", ")}.`);
+  }
+  const head = front.length ? `---\n${front.join("\n")}\n---\n\n` : "";
+  return `${head}${body ? `${body}\n` : ""}`;
+}
+
+/** Where a new item goes. Commands are skills that only run when typed, as Claude Code now recommends. */
+function newItemPath(kind: string, name: string, base: string, memDir: string) {
+  switch (kind) {
+    case "skill":
+    case "command":
+      return join(base, "skills", name, "SKILL.md");
+    case "agent":
+      return join(base, "agents", `${name}.md`);
+    case "rule":
+      return join(base, "rules", `${name}.md`);
+    case "output-style":
+      return join(base, "output-styles", `${name}.md`);
+    case "memory":
+      return join(memDir, `${name}.md`);
+    default:
+      return join(dirname(base), "CLAUDE.md");
+  }
+}
+
+content.post("/library/new", async (c) => {
+  const f = (await c.req.json()) as NewForm & { scope?: string };
+  const project = f.scope && f.scope !== "global" ? await requireProject(f.scope) : null;
+  const base = project ? join(project, ".claude") : claudeDir();
+  if (f.kind === "memory" && !project) throw new WriteError(400, "Memory notes belong to one project. Add it from that project's page.");
+  const memDir = join(claudeDir(), "projects", (project ?? "").replace(/[^A-Za-z0-9]/g, "-"), "memory");
+  const text = newItemFile(f);
+  const path = newItemPath(f.kind, String(f.name ?? ""), base, memDir);
+  if (await Bun.file(path).exists()) throw new WriteError(409, `${tildify(path)} already exists. Pick another name, or open the existing one.`);
+  await safeWrite(path, text, null);
+  if (f.kind === "memory") {
+    // Claude reads MEMORY.md each session; a note it doesn't list there is never seen.
+    const index = join(memDir, "MEMORY.md");
+    const cur = await readWithHash(index);
+    const line = `- [${f.name}](${f.name}.md)${f.description ? ` — ${String(f.description).trim()}` : ""}\n`;
+    await safeWrite(index, `${cur ? cur.content.replace(/\n?$/, "\n") : ""}${line}`, cur?.hash ?? null);
+  }
+  emit({ area: "library" });
+  const check = f.kind === "skill" || f.kind === "command" ? await runSkillsRef(dirname(path)) : null;
+  return c.json({ path, display: tildify(path), check });
+});
+
+// ---- Add a permission rule, hook or MCP server ----
+
+export const HOOK_EVENTS = ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "SessionStart", "SessionEnd", "Notification", "PreCompact", "SubagentStop"];
+const TOOL_EVENTS = new Set(["PreToolUse", "PostToolUse"]);
+
+/** Adds one permission rule or hook to a settings object, leaving everything else in it as it was. */
+export function addToSettings(o: Record<string, any>, f: { what: string; list?: string; rule?: string; event?: string; matcher?: string; command?: string }) {
+  if (f.what === "permission") {
+    const list = f.list ?? "";
+    const rule = String(f.rule ?? "").trim();
+    if (!["allow", "deny", "ask"].includes(list)) throw new WriteError(400, "Pick allow, ask first, or never allow.");
+    if (!rule) throw new WriteError(400, "Write the rule, such as Bash(npm run test) or WebFetch(domain:github.com).");
+    o.permissions ??= {};
+    o.permissions[list] ??= [];
+    if (!o.permissions[list].includes(rule)) o.permissions[list].push(rule);
+    return;
+  }
+  if (f.what === "hook") {
+    const event = f.event ?? "";
+    const command = String(f.command ?? "").trim();
+    if (!HOOK_EVENTS.includes(event)) throw new WriteError(400, "Pick when the hook runs.");
+    if (!command) throw new WriteError(400, "Write the command the hook runs.");
+    const entry: Record<string, any> = { hooks: [{ type: "command", command }] };
+    if (TOOL_EVENTS.has(event) && f.matcher?.trim()) entry.matcher = f.matcher.trim();
+    o.hooks ??= {};
+    o.hooks[event] ??= [];
+    o.hooks[event].push(entry);
+    return;
+  }
+  throw new WriteError(400, "You can add a permission rule or a hook here.");
+}
+
+content.post("/settings/add", async (c) => {
+  const f = await c.req.json();
+  const project = f.scope && f.scope !== "global" ? await requireProject(f.scope) : null;
+  const file = project ? join(project, ".claude", f.local ? "settings.local.json" : "settings.json") : join(claudeDir(), "settings.json");
+  const r = await updateJson(file, (o) => addToSettings(o, f));
+  emit({ area: "library" });
+  return c.json({ ...r, path: file, display: tildify(file) });
+});
+
+/** MCP servers go through Claude Code's own `claude mcp add`, which knows where each scope's servers are kept. */
+content.post("/mcp/add", async (c) => {
+  const f = await c.req.json();
+  const name = String(f.name ?? "").trim();
+  const target = String(f.target ?? "").trim();
+  if (!/^[\w-]+$/.test(name)) throw new WriteError(400, "Use a name of letters, numbers, hyphens and underscores.");
+  if (!target) throw new WriteError(400, f.transport === "stdio" ? "Write the command that starts the server." : "Paste the server's address.");
+  const project = f.scope && f.scope !== "global" ? await requireProject(f.scope) : null;
+  const claude = findClaude();
+  if (!claude) throw new WriteError(400, "Claude Code isn't installed where the app can find it, so the server can't be added.");
+  const env = String(f.env ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^[A-Za-z_]\w*=/.test(l))
+    .flatMap((l) => ["-e", l]);
+  const args =
+    f.transport === "stdio"
+      ? ["mcp", "add", "--scope", project ? "project" : "user", ...env, name, "--", ...target.split(/\s+/)]
+      : ["mcp", "add", "--transport", f.transport === "sse" ? "sse" : "http", "--scope", project ? "project" : "user", name, target];
+  const p = Bun.spawn([claude, ...args], { cwd: project ?? claudeDir(), stdout: "pipe", stderr: "pipe" });
+  const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+  if ((await p.exited) !== 0) throw new WriteError(400, (err || out).trim().split("\n")[0] || "Claude Code couldn't add the server.");
+  emit({ area: "projects" });
+  return c.json({ ok: true, message: out.trim() });
+});
+
 async function skillDir(path: string) {
   const dir = await itemTarget(path, "skill");
-  if (!canRead(dir) || !(await isDir(dir))) throw new WriteError(400, "Not a skill folder.");
+  if (!canRead(dir) || !(await isDir(dir))) throw new WriteError(400, "That folder isn't a skill. A skill is a folder with a SKILL.md file in it.");
   return dir;
 }
 
@@ -238,7 +462,7 @@ content.post("/library/validate-draft", async (c) => {
 // ---- Memory index ----
 
 const memoryDir = (folder: string) => {
-  if (!/^[\w.-]+$/.test(folder)) throw new WriteError(400, "Bad memory folder.");
+  if (!/^[\w.-]+$/.test(folder)) throw new WriteError(400, "That memory folder name isn't valid.");
   return join(claudeDir(), "projects", folder, "memory");
 };
 
@@ -304,11 +528,8 @@ content.get("/settings", async (c) => {
     const cur = await readWithHash(f.path).catch(() => null);
     let error: string | null = null;
     if (cur) {
-      try {
-        parsed[f.source] = JSON.parse(cur.content);
-      } catch (e: any) {
-        error = `Not valid JSON: ${e.message}`;
-      }
+      error = jsonProblem(cur.content);
+      if (!error) parsed[f.source] = JSON.parse(cur.content);
     }
     sources.push({ source: f.source, path: f.path, display: tildify(f.path), exists: !!cur, access: classify(f.path), error });
   }
@@ -341,8 +562,8 @@ content.get("/search", async (c) => {
     } else if (h.kind === "doc") {
       const p = projects.find((p) => isInside(h.ref, untildify(p.id)));
       const name = basename(h.ref);
-      if (p && name === "BACKLOG.md") link = `/projects/${encodeURIComponent(p.id)}?tab=backlog`;
-      else if (p && name === "CHANGELOG.md") link = `/projects/${encodeURIComponent(p.id)}?tab=changelog`;
+      if (p && (name === "BACKLOG.md" || name === "PROGRESS.md")) link = `/projects/${encodeURIComponent(p.id)}#backlog`;
+      else if (p && name === "CHANGELOG.md") link = `/projects/${encodeURIComponent(p.id)}#changelog`;
     }
     return { ...h, link, display: h.kind === "session" ? h.subtitle : tildify(h.ref) };
   });

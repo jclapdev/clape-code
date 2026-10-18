@@ -1,12 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Link } from "@tanstack/react-router";
 import { api } from "@/lib/api";
 import { when } from "@/lib/format";
 import { Page } from "@/components/Panes";
 import { EmptyState, ErrorNote, Loading, Tag } from "@/components/ui";
-import { KIND_LABEL } from "./Library";
+
+const KIND_LABEL: Record<string, [string, string]> = {
+  skill: ["Skill", "Skills"],
+  agent: ["Agent", "Agents"],
+  command: ["Command", "Commands"],
+  rule: ["Rule", "Rules"],
+  "output-style": ["Output style", "Output styles"],
+  plan: ["Plan", "Plans"],
+  memory: ["Memory note", "Memory"],
+};
 
 interface Rec {
   id: string;
@@ -30,19 +38,12 @@ export function ArchivePage() {
   });
   return (
     <Page
-      title="Archive"
+      title="Archived items"
       sub="Skills, agents, commands, plans and notes you archived. Claude Code doesn't load them; restore puts each back where it came from."
-      actions={
-        <Button asChild variant="outline" size="lg" className="no-underline">
-<Link to="/sessions" search={{ archived: "1" }}>
-          Archived sessions
-        </Link>
-</Button>
-      }
     >
       {q.isLoading && <Loading />}
       <ErrorNote error={q.error} />
-      {q.data && !q.data.length && <EmptyState title="Nothing archived">Archive items from the Library to get them out of Claude's way without deleting them.</EmptyState>}
+      {q.data && !q.data.length && <EmptyState title="No archived items">Things archived earlier show up here so you can put them back.</EmptyState>}
       {!!q.data?.length && (
         <ul className="overflow-hidden rounded-lg border border-line bg-surface">
           {q.data.map((r) => (

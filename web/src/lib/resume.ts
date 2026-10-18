@@ -13,3 +13,10 @@ export async function copy(text: string): Promise<boolean> {
     return false;
   }
 }
+
+/** Copies a command and says so; when the browser blocks the clipboard, shows the command to copy by hand. */
+export async function copyCommand(cmd: string) {
+  const { toast } = await import("sonner");
+  if (await copy(cmd)) toast.success("Command copied. Paste it into a terminal.");
+  else toast.error("Couldn't copy. Here is the command to copy by hand:", { description: cmd, duration: 20000 });
+}

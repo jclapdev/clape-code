@@ -1,16 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
 import { ago, modelName, money } from "@/lib/format";
-import type { LiveSession, PendingRequest, Project, Session } from "@/lib/types";
-import { DetailHeader, TwoPane } from "@/components/Panes";
-import { Dot, EmptyState, ErrorNote, Loading, Md, Tag, cn } from "@/components/ui";
+import type { LiveSession, PendingRequest, Project, Session, SlashCommand } from "@/lib/types";
+import { DetailHeader } from "@/components/Panes";
+import { Dot, ErrorNote, Loading, Md, cn } from "@/components/ui";
 import { SimpleSelect } from "@/components/SimpleSelect";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { MessageBox } from "@/components/MessageBox";
 
 const MODES = [
   { value: "default", label: "Ask before changes" },
@@ -33,13 +33,14 @@ const STATUS: Record<LiveSession["status"], [string, "accent" | "attn" | "ok" | 
   stopped: ["Ended", "muted"],
 };
 
-function NewSession({ project, resume }: { project?: string; resume?: string }) {
+function NewSession({ project, resume, initialPrompt, initialMode }: { project?: string; resume?: string; initialPrompt?: string; initialMode?: string }) {
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
   const resumed = useQuery({ queryKey: ["session", resume], queryFn: () => api.get<Session>(`/sessions/${resume}`), enabled: !!resume });
   const [proj, setProj] = useState(project ?? "");
   const [model, setModel] = useState("");
-  const [mode, setMode] = useState("default");
-  const [prompt, setPrompt] = useState("");
+  const [mode, setMode] = useState(initialMode ?? "default");
+  const [prompt, setPrompt] = useState(initialPrompt ?? "");
+  const cmds = useQuery({ queryKey: ["live-commands", proj || resumed.data?.project || ""], queryFn: () => api.get<SlashCommand[]>(`/live-commands?project=${encodeURIComponent(proj || resumed.data?.project || "")}`) });
   const navigate = useNavigate();
   const qc = useQueryClient();
   useEffect(() => {
@@ -67,7 +68,7 @@ function NewSession({ project, resume }: { project?: string; resume?: string }) 
       {resume ? (
         <div className="rounded-lg border border-line bg-surface px-4 py-3">
           <div className="font-medium">{resumed.data?.displayTitle ?? "Loading…"}</div>
-          <div className="font-mono text-xs text-muted-foreground">{resumed.data?.cwd}</div>
+          <div className="text-xs text-muted-foreground">{resumed.data?.cwd}</div>
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
@@ -92,24 +93,22 @@ function NewSession({ project, resume }: { project?: string; resume?: string }) 
           <SimpleSelect label="Permissions" value={mode} onChange={setMode} options={MODES} className="w-full" />
         </div>
       </div>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[13px] text-ink-2">First message</span>
-        <Textarea
-          required
-          rows={6}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[13px] text-ink-2">{resume ? "Your next message" : "First message"}</span>
+        <MessageBox
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && (e.metaKey || e.ctrlKey) && submit(e)}
-          placeholder="What should Claude do?"
-          className="text-[14.5px] leading-relaxed"
+          onChange={setPrompt}
+          onSubmit={() => (proj || resume) && start.mutate()}
+          commands={cmds.data ?? []}
+          rows={6}
+          placeholder="What should Claude do? Type / for commands and skills."
+          submitLabel="Start"
+          busy={start.isPending}
+          disabled={!proj && !resume}
+          enterSends={false}
         />
-      </label>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-muted-foreground">Claude runs on this computer with your Claude Code settings. Approvals and questions appear here.</span>
-        <Button size="lg" type="submit" variant="default" busy={start.isPending} disabled={!prompt.trim() || (!proj && !resume)}>
-          Start
-        </Button>
       </div>
+      <p className="text-xs text-muted-foreground">Claude runs on this computer with your Claude Code settings. When it needs your approval or has a question, it shows up here and on Home.</p>
     </form>
   );
 }
@@ -263,10 +262,11 @@ function LiveView({ id }: { id: string }) {
   return (
     <div className="flex h-full flex-col">
       <DetailHeader
-        title={<span className="font-mono text-[17px]">{s.cwd}</span>}
+        title={(s.events.find((e) => e.kind === "user") as { text?: string } | undefined)?.text?.split("\n")[0]?.slice(0, 90) ?? "Session"}
         sub={
           <span className="flex items-center gap-2">
             <Dot tone={tone} /> {label}
+            <span>· {s.cwd.split("/").pop()}</span>
             {s.model && <span>· {modelName(s.model)}</span>}
             <span>· started {ago(s.startedAt)}</span>
           </span>
@@ -338,22 +338,14 @@ function LiveView({ id }: { id: string }) {
       </div>
       {!ended && (
         <form onSubmit={send} className="border-t border-line bg-panel px-4 py-3">
-          <div className="mx-auto flex max-w-[860px] items-end gap-2">
-            <label htmlFor="msg" className="sr-only">
-              Message Claude
-            </label>
-            <Textarea
-              id="msg"
-              rows={2}
+          <div className="mx-auto max-w-[860px]">
+            <MessageBox
               value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), send())}
-              placeholder={s.status === "working" ? "Send a follow-up while it works…" : "Reply to Claude…"}
-              className="min-w-0 flex-1 resize-none"
+              onChange={setText}
+              onSubmit={() => send()}
+              commands={s.commands ?? []}
+              placeholder={s.status === "working" ? "Send a follow-up while it works…" : "Reply to Claude, or type / for a command"}
             />
-            <Button size="lg" type="submit" variant="default" disabled={!text.trim()}>
-              Send
-            </Button>
           </div>
         </form>
       )}
@@ -361,48 +353,8 @@ function LiveView({ id }: { id: string }) {
   );
 }
 
-function LiveList({ selected }: { selected: string | null }) {
-  const q = useQuery({ queryKey: ["live"], queryFn: () => api.get<LiveSession[]>("/live") });
-  return (
-    <div className="flex flex-col gap-1 px-2 py-4">
-      <Button asChild size="lg" className="mx-2 mb-3 no-underline">
-        <Link to="/live" search={{ new: "1" }}>
-          New session
-        </Link>
-      </Button>
-      {(q.data ?? []).map((s) => {
-        const [label, tone] = STATUS[s.status];
-        return (
-          <Link key={s.id} to="/live/$id" params={{ id: s.id }} search={{}} className={cn("flex flex-col gap-0.5 rounded-md px-2.5 py-2 text-ink no-underline hover:bg-sunken", selected === s.id && "bg-surface shadow-[0_0_0_1px_var(--line-strong)]")}>
-            <span className="flex items-center gap-2">
-              <Dot tone={tone} />
-              <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{s.cwd.split("/").pop()}</span>
-              {s.pending.length > 0 && <Tag tone="attn">Needs you</Tag>}
-            </span>
-            <span className="truncate pl-4 text-xs text-muted-foreground">
-              {(s.events.find((e) => e.kind === "user") as any)?.text ?? ""} · {label.toLowerCase()}
-            </span>
-          </Link>
-        );
-      })}
-      {q.data && !q.data.length && <p className="px-3 text-[13px] text-muted-foreground">Sessions you start here appear in this list while the app is running.</p>}
-    </div>
-  );
-}
-
 export function LivePage() {
   const { id } = useParams({ strict: false }) as { id?: string };
-  const s = useSearch({ strict: false }) as { new?: string; project?: string; resume?: string };
-  const navigate = useNavigate();
-  const showNew = !id && (s.new === "1" || !!s.resume);
-  return (
-    <TwoPane
-      id="live"
-      listLabel="Live sessions"
-      hasSelection={!!id || showNew}
-      onBack={() => navigate({ to: "/live", search: {} })}
-      list={<LiveList selected={id ?? null} />}
-      detail={id ? <LiveView key={id} id={id} /> : showNew ? <NewSession project={s.project} resume={s.resume} /> : <EmptyState title="Run Claude from here">Start a session in any project. When Claude asks for permission or has a question, it shows up here and on Home.</EmptyState>}
-    />
-  );
+  const s = useSearch({ strict: false }) as { new?: string; project?: string; resume?: string; prompt?: string; mode?: string };
+  return <div className="h-full overflow-auto">{id ? <LiveView key={id} id={id} /> : <NewSession project={s.project} resume={s.resume} initialPrompt={s.prompt} initialMode={s.mode} />}</div>;
 }

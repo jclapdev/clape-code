@@ -234,15 +234,71 @@
 }
 .prose-cc h1,
 .prose-cc h2,
-.prose-cc h3 {
-  font-size: 1em;
+.prose-cc h3,
+.prose-cc h4 {
   font-weight: 600;
-  margin: 1em 0 0.4em;
+  line-height: 1.3;
+  margin: 1.3em 0 0.5em;
+}
+.prose-cc h1 {
+  font-size: 1.45em;
+}
+.prose-cc h2 {
+  font-size: 1.25em;
+}
+.prose-cc h3 {
+  font-size: 1.1em;
+}
+.prose-cc h4 {
+  font-size: 1em;
+}
+.prose-cc > :first-child {
+  margin-top: 0;
 }
 .prose-cc ul,
 .prose-cc ol {
-  padding-left: 1.3em;
+  padding-left: 1.4em;
 }
+.prose-cc ul {
+  list-style: disc;
+}
+.prose-cc ol {
+  list-style: decimal;
+}
+.prose-cc li {
+  margin: 0.2em 0;
+}
+.prose-cc li > ul,
+.prose-cc li > ol {
+  margin: 0.2em 0;
+}
+.prose-cc blockquote {
+  border-left: 3px solid var(--line-strong);
+  padding-left: 0.9em;
+  color: var(--ink-2);
+  margin: 0 0 0.7em;
+}
+.prose-cc table {
+  border-collapse: collapse;
+  margin: 0 0 0.9em;
+  display: block;
+  overflow-x: auto;
+}
+.prose-cc th,
+.prose-cc td {
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.prose-cc th {
+  background: var(--sunken);
+  font-weight: 600;
+}
+.prose-cc a {
+  color: var(--primary);
+}
+
 
 @media (prefers-reduced-motion: reduce) {
   * {

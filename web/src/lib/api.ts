@@ -8,23 +8,31 @@ export class ApiError extends Error {
   }
 }
 
+export const UNREACHABLE = "Can't reach Control Center. Is it still running?";
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    method,
-    headers: body === undefined ? undefined : { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: "same-origin",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: "same-origin",
+    });
+  } catch {
+    throw new ApiError(0, UNREACHABLE);
+  }
   const text = await res.text();
   let data: any = null;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
-    data = { error: text };
+    data = null; // not our server's JSON: a proxy page or a dropped connection
   }
   if (!res.ok) {
     if (res.status === 401) window.dispatchEvent(new Event("cc:login-required"));
-    throw new ApiError(res.status, data?.error ?? `Request failed (${res.status})`, data?.current ?? null);
+    if (typeof data?.error !== "string") throw new ApiError(res.status >= 500 || res.status === 0 ? 0 : res.status, res.status >= 500 ? UNREACHABLE : "Something went wrong. Try again.");
+    throw new ApiError(res.status, data.error, data?.current ?? null);
   }
   return data as T;
 }

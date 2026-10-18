@@ -31,3 +31,11 @@ After a change, run in this order:
 2. `bun run test`
 3. `bun run build`
 4. For UI changes: `bun run dev`, open http://localhost:5317, check light and dark themes and a 390 px wide window.
+
+## Larger requests
+
+For anything bigger than one small fix, use the `breakdown` skill. It plans the work as stories with acceptance criteria and builds and verifies one story at a time.
+
+## Handoff
+
+Read `PROGRESS.md` before starting and update it after each finished item: tick what's done, move the next item up, note what you learned. Add each change a user would notice to `CHANGELOG.md` under Unreleased.

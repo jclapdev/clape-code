@@ -59,7 +59,7 @@ export async function listArchive(): Promise<ArchiveRecord[]> {
 }
 
 export async function restoreItem(id: string): Promise<ArchiveRecord> {
-  if (!/^[\w-]+$/.test(id)) throw new WriteError(400, "Bad archive id.");
+  if (!/^[\w-]+$/.test(id)) throw new WriteError(400, "That isn't a valid archived item.");
   let rec: ArchiveRecord;
   try {
     rec = JSON.parse(await readFile(manifestOf(id), "utf8"));
