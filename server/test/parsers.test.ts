@@ -204,3 +204,205 @@ describe("transcript", () => {
     expect(t[1].blocks[1]).toMatchObject({ kind: "tool", name: "Bash", summary: "ls", result: "a.txt" });
   });
 });
+
+// ---- Board (PROGRESS.md as Next / In progress / Done) ----
+
+import { addCard, deleteCard, editCard, moveCard, NEW_BOARD, parseBoard } from "../src/parsers/board";
+import { addImport, importedPaths, removeImport } from "../src/parsers/imports";
+
+const PROGRESS = `# Progress
+
+Read this first.
+
+## Done
+
+- [x] 1. Menu cut down (2026-10-18).
+- [x] 2. One page per project.
+
+## Waiting for John
+
+- **Choices:**
+  1. Something he should check.
+- [ ] Not a card: this section isn't a column.
+
+## In progress
+
+- [x] 3. Shell and menu.
+- [ ] 4. **Next: Projects**: board and context.
+  - a sub-point that belongs to the card
+- [ ] 5. Settings page.
+
+Facts checked on 2026-10-18: a paragraph that stays put.
+
+## Next
+
+- [ ] Share rules between projects. #research
+- [ ] Check every page at 390 px. #ui #check
+
+## Notes
+
+- Run the dev server as two processes.
+`;
+
+/** The lines of b that aren't in a, and the lines of a that aren't in b, as multisets. */
+function diffLines(a: string, b: string) {
+  const count = (s: string) => s.split("\n").reduce((m, l) => m.set(l, (m.get(l) ?? 0) + 1), new Map<string, number>());
+  const ca = count(a);
+  const cb = count(b);
+  const added: string[] = [];
+  const removed: string[] = [];
+  for (const [l, n] of cb) for (let i = 0; i < n - (ca.get(l) ?? 0); i++) added.push(l);
+  for (const [l, n] of ca) for (let i = 0; i < n - (cb.get(l) ?? 0); i++) removed.push(l);
+  return { added, removed };
+}
+
+const lineOf = (src: string, start: string) => src.split("\n").findIndex((l) => l.startsWith(start));
+
+describe("board", () => {
+  test("reads only Next, In progress and Done", () => {
+    const cols = parseBoard(PROGRESS);
+    expect(cols.map((c) => [c.key, c.cards.length])).toEqual([
+      ["next", 2],
+      ["progress", 3],
+      ["done", 2],
+    ]);
+    const four = cols[1].cards[1];
+    expect(four.end - four.line).toBe(1); // the indented sub-point is part of the card
+    expect(four.n).toBe(4);
+    expect(cols[0].cards[1]).toMatchObject({ title: "Check every page at 390 px.", labels: ["ui", "check"], done: false });
+  });
+
+  test("a label must start with a letter and end the line", () => {
+    const [next] = parseBoard("## Next\n\n- Fix bug #123\n- #wip in the middle text\n");
+    expect(next.cards.map((c) => c.labels)).toEqual([[], []]);
+  });
+
+  test("a new board has three empty columns", () => {
+    expect(parseBoard(NEW_BOARD).map((c) => [c.name, c.line, c.cards.length])).toEqual([
+      ["Next", 2, 0],
+      ["In progress", 4, 0],
+      ["Done", 6, 0],
+    ]);
+  });
+
+  test("edit changes only that line and keeps checkbox and number", () => {
+    const at = lineOf(PROGRESS, "- [ ] 5.");
+    const out = editCard(PROGRESS, at, "Settings page, first part");
+    expect(out.split("\n")[at]).toBe("- [ ] 5. Settings page, first part");
+    expect(diffLines(PROGRESS, out)).toEqual({ added: ["- [ ] 5. Settings page, first part"], removed: ["- [ ] 5. Settings page."] });
+  });
+
+  test("delete removes the card and its indented lines only", () => {
+    const out = deleteCard(PROGRESS, lineOf(PROGRESS, "- [ ] 4."));
+    expect(diffLines(PROGRESS, out)).toEqual({ added: [], removed: ["- [ ] 4. **Next: Projects**: board and context.", "  - a sub-point that belongs to the card"] });
+  });
+
+  test("lines outside the columns can't be edited as cards", () => {
+    expect(() => deleteCard(PROGRESS, lineOf(PROGRESS, "- [ ] Not a card"))).toThrow();
+  });
+
+  test("add matches the column's style and continues the numbers", () => {
+    const next = addCard(PROGRESS, "next", "Write docs #docs");
+    expect(diffLines(PROGRESS, next)).toEqual({ added: ["- [ ] Write docs #docs"], removed: [] });
+    expect(next.split("\n")[lineOf(PROGRESS, "- [ ] Check every page") + 1]).toBe("- [ ] Write docs #docs");
+    const prog = addCard(PROGRESS, "progress", "Board");
+    expect(prog.split("\n")[lineOf(PROGRESS, "- [ ] 5.") + 1]).toBe("- [ ] 6. Board");
+    const done = addCard(PROGRESS, "done", "Shipped");
+    expect(done.split("\n")[lineOf(PROGRESS, "- [x] 2.") + 1]).toBe("- [x] 6. Shipped");
+  });
+
+  test("a card moves across all three columns, touching only its own lines", () => {
+    let text = addCard(PROGRESS, "next", "Try the board #test");
+    const added = text;
+    text = moveCard(text, lineOf(text, "- [ ] Try the board"), "progress");
+    expect(parseBoard(text)[1].cards.at(-1)!.title).toBe("Try the board");
+    text = moveCard(text, lineOf(text, "- [ ] Try the board"), "done");
+    expect(parseBoard(text)[2].cards.at(-1)).toMatchObject({ title: "Try the board", done: true });
+    expect(diffLines(added, text)).toEqual({ added: ["- [x] Try the board #test"], removed: ["- [ ] Try the board #test"] });
+    text = moveCard(text, lineOf(text, "- [x] Try the board"), "next");
+    expect(parseBoard(text)[0].cards.at(-1)).toMatchObject({ title: "Try the board", done: false });
+    expect(text).toBe(added);
+    expect(deleteCard(text, lineOf(text, "- [ ] Try the board"))).toBe(PROGRESS);
+  });
+
+  test("moving a card carries its indented lines", () => {
+    const out = moveCard(PROGRESS, lineOf(PROGRESS, "- [ ] 4."), "next");
+    const lines = out.split("\n");
+    const at = lineOf(out, "- [ ] 4.");
+    expect(lines[at - 1]).toBe("- [ ] Check every page at 390 px. #ui #check");
+    expect(lines[at + 1]).toBe("  - a sub-point that belongs to the card");
+    expect(diffLines(PROGRESS, out)).toEqual({ added: [], removed: [] });
+  });
+
+  test("Windows line endings stay, byte for byte", () => {
+    const crlf = PROGRESS.replace(/\n/g, "\r\n");
+    let text = addCard(crlf, "next", "CRLF card");
+    expect(text).toContain("\r\n- [ ] CRLF card\r\n");
+    text = moveCard(text, lineOf(text, "- [ ] CRLF card"), "progress");
+    text = moveCard(text, lineOf(text, "- [ ] CRLF card"), "done");
+    expect(text.replace(/\r\n/g, "")).not.toContain("\n");
+    text = deleteCard(text, lineOf(text, "- [x] CRLF card"));
+    expect(Buffer.from(text).equals(Buffer.from(crlf))).toBe(true);
+  });
+
+  test("a file mixing line endings keeps each line's own ending", () => {
+    const mixed = "# P\r\n\r\n## Next\n\n- [ ] a\r\n- [ ] b\n\n## Done\r\n\r\n- [x] c\r\n";
+    const out = moveCard(mixed, 4, "done");
+    expect(out).toBe("# P\r\n\r\n## Next\n\n- [ ] b\n\n## Done\r\n\r\n- [x] c\r\n- [x] a\r\n");
+    expect(moveCard(out, lineOf(out, "- [x] a"), "next")).toBe("# P\r\n\r\n## Next\n\n- [ ] b\n- [ ] a\r\n\n## Done\r\n\r\n- [x] c\r\n");
+  });
+
+  test("first card in an empty column goes under its heading", () => {
+    expect(addCard(NEW_BOARD, "progress", "Start")).toBe("# Progress\n\n## Next\n\n## In progress\n\n- [ ] Start\n\n## Done\n");
+    expect(addCard(NEW_BOARD, "done", "Old")).toBe("# Progress\n\n## Next\n\n## In progress\n\n## Done\n\n- [x] Old\n");
+    // Moving through every empty column and deleting it gives back the empty board.
+    let t = addCard(NEW_BOARD, "next", "Walk");
+    t = moveCard(t, lineOf(t, "- [ ] Walk"), "progress");
+    expect(t).toBe("# Progress\n\n## Next\n\n## In progress\n\n- [ ] Walk\n\n## Done\n");
+    t = moveCard(t, lineOf(t, "- [ ] Walk"), "done");
+    expect(t).toBe("# Progress\n\n## Next\n\n## In progress\n\n## Done\n\n- [x] Walk\n");
+    expect(deleteCard(t, lineOf(t, "- [x] Walk"))).toBe(NEW_BOARD);
+  });
+
+  test("a missing column is added at the end of the file", () => {
+    const src = "# Progress\n\n## Done\n\n- [x] a\n\n## Notes\n\nkeep me\n";
+    expect(addCard(src, "next", "b")).toBe(src + "\n## Next\n\n- [ ] b\n");
+  });
+
+  test("a file without a final newline", () => {
+    const src = "## Next\n\n- [ ] a\n\n## Done\n\n- [x] b";
+    const out = moveCard(src, 2, "done");
+    expect(out).toBe("## Next\n\n## Done\n\n- [x] b\n- [x] a");
+    expect(deleteCard(out, lineOf(out, "- [x] a"))).toBe("## Next\n\n## Done\n\n- [x] b");
+  });
+});
+
+describe("CLAUDE.md imports", () => {
+  const MD = "# Project\n\nSee @README.md for the overview.\n\n```\n@docs/in-code.md\n```\nUse `@docs/span.md` literally.\n";
+
+  test("finds imports outside code", () => {
+    expect(importedPaths(MD)).toEqual(["README.md"]);
+    expect(importedPaths("@./docs/My\\ File.md\n")).toEqual(["docs/My File.md"]);
+  });
+
+  test("add then remove gives back the same bytes", () => {
+    const on = addImport(MD, "docs/spec.md");
+    expect(on).toBe(MD + "\n@docs/spec.md\n");
+    expect(addImport(on, "docs/spec.md")).toBe(on);
+    const two = addImport(on, "docs/api.md");
+    expect(two).toBe(on + "@docs/api.md\n");
+    expect(removeImport(two, "docs/spec.md")).toBe(MD + "\n@docs/api.md\n");
+    expect(removeImport(removeImport(two, "docs/api.md"), "docs/spec.md")).toBe(MD);
+    const crlf = MD.replace(/\n/g, "\r\n");
+    expect(Buffer.from(removeImport(addImport(crlf, "docs/x.md"), "docs/x.md")).equals(Buffer.from(crlf))).toBe(true);
+    expect(addImport("", "docs/a.md")).toBe("@docs/a.md\n");
+  });
+
+  test("escapes spaces", () => {
+    expect(addImport("# P\n", "docs/My File.md")).toBe("# P\n\n@docs/My\\ File.md\n");
+  });
+
+  test("an import inside a sentence is pointed out, not reworded", () => {
+    expect(() => removeImport(MD, "README.md")).toThrow(/line 3/);
+  });
+});

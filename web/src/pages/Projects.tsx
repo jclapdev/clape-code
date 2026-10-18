@@ -8,7 +8,10 @@ import { ChevronDown, Pencil, Plus } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { api, ApiError, enc } from "@/lib/api";
 import { when } from "@/lib/format";
-import type { BacklogItem, LibraryItem, Project, ProjectDetail } from "@/lib/types";
+import type { BacklogItem, Catalog, LibraryItem, Project, ProjectDetail } from "@/lib/types";
+import { FEATURES } from "@/lib/features";
+import { ProjectBoard } from "./ProjectBoard";
+import { ContextDropZone, ContextSection } from "./ProjectContext";
 import { openOnComputer } from "@/components/FileEditor";
 import { ItemActions } from "@/components/ItemActions";
 import { DetailHeader } from "@/components/Panes";
@@ -311,10 +314,10 @@ export function ItemRows({ items, empty, usage, scope = "global" }: { items: Lib
 
 function SessionRows({ p }: { p: ProjectDetail }) {
   const [all, setAll] = useState(false);
-  if (!p.sessions.length) return <p className="text-[13.5px] text-muted-foreground">No sessions yet. Press "New session here" to give Claude a task in this project.</p>;
+  if (!p.sessions.length) return <p className="text-[13.5px] text-muted-foreground">No sessions yet. Press "New session" to give Claude a task in this project.</p>;
   const plansBy = new Map<string, ProjectDetail["plans"]>();
   for (const pl of p.plans) plansBy.set(pl.sessionId, [...(plansBy.get(pl.sessionId) ?? []), pl]);
-  const shown = all ? p.sessions : p.sessions.slice(0, 10);
+  const shown = all ? p.sessions : p.sessions.slice(0, 5);
   return (
     <>
       <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
@@ -348,7 +351,7 @@ function SessionRows({ p }: { p: ProjectDetail }) {
           </li>
         ))}
       </ul>
-      {!all && p.sessions.length > 10 && (
+      {!all && p.sessions.length > 5 && (
         <Button variant="ghost" size="sm" className="mt-2" onClick={() => setAll(true)}>
           Show all {p.sessions.length} sessions
         </Button>
@@ -410,26 +413,111 @@ export const nameOf = (i: LibraryItem) => (i.folder ? i.folder.split(/[\\/]/).fi
 
 const docItem: LibraryItem = { kind: "claude-md", name: "", description: "", path: "", display: "", folder: null, source: "project", sourceName: null, access: "edit", state: null, overrideKey: null, mtime: null, error: null, meta: {} };
 
+/** Unfinished steps from the project's plans, for a project without a board or BACKLOG.md. */
 function PlanBacklog({ p }: { p: ProjectDetail }) {
-  const plans = p.plans.filter((pl) => pl.open.length);
-  if (!plans.length) return <p className="text-[13.5px] text-muted-foreground">Nothing open. When a plan has unticked items, or the project has a BACKLOG.md, they show here.</p>;
+  const open = p.plans.flatMap((pl) => pl.open.map((t) => ({ t, plan: pl.title.replace(/^plan:\s*/i, "") })));
+  if (!open.length) return <p className="text-[13.5px] text-muted-foreground">Nothing open. Start a board above to track what comes next.</p>;
   return (
-    <div className="flex flex-col gap-3">
-      {plans.map((pl) => (
-        <section key={pl.path} className="rounded-lg border border-line bg-surface px-4 py-3">
-          <a href={`#plan-${encodeURIComponent(pl.path)}`} className="font-medium">
-            {pl.title}
-          </a>
-          <ul className="mt-2 flex flex-col gap-1.5">
-            {pl.open.map((t, i) => (
-              <li key={i} className="flex gap-2 text-[14px] leading-relaxed">
-                <span className="mt-2 size-1.5 flex-none rounded-full bg-faint" aria-hidden />
-                <Md className="[&_p]:m-0">{t}</Md>
-              </li>
+    <div className="flex flex-col gap-2">
+      <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
+        {open.slice(0, 5).map((o, i) => (
+          <li key={i} className="px-4 py-2.5">
+            <Md className="break-words text-[14px] leading-relaxed [&_p]:m-0">{o.t}</Md>
+            <div className="text-[12.5px] text-muted-foreground">From the plan "{o.plan}"</div>
+          </li>
+        ))}
+      </ul>
+      <Link to="/plans" search={{ project: p.id }} className="text-[13px]">
+        {open.length > 5 ? `All ${open.length} unfinished plan steps` : "Open this project's plans"}
+      </Link>
+    </div>
+  );
+}
+
+/** What's at the top of Next: the board's cards, else an older BACKLOG.md's open items, else unfinished plan steps. */
+function UpNext({ p }: { p: ProjectDetail }) {
+  if (p.board) {
+    const next = p.board.columns.find((c) => c.key === "next")?.cards ?? [];
+    if (!next.length) return <p className="text-[13.5px] text-muted-foreground">Nothing in Next. Add a card to the board's Next column.</p>;
+    return (
+      <ol className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
+        {next.slice(0, 5).map((c) => (
+          <li key={c.line} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-2.5">
+            <Md className="min-w-0 flex-1 break-words text-[14px] leading-relaxed [&_p]:m-0">{c.title}</Md>
+            {c.labels.map((l) => (
+              <Tag key={l}>#{l}</Tag>
             ))}
-          </ul>
-        </section>
-      ))}
+          </li>
+        ))}
+        {next.length > 5 && <li className="px-4 py-2 text-[13px] text-muted-foreground">and {next.length - 5} more on the board</li>}
+      </ol>
+    );
+  }
+  if (p.backlog) {
+    const open = p.backlog.sections.filter((s) => !/^(done|notes?)\b/i.test(s.name.trim())).flatMap((s) => s.items.filter((i) => i.done !== true));
+    if (!open.length) return <p className="text-[13.5px] text-muted-foreground">Nothing open in BACKLOG.md.</p>;
+    return (
+      <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
+        {open.slice(0, 5).map((i) => (
+          <li key={i.line} className="px-4 py-2.5">
+            <Md className="break-words text-[14px] leading-relaxed [&_p]:m-0">{i.text}</Md>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return <PlanBacklog p={p} />;
+}
+
+/** How many of each customization the project has, each linking to that feature's page filtered to it. */
+function FeatureCounts({ p }: { p: ProjectDetail }) {
+  const cat = useQuery({ queryKey: ["catalog"], queryFn: () => api.get<Catalog>("/catalog") });
+  // Plugins and scheduled tasks never belong to one project; Slash commands repeats Skills.
+  const shown = FEATURES.filter((f) => !["commands", "plugins", "scheduled"].includes(f.id));
+  const mine = (cat.data?.items ?? []).filter((i) => i.projectId === p.id);
+  return (
+    <ul className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))]">
+      {shown.map((f) => {
+        const n = mine.filter((i) => f.kinds.includes(i.kind)).length;
+        const Icon = f.icon;
+        return (
+          <li key={f.id}>
+            <Link to={`/${f.id}` as "/skills"} search={{ project: p.id }} className="flex items-center gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5 text-ink no-underline hover:border-line-strong">
+              <Icon aria-hidden className="size-4 flex-none text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate text-[13.5px]">{f.label}</span>
+              <span className={cn("text-[13.5px] font-semibold tabular-nums", !n && "font-normal text-muted-foreground")}>{cat.isLoading ? "…" : n}</span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function WorktreeInclude({ p }: { p: ProjectDetail }) {
+  const w = p.worktreeInclude;
+  if (!w.exists)
+    return (
+      <p className="text-[13.5px] text-muted-foreground">
+        No .worktreeinclude. It lists files git ignores, such as .env, that Claude Code copies into each new worktree it makes for this project. It uses the same patterns as .gitignore.
+      </p>
+    );
+  return (
+    <div className="flex flex-col gap-2">
+      {w.patterns.length ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {w.patterns.map((pt) => (
+            <li key={pt}>
+              <code className="rounded bg-sunken px-1.5 py-0.5 text-[12.5px]">{pt}</code>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[13.5px] text-muted-foreground">It's empty, so nothing extra is copied into new worktrees.</p>
+      )}
+      <Link to="/file" search={{ path: w.path }} className="text-[13px]">
+        Edit .worktreeinclude
+      </Link>
     </div>
   );
 }
@@ -439,74 +527,12 @@ function ProjectDetailView({ id }: { id: string }) {
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const p = q.data!;
-  const of = (k: LibraryItem["kind"]) => p.library.filter((i) => i.kind === k);
-  const instructions = of("claude-md");
-  const openSections = (p.backlog?.sections ?? []).filter((s) => !/^(done|notes?)\b/i.test(s.name.trim()));
-  const openItems = openSections.flatMap((s) => s.items.filter((i) => i.done !== true).map((i) => ({ ...i, section: s.name })));
-  const openTasks = openItems.length;
-  const planOpen = p.plans.flatMap((pl) => pl.open);
-  const sections: { id: string; title: string; count?: number; node: ReactNode; action?: ReactNode }[] = [
-    { id: "sessions", title: "Sessions", count: p.sessions.length, node: <SessionRows p={p} /> },
-    {
-      id: "plans", action: <ActionLink to="/live" search={{ new: "1", project: p.id, mode: "plan" }} label="Plan something" />,
-      title: "Plans",
-      count: p.plans.length,
-      node: p.plans.length ? <div className="flex flex-col gap-2">{p.plans.map((pl, i) => <PlanCard key={pl.path} plan={pl} open={i === 0} />)}</div> : <p className="text-[13.5px] text-muted-foreground">No plans yet. Claude writes one when a session uses plan mode (Shift+Tab in Claude Code).</p>,
-    },
-    {
-      id: "instructions", action: <span className="flex gap-2"><ActionLink to="/live" search={{ new: "1", project: p.id, prompt: "/init" }} label="Have Claude write it" /><NewButton kind="instructions" scope={p.id} label="Write it yourself" /></span>,
-      title: "CLAUDE.md",
-      count: instructions.length,
-      node: instructions.length ? <div className="flex flex-col gap-3">{instructions.map((i) => <MdFile key={i.path} path={i.path} />)}</div> : <p className="text-[13.5px] text-muted-foreground">No CLAUDE.md yet. Run /init in Claude Code to have Claude write one.</p>,
-    },
-    { id: "skills", action: <NewButton kind="skill" scope={p.id} label="New skill" />, title: "Skills", count: of("skill").length, node: <ItemRows scope={p.id} items={of("skill")} empty="No project skills. Skills in .claude/skills/ appear here." usage={(i) => `/${nameOf(i)}`} /> },
-    { id: "agents", action: <NewButton kind="agent" scope={p.id} label="New agent" />, title: "Agents", count: of("agent").length, node: <ItemRows scope={p.id} items={of("agent")} empty="No project agents. Agents in .claude/agents/ appear here." /> },
-    { id: "commands", action: <NewButton kind="command" scope={p.id} label="New command" />, title: "Commands", count: of("command").length, node: <ItemRows scope={p.id} items={of("command")} empty="No project commands." usage={(i) => `/${nameOf(i)}`} /> },
-    { id: "hooks", action: <ActionLink to="/add" search={{ what: "hook", scope: p.id }} label="New hook" />, title: "Hooks", count: of("hook-def").length + of("hook").length, node: <ItemRows scope={p.id} items={[...of("hook-def"), ...of("hook")]} empty="No hooks in this project." /> },
-    { id: "rules", action: <NewButton kind="rule" scope={p.id} label="New rule" />, title: "Rules", count: of("rule").length, node: <ItemRows scope={p.id} items={of("rule")} empty="No rules." /> },
-    { id: "memory", action: <NewButton kind="memory" scope={p.id} label="New note" />, title: "Memory", count: p.memory.length, node: <ItemRows scope={p.id} items={p.memory} empty="Claude hasn't saved any notes for this project." /> },
-    {
-      id: "mcp", action: <ActionLink to="/add" search={{ what: "mcp", scope: p.id }} label="Add server" />,
-      title: "MCP servers",
-      count: p.mcpServers.servers.length,
-      node: p.mcpServers.servers.length ? (
-        <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
-          {p.mcpServers.servers.map((s) => (
-            <li key={s.name} className="px-4 py-3">
-              <span className="font-medium">{s.name}</span> <span className="text-[13px] text-muted-foreground">({s.type})</span>
-              <div className="mt-0.5 break-all text-[13px] text-ink-2">{s.runs}</div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-[13.5px] text-muted-foreground">{p.mcpServers.error ?? "No MCP servers set up for this project."}</p>
-      ),
-    },
-    { id: "settings", action: <ActionLink to="/add" search={{ what: "permission", scope: p.id }} label="New permission rule" />, title: "Settings", count: of("settings").length, node: <ItemRows scope={p.id} items={of("settings")} empty="No project settings files." /> },
-    {
-      id: "backlog",
-      title: "Backlog",
-      count: p.backlog ? openTasks : planOpen.length,
-      node: p.backlog ? <BacklogTab p={p} /> : <PlanBacklog p={p} />,
-    },
-    {
-      id: "changelog",
-      title: "Changelog",
-      node: p.changelog ? <ChangelogTab p={p} /> : <p className="text-[13.5px] text-muted-foreground">No CHANGELOG.md. A changelog lists the notable changes for the people who use the project, newest first. Ask Claude to start one when the project has users.</p>,
-    },
-    {
-      id: "docs",
-      title: "Docs",
-      count: p.docs.length,
-      node: <ItemRows scope={p.id} items={p.docs.map((d) => ({ ...docItem, name: d.name.replace(/\.md$/i, ""), path: d.path, display: d.name }))} empty="No documents at the top of this project." />,
-    },
-  ];
   return (
-    <div className="flex min-h-full flex-col">
+    <ContextDropZone p={p}>
       <DetailHeader
         title={p.name}
         sub={
-          <span>
+          <span className="break-all">
             {p.path}
             {p.git?.branch ? ` · branch ${p.git.branch}${p.git.dirty ? `, ${p.git.dirty} changed files` : ""}` : ""}
           </span>
@@ -518,34 +544,44 @@ function ProjectDetailView({ id }: { id: string }) {
             </Button>
             <Button asChild className="no-underline">
               <Link to="/live" search={{ new: "1", project: p.id }}>
-                New session here
+                New session
               </Link>
             </Button>
           </>
         }
       />
-      <div className="flex gap-8 px-6 md:pl-12">
-        <div className="min-w-0 max-w-[860px] flex-1">
-          {sections.map((s) => (
-            <Section key={s.id} id={s.id} title={s.title} action={s.action}>
-              {s.node}
-            </Section>
-          ))}
-        </div>
-        <nav aria-label="On this page" className="sticky top-4 hidden h-fit w-48 flex-none py-6 xl:block">
-          <ul className="flex flex-col gap-0.5 text-[13.5px]">
-            {sections.map((s) => (
-              <li key={s.id}>
-                <a href={`#${s.id}`} className="flex justify-between rounded px-2 py-1 text-ink-2 no-underline hover:bg-sunken">
-                  {s.title}
-                  {s.count !== undefined && <span className="text-muted-foreground">{s.count}</span>}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
+      <div className="mx-auto w-full max-w-[1180px] px-4 md:px-8 md:pl-12">
+        <Section id="board" title="Board">
+          <ProjectBoard p={p} />
+        </Section>
+        <Section id="next" title="Up next">
+          <UpNext p={p} />
+        </Section>
+        <Section id="customize" title="Customizations">
+          <FeatureCounts p={p} />
+        </Section>
+        <Section id="sessions" title="Recent sessions">
+          <SessionRows p={p} />
+        </Section>
+        <Section id="context" title="Context for Claude">
+          <ContextSection p={p} />
+        </Section>
+        <Section id="changelog" title="Changelog">
+          {p.changelog ? <ChangelogTab p={p} /> : <p className="text-[13.5px] text-muted-foreground">No CHANGELOG.md. A changelog lists the notable changes for the people who use the project, newest first. Ask Claude to start one when the project has users.</p>}
+        </Section>
+        {p.backlog && (
+          <Section id="backlog" title="Backlog">
+            <BacklogTab p={p} />
+          </Section>
+        )}
+        <Section id="docs" title="Docs">
+          <ItemRows scope={p.id} items={p.docs.map((d) => ({ ...docItem, name: d.name.replace(/\.md$/i, ""), path: d.path, display: d.name }))} empty="No documents at the top of this project." />
+        </Section>
+        <Section id="worktreeinclude" title=".worktreeinclude">
+          <WorktreeInclude p={p} />
+        </Section>
       </div>
-    </div>
+    </ContextDropZone>
   );
 }
 

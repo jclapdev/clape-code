@@ -15,9 +15,10 @@ import { globalLibrary, listThemes, memoryItems, projectLibrary, readKeybindings
 import { catalog } from "../scan/catalog";
 import { initArgs, initResult, marketplaceCounts, parseAvailable, parseMarketplaces, pluginArgs, pluginResult, searchAvailable, skillsDirPlugins, type Available } from "../scan/plugins";
 import { buildMap, managedSettingsPath } from "../scan/map";
-import { handoffName, listProjects, projectDir, projectPathOf } from "../scan/projects";
+import { listProjects, projectDir, projectPathOf } from "../scan/projects";
 import { isDir, ls, readMd } from "../scan/md";
 import type { Env } from "./env";
+import { boardOf, contextOf } from "./projectWork";
 import { findClaude } from "../live/sessions";
 import { jsonProblem, MISSING_FILE } from "../errors";
 
@@ -47,8 +48,8 @@ content.get("/projects", async (c) => c.json(await listProjects()));
 content.get("/projects/:id", async (c) => {
   const dir = await requireProject(c.req.param("id"));
   const summary = (await listProjects()).find((p) => untildify(p.id) === dir)!;
-  const handoff = handoffName(await readdir(dir).catch(() => [] as string[])) ?? "BACKLOG.md";
-  const backlogFile = await readWithHash(join(dir, handoff));
+  // The board reads PROGRESS.md; the older backlog editor is only for a BACKLOG.md.
+  const backlogFile = await readWithHash(join(dir, "BACKLOG.md"));
   const changelogFile = await readWithHash(join(dir, "CHANGELOG.md"));
   const worktrees = (await ls(join(dir, ".claude", "worktrees"))).map((n) => ({ name: n, path: tildify(join(dir, ".claude", "worktrees", n)) }));
   const all = listSessions().filter((s) => s.cwd && isInside(projectPathOf(s.cwd), dir));
@@ -58,7 +59,9 @@ content.get("/projects/:id", async (c) => {
   return c.json({
     ...summary,
     abs: dir,
-    backlog: backlogFile ? { ...parseBacklog(backlogFile.content), hash: backlogFile.hash, path: join(dir, handoff), file: handoff } : null,
+    board: await boardOf(dir),
+    context: await contextOf(dir),
+    backlog: backlogFile ? { ...parseBacklog(backlogFile.content), hash: backlogFile.hash, path: join(dir, "BACKLOG.md"), file: "BACKLOG.md" } : null,
     changelog: changelogFile ? { ...parseChangelog(changelogFile.content), keep: isKeepAChangelog(changelogFile.content), hash: changelogFile.hash, path: join(dir, "CHANGELOG.md") } : null,
     docs: summary.docs.map((d) => ({ name: d, path: join(dir, d) })),
     library: await projectLibrary(dir),
@@ -117,7 +120,8 @@ async function mcpServersIn(path: string) {
 }
 
 async function handoffOf(id: string) {
-  return handoffName(await readdir(await requireProject(id)).catch(() => [] as string[])) ?? "BACKLOG.md";
+  await requireProject(id);
+  return "BACKLOG.md";
 }
 
 async function editProjectFile(id: string, file: string, hash: string, change: (text: string) => string) {
@@ -556,7 +560,8 @@ content.get("/search", async (c) => {
     } else if (h.kind === "doc") {
       const p = projects.find((p) => isInside(h.ref, untildify(p.id)));
       const name = basename(h.ref);
-      if (p && (name === "BACKLOG.md" || name === "PROGRESS.md")) link = `/projects/${encodeURIComponent(p.id)}#backlog`;
+      if (p && name === "PROGRESS.md") link = `/projects/${encodeURIComponent(p.id)}#board`;
+      else if (p && name === "BACKLOG.md") link = `/projects/${encodeURIComponent(p.id)}#backlog`;
       else if (p && name === "CHANGELOG.md") link = `/projects/${encodeURIComponent(p.id)}#changelog`;
     }
     return { ...h, link, display: h.kind === "session" ? h.subtitle : tildify(h.ref) };

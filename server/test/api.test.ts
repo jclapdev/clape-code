@@ -118,3 +118,72 @@ describe("errors", () => {
     expect(r).toEqual({ status: 500, error: "Something went wrong on the server. Try again." });
   });
 });
+
+describe("project board, context files and new projects", () => {
+  const demo = encodeURIComponent("~/projects/demo");
+  const post = (path: string, body: unknown) => request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const detail = async () => (await (await request(`/api/projects/${demo}`)).json()) as any;
+
+  test("Start a board, then add, move across all columns and delete a card", async () => {
+    expect((await detail()).board).toBeNull();
+    expect((await post(`/api/projects/${demo}/board/start`, {})).status).toBe(200);
+    expect((await post(`/api/projects/${demo}/board/start`, {})).status).toBe(409);
+    const file = join(root, "projects", "demo", "PROGRESS.md");
+    const start = await Bun.file(file).text();
+    let d = await detail();
+    expect(d.board.columns.map((c: any) => c.name)).toEqual(["Next", "In progress", "Done"]);
+    let r = await post(`/api/projects/${demo}/board/add`, { column: "next", text: "Try it #test", hash: d.board.hash });
+    expect(r.status).toBe(200);
+    for (const to of ["progress", "done", "next"]) {
+      d = await detail();
+      const card = d.board.columns.flatMap((c: any) => c.cards).find((c: any) => c.title === "Try it");
+      expect(card.labels).toEqual(["test"]);
+      r = await post(`/api/projects/${demo}/board/move`, { line: card.line, to, hash: d.board.hash });
+      expect(r.status).toBe(200);
+    }
+    expect((await post(`/api/projects/${demo}/board/move`, { line: 0, to: "done", hash: "stale" })).status).toBe(409);
+    d = await detail();
+    const card = d.board.columns[0].cards[0];
+    await post(`/api/projects/${demo}/board/delete`, { line: card.line, hash: d.board.hash });
+    expect(await Bun.file(file).text()).toBe(start);
+  });
+
+  test("Add context takes text files, refuses binary and big ones, and the switch edits CLAUDE.md", async () => {
+    const send = (name: string, data: string | Uint8Array) => {
+      const fd = new FormData();
+      fd.append("file", new File([data], name));
+      return request(`/api/projects/${demo}/context`, { method: "POST", body: fd });
+    };
+    const ok = await send("API notes.md", "# Notes\n");
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as any).name).toBe("API-notes.md");
+    expect((await send("API notes.md", "again")).status).toBe(409);
+    expect((await send("pic.png", new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0xff]))).status).toBe(400);
+    expect((await send("big.txt", "a".repeat(2 * 1024 * 1024 + 1))).status).toBe(400);
+    let d = await detail();
+    expect(d.context.files).toEqual([expect.objectContaining({ name: "API-notes.md", imported: false })]);
+    expect(d.context.claudeMd.hash).toBeNull();
+    expect((await post(`/api/projects/${demo}/context/import`, { name: "API-notes.md", on: true, hash: null })).status).toBe(200);
+    const md = join(root, "projects", "demo", "CLAUDE.md");
+    expect(await Bun.file(md).text()).toBe("@docs/API-notes.md\n");
+    d = await detail();
+    expect(d.context.files[0].imported).toBe(true);
+    await post(`/api/projects/${demo}/context/import`, { name: "API-notes.md", on: false, hash: d.context.claudeMd.hash });
+    expect(await Bun.file(md).text()).toBe("");
+  });
+
+  test("New project makes the folder, CLAUDE.md and an empty board, and shows up at once", async () => {
+    const r = await post("/api/projects-new", { name: "fresh-one" });
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as any;
+    expect(body.id).toBe("~/projects/fresh-one");
+    const dir = join(root, "projects", "fresh-one");
+    expect(await Bun.file(join(dir, "PROGRESS.md")).text()).toBe("# Progress\n\n## Next\n\n## In progress\n\n## Done\n");
+    expect(await Bun.file(join(dir, "CLAUDE.md")).text()).toContain("# fresh-one");
+    const list = (await (await request("/api/projects")).json()) as any[];
+    expect(list.some((p) => p.id === "~/projects/fresh-one")).toBe(true);
+    expect((await post("/api/projects-new", { name: "fresh-one" })).status).toBe(409);
+    expect((await post("/api/projects-new", { name: "x", folder: join(root, "elsewhere", "x") })).status).toBe(400);
+    expect((await post("/api/projects-new", { name: "../up" })).status).toBe(400);
+  });
+});

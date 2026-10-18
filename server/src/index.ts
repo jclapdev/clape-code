@@ -3,6 +3,7 @@ import { getConnInfo } from "hono/bun";
 import { readFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { content } from "./api/content";
+import { projectWork } from "./api/projectWork";
 import type { Env } from "./api/env";
 import { guides } from "./api/guides";
 import { sessions } from "./api/sessions";
@@ -45,6 +46,7 @@ app.onError((err, c) => {
 
 app.route("/api", system);
 app.route("/api", content);
+app.route("/api", projectWork);
 app.route("/api", sessions);
 app.route("/api", guides);
 app.all("/api/*", (c) => c.json({ error: "Not found." }, 404));

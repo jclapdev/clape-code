@@ -13,6 +13,10 @@ Notable changes to Control Center, newest first.
 - The Plugins page turns each plugin on and off and uninstalls it, using Claude Code's own plugin commands. "Find plugins" searches every marketplace you have (about 3,800 plugins), showing what each does and how many people installed it, with Install. "New plugin" makes a starter plugin in your skills folder and opens it, with its files listed. When Claude Code refuses, its own message shows.
 - Plugins you made in your skills folder show on the Plugins page. Removing one moves its folder to Archived items.
 - The menu has Home, Sessions, Projects, Customize, Settings and Guides. On a phone it opens full screen; on tablets it's a strip of icons.
+- Each project page opens on a board of its PROGRESS.md: Next, In progress and Done. Drag a card to another column, or use its menu ("Move to…"), which is how phones move cards. Add, edit and delete cards; a `#label` at the end of a card shows as a tag. Saving changes only the lines of that card, and the file's other sections stay as they are. A project without PROGRESS.md gets a "Start a board" button.
+- New project makes a folder in your projects folder with git, a starter CLAUDE.md and an empty board, and offers "Have Claude set it up", which opens a new session with /init.
+- Add context: drop text files on a project page, or pick them, to copy them into its docs/ folder. Each file has a "Claude reads this every session" switch that adds or removes its `@docs/…` line in CLAUDE.md.
+- The project page is now a summary: the board, Up next, how many instructions, skills, agents, hooks and so on the project has (each opens that page filtered to the project), recent sessions, context files, changelog, docs and .worktreeinclude.
 
 - A search box at the top of the menu finds sessions by what was said, plus plans, skills, agents and documents.
 - All projects shows what applies in every project: your instructions, skills, agents, commands, plugins, hooks, rules, output styles, plans and settings.

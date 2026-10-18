@@ -13,7 +13,8 @@ import { SetupPage } from "./pages/Setup";
 import { GuidesPage } from "./pages/Guides";
 import { NewItemPage, type NewKind } from "./pages/NewItem";
 import { AddSettingPage, type AddWhat } from "./pages/AddSetting";
-import { CustomizePage, FeaturePage, NewProjectPage, type FeatureSearch } from "./pages/Feature";
+import { CustomizePage, FeaturePage, type FeatureSearch } from "./pages/Feature";
+import { NewProjectPage } from "./pages/NewProject";
 import { FEATURES } from "./lib/features";
 
 const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);

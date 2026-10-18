@@ -483,14 +483,3 @@ export function CustomizePage() {
     </Page>
   );
 }
-
-/** Placeholder for New project until the projects step builds it. */
-export function NewProjectPage() {
-  return (
-    <Page title="New project" sub="Making a new project from here is coming soon.">
-      <p className="text-ink-2">
-        Until then, make a folder for it and start a session there with <code>claude</code>. It shows up under Projects once Claude Code has run in it.
-      </p>
-    </Page>
-  );
-}
