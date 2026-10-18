@@ -13,8 +13,9 @@ import type { Env } from "./env";
 
 export const system = new Hono<Env>();
 
-export type Restart = () => Promise<void>;
-let restart: Restart = async () => {};
+/** Prepares a restart and returns the synchronous step that swaps servers. */
+export type Restart = () => Promise<() => void>;
+let restart: Restart = async () => () => {};
 export const onRestart = (r: Restart) => (restart = r);
 
 system.get("/auth/status", async (c) => {
@@ -25,7 +26,8 @@ system.get("/auth/status", async (c) => {
 
 system.post("/auth/login", async (c) => {
   const cfg = await getConfig();
-  const ip = c.get("isLocal") ? "local" : (c.req.header("x-forwarded-for") ?? "remote");
+  // Keyed on the address the connection really comes from; headers like X-Forwarded-For are set by the client.
+  const ip = c.get("ip");
   if (!allowLoginAttempt(ip)) return c.json({ error: "Too many attempts. Wait a minute and try again." }, 429);
   const { password } = await c.req.json();
   if (!cfg.lan.passwordHash || !(await Bun.password.verify(String(password ?? ""), cfg.lan.passwordHash))) {
@@ -72,7 +74,8 @@ system.post("/lan", async (c) => {
   }
   if (enabled && !passwordHash) throw new WriteError(400, "Set a password first.");
   await saveConfig({ ...cfg, lan: { enabled: !!enabled, passwordHash } });
-  setTimeout(() => void restart(), 200);
+  const swap = await restart(); // loads the new options while this request is still open
+  queueMicrotask(swap); // runs once this response is on its way
   return c.json(publicConfig(await getConfig()));
 });
 

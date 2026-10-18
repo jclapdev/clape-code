@@ -82,6 +82,7 @@ export function guard(getIp: (c: Context) => string | undefined) {
       if (!(await verifyToken(getCookie(c, COOKIE)))) return c.json({ error: "Login required." }, 401);
     }
     c.set("isLocal", local);
+    c.set("ip", ip ?? "unknown");
     await next();
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Referrer-Policy", "no-referrer");

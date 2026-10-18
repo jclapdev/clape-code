@@ -1,1 +1,1 @@
-export type Env = { Variables: { isLocal: boolean } };
+export type Env = { Variables: { isLocal: boolean; ip: string } };

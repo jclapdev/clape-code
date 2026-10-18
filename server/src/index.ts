@@ -132,25 +132,43 @@ async function boot() {
 
 let server: ReturnType<typeof Bun.serve> | null = null;
 
-async function serve() {
+/** Everything the server needs, loaded up front so starting it is synchronous. */
+async function serveOptions() {
   const cfg = await getConfig();
   const port = Number(process.env.PORT ?? cfg.port);
   const tls = cfg.lan.enabled ? await tlsFiles() : undefined;
+  const url = `${tls ? "https" : "http"}://${cfg.lan.enabled ? "localhost" : "127.0.0.1"}:${port}`;
+  return { port, hostname: cfg.lan.enabled ? "0.0.0.0" : "127.0.0.1", tls, url, lan: cfg.lan.enabled };
+}
+
+function listen(o: Awaited<ReturnType<typeof serveOptions>>) {
   server = Bun.serve({
-    port,
-    hostname: cfg.lan.enabled ? "0.0.0.0" : "127.0.0.1",
-    tls,
+    port: o.port,
+    hostname: o.hostname,
+    tls: o.tls,
     idleTimeout: 0, // server-sent events stay open
     fetch: (req, srv) => app.fetch(req, { server: srv }),
   });
-  const url = `${tls ? "https" : "http"}://${cfg.lan.enabled ? "localhost" : "127.0.0.1"}:${port}`;
-  console.log(`Control Center is running at ${url}${cfg.lan.enabled ? " (home network mode)" : ""}`);
-  return url;
+  console.log(`Control Center is running at ${o.url}${o.lan ? " (home network mode)" : ""}`);
+  return o.url;
 }
 
+const serve = async () => listen(await serveOptions());
+
+// Called from the request that changes home-network mode. Async work queued after a Bun.serve handler has
+// responded doesn't run while the server is idle, so the options are loaded here, inside the request, and the
+// returned swap is synchronous. The old server stops listening; the triggering request and any open
+// live-update streams finish on their own (waiting for that would hang on the streams).
 onRestart(async () => {
-  server?.stop(true);
-  await serve();
+  const o = await serveOptions();
+  return () => {
+    try {
+      server?.stop();
+      listen(o);
+    } catch (e) {
+      console.error("Restart failed:", e);
+    }
+  };
 });
 
 export async function main(opts: { open?: boolean } = {}) {
