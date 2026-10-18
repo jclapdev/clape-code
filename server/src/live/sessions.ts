@@ -1,4 +1,7 @@
 import { query, type PermissionMode, type PermissionResult, type Query, type SDKMessage, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { emit } from "../events";
 import { tildify } from "../fs/paths";
 import { toolSummary } from "../parsers/transcript";
@@ -72,6 +75,28 @@ class AsyncQueue<T> implements AsyncIterable<T> {
 const now = () => new Date().toISOString();
 const compiled = import.meta.path.includes("$bunfs") || /^[A-Z]:[\\/]~BUN/.test(import.meta.path);
 
+/**
+ * The installed Claude Code, for the compiled executable (which has no node_modules copy of it).
+ * Started from Finder or at login the app may not have the shell's PATH, so the usual install folders are tried too.
+ */
+export function findClaude(): string | null {
+  const onPath = Bun.which("claude");
+  if (onPath) return onPath;
+  const home = homedir();
+  const candidates =
+    process.platform === "win32"
+      ? [join(home, ".local", "bin", "claude.exe"), join(process.env.LOCALAPPDATA ?? join(home, "AppData", "Local"), "Programs", "claude", "claude.exe")]
+      : [join(home, ".local", "bin", "claude"), join(home, ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
+  return candidates.find((p) => existsSync(p)) ?? null;
+}
+
+function claudeExecutable(): string | undefined {
+  if (!compiled) return undefined; // running from source: the SDK uses its own bundled copy
+  const p = findClaude();
+  if (!p) throw new Error("Claude Code isn't installed, or the app can't find it. Install Claude Code, or start the app from a terminal where `claude` works.");
+  return p;
+}
+
 class LiveSession {
   id = crypto.randomUUID();
   sessionId: string | null = null;
@@ -99,8 +124,7 @@ class LiveSession {
         resume: resume ?? undefined,
         abortController: this.abort,
         settingSources: ["user", "project", "local"],
-        // Inside a compiled executable there is no node_modules copy of Claude Code; use the installed one.
-        pathToClaudeCodeExecutable: compiled ? (Bun.which("claude") ?? undefined) : undefined,
+        pathToClaudeCodeExecutable: claudeExecutable(),
         canUseTool: (toolName, input, opts) => this.ask(toolName, input, opts as any),
       },
     });
