@@ -35,7 +35,7 @@ describe("policy", async () => {
     expect(classify(join(claude, "skills", "synced", "x", "SKILL.md"))).toBe("app");
     expect(classify(join(claude, "sessions", "1.abc.key"))).toBe("secret");
     expect(classify(join(claude, "daemon", "control.key"))).toBe("secret");
-    expect(classify(join(root, ".claude.json"))).toBe("app");
+    expect(classify(join(root, ".claude.json"))).toBe("secret");
     expect(classify(join(proj, "BACKLOG.md"))).toBe("edit");
     expect(classify(join(proj, ".git", "config"))).toBe("app");
     expect(classify(join(root, "elsewhere.txt"))).toBe("outside");

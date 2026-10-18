@@ -48,7 +48,8 @@ export function classify(abs: string): Access {
     if (EDITABLE.some((r) => r.test(rel))) return "edit";
     return "app";
   }
-  if (isInside(abs, claudeJson())) return "app";
+  // Holds account details (oauthAccount, userID, …): never served raw. The server reads only the fields it needs.
+  if (isInside(abs, claudeJson())) return "secret";
   for (const dir of projectDirs) {
     if (isInside(abs, dir)) {
       const rel = toPosix(relative(dir, abs));

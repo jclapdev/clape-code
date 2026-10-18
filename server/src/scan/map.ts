@@ -149,7 +149,7 @@ export async function buildMap(projects: { id: string; name: string; dir: string
     {
       name: "Elsewhere on this machine",
       entries: [
-        { path: tildify(claudeJson()), what: "Per-project state and usage counts; Claude Code rewrites it often", format: "JSON", count: null, access: "app", link: null, exists: await Bun.file(claudeJson()).exists() },
+        { path: tildify(claudeJson()), what: "Per-project state, usage counts and your account details; Claude Code rewrites it often", format: "JSON", count: null, access: "secret", link: null, exists: await Bun.file(claudeJson()).exists() },
         { path: managed, what: "Settings your organization manages; nothing overrides them", format: "JSON", count: null, access: "app", link: "/settings", exists: await Bun.file(managed).exists() },
       ],
     },

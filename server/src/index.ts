@@ -18,7 +18,7 @@ import { bump } from "./metrics";
 import { globalLibrary, projectLibrary } from "./scan/library";
 import { listProjects } from "./scan/projects";
 
-const app = new Hono<Env>();
+export const app = new Hono<Env>();
 
 app.use("*", guard((c) => getConnInfo(c).remote.address));
 app.use("/api/*", async (c, next) => {
