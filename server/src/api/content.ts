@@ -10,6 +10,8 @@ import { readWithHash, safeWrite, WriteError } from "../fs/safeWrite";
 import { addItem, editItemText, parseBacklog, toggleItem } from "../parsers/backlog";
 import { addEntry, isKeepAChangelog, parseChangelog } from "../parsers/changelog";
 import { effective, type Source } from "../parsers/settings";
+import { applySettingsChange, redactEnv, removeKeybinding, setKeybinding, type SettingsChange } from "../parsers/settingsEdit";
+import { KEY_ACTIONS, KEY_CONTEXTS } from "../parsers/keybindingDocs";
 import { search as searchDocs, listSessions, untitled } from "../db/index";
 import { globalLibrary, listThemes, memoryItems, projectLibrary, readKeybindings, readWorktreeInclude } from "../scan/library";
 import { catalog } from "../scan/catalog";
@@ -35,6 +37,8 @@ async function requireProject(id: string) {
 /** Read-modify-write a JSON settings file through safeWrite, keeping its indentation. */
 async function updateJson(abs: string, mutate: (o: Record<string, any>) => void) {
   const cur = await readWithHash(abs);
+  const problem = cur ? jsonProblem(cur.content) : null;
+  if (problem) throw new WriteError(400, `${problem} Fix it as text first.`);
   const obj = cur ? JSON.parse(cur.content) : {};
   mutate(obj);
   const indent = cur?.content.match(/^\{\s*\n([ \t]+)/)?.[1] ?? "  ";
@@ -394,10 +398,15 @@ export function addToSettings(o: Record<string, any>, f: { what: string; list?: 
   throw new WriteError(400, "You can add a permission rule or a hook here.");
 }
 
+/** The settings file a form writes to: yours for every project, or a project's shared or local one. */
+async function settingsFile(scope: unknown, local: unknown) {
+  const project = scope && scope !== "global" ? await requireProject(String(scope)) : null;
+  return project ? join(project, ".claude", local ? "settings.local.json" : "settings.json") : join(claudeDir(), "settings.json");
+}
+
 content.post("/settings/add", async (c) => {
   const f = await c.req.json();
-  const project = f.scope && f.scope !== "global" ? await requireProject(f.scope) : null;
-  const file = project ? join(project, ".claude", f.local ? "settings.local.json" : "settings.json") : join(claudeDir(), "settings.json");
+  const file = await settingsFile(f.scope, f.local);
   const r = await updateJson(file, (o) => addToSettings(o, f));
   emit({ area: "library" });
   return c.json({ ...r, path: file, display: tildify(file) });
@@ -526,12 +535,59 @@ content.get("/settings", async (c) => {
     let error: string | null = null;
     if (cur) {
       error = jsonProblem(cur.content);
-      if (!error) parsed[f.source] = JSON.parse(cur.content);
+      // Environment variable values can be secrets: only their names leave the server here.
+      if (!error) parsed[f.source] = redactEnv(JSON.parse(cur.content))!;
     }
-    sources.push({ source: f.source, path: f.path, display: tildify(f.path), exists: !!cur, access: classify(f.path), error });
+    sources.push({ source: f.source, path: f.path, display: tildify(f.path), exists: !!cur, access: classify(f.path), error, values: parsed[f.source] ?? null });
   }
   // Keyboard shortcuts and themes exist only for all projects, so they come with every settings view.
-  return c.json({ sources, entries: effective(parsed), keybindings: await readKeybindings(), themes: await listThemes() });
+  return c.json({
+    sources,
+    entries: effective(parsed),
+    keybindings: { ...(await readKeybindings()), contexts: KEY_CONTEXTS, actions: KEY_ACTIONS },
+    themes: await listThemes(),
+  });
+});
+
+/** One environment variable's value, sent only when someone clicks to see it. */
+content.get("/settings/env-value", async (c) => {
+  const source = c.req.query("source");
+  const name = c.req.query("name") ?? "";
+  const project = c.req.query("project");
+  if (source !== "managed" && source !== "user" && !(source === "project" || source === "local")) throw new WriteError(400, "Pick the settings file.");
+  if ((source === "project" || source === "local") && !project) throw new WriteError(400, "Pick the project.");
+  const file = source === "managed" ? managedSettingsPath() : await settingsFile(source === "user" ? "global" : project, source === "local");
+  const cur = await readWithHash(file).catch(() => null);
+  const env = cur && !jsonProblem(cur.content) ? (JSON.parse(cur.content) as { env?: Record<string, unknown> }).env : null;
+  if (!env || typeof env !== "object" || !(name in env)) throw new WriteError(404, "That variable isn't in this file any more.");
+  return c.json({ value: String(env[name]) });
+});
+
+/** One change from the Settings page to one settings file: permissions, model, env, status line, sandbox or theme. */
+content.post("/settings/change", async (c) => {
+  const f = (await c.req.json()) as { scope?: string; local?: boolean; change: SettingsChange };
+  const file = await settingsFile(f.scope, f.local);
+  const themes = (await listThemes()).map((t) => t.slug);
+  const r = await updateJson(file, (o) => applySettingsChange(o, f.change ?? ({} as SettingsChange), themes));
+  emit({ area: "settings" });
+  return c.json({ ...r, path: file, display: tildify(file) });
+});
+
+/** Keyboard shortcuts live only in ~/.claude/keybindings.json. */
+content.post("/keybindings/set", async (c) => {
+  const f = await c.req.json();
+  const file = join(claudeDir(), "keybindings.json");
+  const r = await updateJson(file, (o) => setKeybinding(o, String(f.context ?? ""), String(f.keys ?? ""), f.action === null ? null : String(f.action ?? "")));
+  emit({ area: "settings" });
+  return c.json({ ...r, path: file, display: tildify(file) });
+});
+
+content.post("/keybindings/remove", async (c) => {
+  const f = await c.req.json();
+  const file = join(claudeDir(), "keybindings.json");
+  const r = await updateJson(file, (o) => removeKeybinding(o, String(f.context ?? ""), String(f.keys ?? "")));
+  emit({ area: "settings" });
+  return c.json({ ...r, path: file, display: tildify(file) });
 });
 
 // ---- Map and search ----

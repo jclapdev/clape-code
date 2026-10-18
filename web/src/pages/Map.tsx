@@ -192,15 +192,19 @@ export function MapPage() {
   const [hideMissing, setHideMissing] = useState(true);
   const [view, setView] = useState<"table" | "tree">("table");
   const navigate = useNavigate();
-  // Entries point at where each thing is shown: a section of Settings, or a project page.
-  const SECTION: Record<string, string> = { skill: "skills", agent: "agents", command: "commands", rule: "rules", "output-style": "output-styles", hook: "hooks", plan: "plans", "claude-md": "instructions", memory: "plans" };
+  // Entries point at where each thing is shown: its Customize page, filtered to the project, or Settings.
+  const SECTION: Record<string, string> = { skill: "skills", agent: "agents", command: "skills", rule: "instructions", "output-style": "output-styles", hook: "hooks", plan: "plans", "claude-md": "instructions", memory: "memory" };
   const open = (link: string) => {
     const [pathname, query = ""] = link.split("?");
     const params = Object.fromEntries(new URLSearchParams(query));
-    if (pathname === "/library" || pathname === "/settings") {
-      const hash = pathname === "/settings" ? "settings" : SECTION[params.kind ?? ""] ?? "";
-      if (params.scope && params.scope !== "global") navigate({ to: "/projects/$id", params: { id: params.scope }, search: {}, hash });
-      else navigate({ to: "/setup", hash });
+    if (pathname === "/settings") {
+      navigate({ to: "/settings", search: params.scope && params.scope !== "global" ? { project: params.scope } : {} });
+      return;
+    }
+    if (pathname === "/library") {
+      const feature = SECTION[params.kind ?? ""];
+      if (feature) navigate({ to: `/${feature}` as "/skills", search: params.scope && params.scope !== "global" ? { project: params.scope } : {} });
+      else navigate({ to: "/customize" });
       return;
     }
     navigate({ to: pathname, search: params } as any);

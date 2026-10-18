@@ -153,7 +153,7 @@ export function NewItemPage() {
     onSuccess: () => {
       void qc.invalidateQueries();
       const hash = `#${spec.section}`;
-      if (scope === "global") void navigate({ to: "/setup", hash: spec.section });
+      if (scope === "global") void navigate({ to: `/${spec.section === "rules" ? "instructions" : spec.section}` as "/skills" });
       else void navigate({ to: "/projects/$id", params: { id: scope }, search: {}, hash: hash.slice(1) });
     },
   });

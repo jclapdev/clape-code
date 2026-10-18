@@ -1,7 +1,7 @@
 // The real API, against a fixture home folder seeded with secrets: nothing secret may come back,
 // and the login lockout can't be reset with a client-set header.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, mkdir, rm, writeFile, copyFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile, copyFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -185,5 +185,103 @@ describe("project board, context files and new projects", () => {
     expect((await post("/api/projects-new", { name: "fresh-one" })).status).toBe(409);
     expect((await post("/api/projects-new", { name: "x", folder: join(root, "elsewhere", "x") })).status).toBe(400);
     expect((await post("/api/projects-new", { name: "../up" })).status).toBe(400);
+  });
+});
+
+describe("Settings page writes", () => {
+  const demo = "~/projects/demo";
+  const post = (path: string, body: unknown) => request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const change = (change: unknown, scope = "global", local = false) => post("/api/settings/change", { scope, local, change });
+  const user = () => join(root, ".claude", "settings.json");
+  const local = () => join(root, "projects", "demo", ".claude", "settings.local.json");
+  const keys = () => join(root, ".claude", "keybindings.json");
+  const json = async (f: string) => JSON.parse(await readFile(f, "utf8"));
+
+  test("add and remove a permission rule", async () => {
+    expect((await post("/api/settings/add", { scope: "global", what: "permission", list: "deny", rule: "Read(./.env)" })).status).toBe(200);
+    expect((await json(user())).permissions.deny).toEqual(["Read(./.env)"]);
+    expect((await change({ op: "permission-remove", list: "deny", rule: "Read(./.env)" })).status).toBe(200);
+    expect((await json(user())).permissions).toEqual({ allow: ["Bash(osascript *)"] });
+    expect((await change({ op: "permission-remove", list: "deny", rule: "Read(./.env)" })).status).toBe(404);
+    expect((await change({ op: "permission-remove", list: "maybe", rule: "x" })).status).toBe(400);
+  });
+
+  test("set and clear the model in a project's local file", async () => {
+    expect((await change({ op: "model", value: "sonnet[1m]" }, demo, true)).status).toBe(200);
+    expect((await json(local())).model).toBe("sonnet[1m]");
+    expect((await change({ op: "model", value: null }, demo, true)).status).toBe(200);
+    expect(await json(local())).toEqual({});
+    expect((await change({ op: "model", value: "rm -rf /" }, demo, true)).status).toBe(400);
+  });
+
+  test("environment variable values stay on the server until asked for", async () => {
+    expect((await change({ op: "env-set", name: "MY_TOKEN", value: "env-secret-value" })).status).toBe(200);
+    expect((await json(user())).env).toEqual({ MY_TOKEN: "env-secret-value" });
+    const view = await (await request("/api/settings")).text();
+    expect(view).toContain("MY_TOKEN");
+    expect(view).not.toContain("env-secret-value");
+    const shown = (await (await request("/api/settings/env-value?source=user&name=MY_TOKEN")).json()) as { value: string };
+    expect(shown.value).toBe("env-secret-value");
+    expect((await request("/api/settings/env-value?source=local&name=MY_TOKEN")).status).toBe(400);
+    expect((await change({ op: "env-set", name: "1BAD", value: "x" })).status).toBe(400);
+    expect((await change({ op: "env-remove", name: "MY_TOKEN" })).status).toBe(200);
+    expect((await json(user())).env).toBeUndefined();
+  });
+
+  test("set and remove the status line", async () => {
+    expect((await change({ op: "statusline", command: "~/.claude/statusline.sh", padding: 2, refreshInterval: 5, hideVimModeIndicator: false })).status).toBe(200);
+    expect((await json(user())).statusLine).toEqual({ type: "command", command: "~/.claude/statusline.sh", padding: 2, refreshInterval: 5 });
+    expect((await change({ op: "statusline", command: "x", refreshInterval: 0 })).status).toBe(400);
+    expect((await change({ op: "statusline", command: null })).status).toBe(200);
+    expect((await json(user())).statusLine).toBeUndefined();
+  });
+
+  test("sandbox switches and lists, leaving no empty objects behind", async () => {
+    expect((await change({ op: "sandbox-flag", field: "enabled", value: true })).status).toBe(200);
+    expect((await change({ op: "sandbox-list", field: "network.allowedDomains", add: "github.com" })).status).toBe(200);
+    expect((await change({ op: "sandbox-list", field: "network.allowedDomains", add: "github.com" })).status).toBe(200);
+    expect((await json(user())).sandbox).toEqual({ enabled: true, network: { allowedDomains: ["github.com"] } });
+    expect((await change({ op: "sandbox-list", field: "network.allowedDomains", remove: "github.com" })).status).toBe(200);
+    expect((await change({ op: "sandbox-flag", field: "enabled", value: null })).status).toBe(200);
+    expect((await json(user())).sandbox).toBeUndefined();
+    expect((await change({ op: "sandbox-flag", field: "bwrapPath", value: true })).status).toBe(400);
+    expect((await change({ op: "sandbox-list", field: "filesystem.denyRead", remove: "~/.aws" })).status).toBe(404);
+  });
+
+  test("theme takes only documented values", async () => {
+    expect((await change({ op: "theme", value: "light-daltonized" })).status).toBe(200);
+    expect((await json(user())).theme).toBe("light-daltonized");
+    expect((await change({ op: "theme", value: "custom:missing" })).status).toBe(400);
+    expect((await change({ op: "theme", value: "auto" })).status).toBe(200);
+  });
+
+  test("the rest of settings.json is untouched", async () => {
+    const before = JSON.parse(await readFile(join(import.meta.dir, "fixtures", "settings.json"), "utf8"));
+    expect(await json(user())).toEqual(before);
+  });
+
+  test("change, unbind and remove a keyboard shortcut", async () => {
+    expect((await post("/api/keybindings/set", { context: "Chat", keys: "Ctrl+E", action: "chat:externalEditor" })).status).toBe(200);
+    expect((await post("/api/keybindings/set", { context: "Chat", keys: "ctrl+s", action: null })).status).toBe(200);
+    const k = await json(keys());
+    expect(k.$docs).toBe("https://code.claude.com/docs/en/keybindings");
+    expect(k.bindings).toEqual([{ context: "Chat", bindings: { "ctrl+e": "chat:externalEditor", "ctrl+s": null } }]);
+    const view = (await (await request("/api/settings")).json()) as any;
+    expect(view.keybindings.blocks[0].bindings).toContainEqual({ key: "ctrl+s", action: null });
+    expect((await post("/api/keybindings/set", { context: "Chat", keys: "ctrl+c", action: "chat:submit" })).status).toBe(400);
+    expect((await post("/api/keybindings/set", { context: "Chat", keys: "ctl+k", action: "chat:submit" })).status).toBe(400);
+    expect((await post("/api/keybindings/set", { context: "Nowhere", keys: "ctrl+k", action: "chat:submit" })).status).toBe(400);
+    expect((await post("/api/keybindings/set", { context: "Chat", keys: "ctrl+k", action: "chat:madeUp" })).status).toBe(400);
+    await post("/api/keybindings/remove", { context: "Chat", keys: "ctrl+e" });
+    await post("/api/keybindings/remove", { context: "Chat", keys: "ctrl+s" });
+    expect((await json(keys())).bindings).toEqual([]);
+  });
+
+  test("a settings file that isn't valid JSON is refused, not overwritten", async () => {
+    await writeFile(local(), "{ broken");
+    const r = await change({ op: "model", value: "opus" }, demo, true);
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { error: string }).error).toContain("Fix it as text first");
+    expect(await readFile(local(), "utf8")).toBe("{ broken");
   });
 });

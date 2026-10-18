@@ -9,7 +9,7 @@ import { MapPage } from "./pages/Map";
 import { PreferencesPage } from "./pages/Preferences";
 import { ProjectsPage } from "./pages/Projects";
 import { SessionsPage } from "./pages/Sessions";
-import { SetupPage } from "./pages/Setup";
+import { SettingsPage, type SettingsSearch } from "./pages/Settings";
 import { GuidesPage } from "./pages/Guides";
 import { NewItemPage, type NewKind } from "./pages/NewItem";
 import { AddSettingPage, type AddWhat } from "./pages/AddSetting";
@@ -44,9 +44,13 @@ const jobs = createRoute({ getParentRoute: () => root, path: "/jobs", component:
 const job = createRoute({ getParentRoute: () => root, path: "/jobs/$id", component: JobsPage });
 
 // Old addresses land on the pages that replaced them.
-const library = createRoute({ getParentRoute: () => root, path: "/library", beforeLoad: () => { throw redirect({ to: "/setup" }); } });
-// Settings shows the Setup page until the Settings step replaces it.
-const settings = createRoute({ getParentRoute: () => root, path: "/settings", component: SetupPage });
+const library = createRoute({ getParentRoute: () => root, path: "/library", beforeLoad: () => { throw redirect({ to: "/customize" }); } });
+const settings = createRoute({
+  getParentRoute: () => root,
+  path: "/settings",
+  component: SettingsPage,
+  validateSearch: (s: Record<string, unknown>): SettingsSearch => ({ project: str(s.project), file: s.file === "local" || s.file === "shared" ? s.file : undefined }),
+});
 const map = createRoute({ getParentRoute: () => root, path: "/map", component: MapPage });
 const archive = createRoute({ getParentRoute: () => root, path: "/archive", component: ArchivePage });
 const file = createRoute({
@@ -57,7 +61,8 @@ const file = createRoute({
 });
 const preferences = createRoute({ getParentRoute: () => root, path: "/preferences", component: PreferencesPage });
 
-const setup = createRoute({ getParentRoute: () => root, path: "/setup", component: SetupPage });
+// Setup's skills, agents and other lists moved to the Customize pages, and its settings to Settings.
+const setup = createRoute({ getParentRoute: () => root, path: "/setup", beforeLoad: () => { throw redirect({ to: "/settings", search: {} }); } });
 const guidesRoute = createRoute({ getParentRoute: () => root, path: "/guides", component: GuidesPage });
 const guide = createRoute({ getParentRoute: () => root, path: "/guides/$slug", component: GuidesPage });
 const newItem = createRoute({

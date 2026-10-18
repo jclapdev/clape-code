@@ -17,6 +17,7 @@ Notable changes to Control Center, newest first.
 - New project makes a folder in your projects folder with git, a starter CLAUDE.md and an empty board, and offers "Have Claude set it up", which opens a new session with /init.
 - Add context: drop text files on a project page, or pick them, to copy them into its docs/ folder. Each file has a "Claude reads this every session" switch that adds or removes its `@docs/…` line in CLAUDE.md.
 - The project page is now a summary: the board, Up next, how many instructions, skills, agents, hooks and so on the project has (each opens that page filtered to the project), recent sessions, context files, changelog, docs and .worktreeinclude.
+- A Settings page for how Claude Code behaves: permission rules (allow, ask first, never allow), model, environment variables, status line, sandbox, keyboard shortcuts and themes, each with one sentence on what it does. Pick whether to change your settings for every project, a project's shared settings or your own settings for that project; the page lists the files in the order Claude Code ranks them and says which file's value is in effect when more than one sets it, with "Edit as text" for each file. Environment variable values stay hidden until you click "Show value".
 
 - A search box at the top of the menu finds sessions by what was said, plus plans, skills, agents and documents.
 - All projects shows what applies in every project: your instructions, skills, agents, commands, plugins, hooks, rules, output styles, plans and settings.
@@ -41,6 +42,7 @@ Notable changes to Control Center, newest first.
 
 ### Removed
 
+- The Setup page. Its skills, agents and other lists are on the Customize pages, its settings on Settings; /setup opens Settings and /library opens Customize.
 - The command palette and its hidden keyboard shortcuts.
 - The separate Sessions, Live, Jobs, Library, Settings and Map menu entries. Old links land on the pages that replaced them.
 

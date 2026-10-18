@@ -74,7 +74,7 @@ export function AddSettingPage() {
         : api.post("/settings/add", { scope, local: local === "local", what, list, rule, event, matcher, command }),
     onSuccess: () => {
       void qc.invalidateQueries();
-      if (scope === "global") void navigate({ to: "/setup", hash: spec.section });
+      if (scope === "global") void navigate(what === "permission" ? { to: "/settings", search: {}, hash: "permissions" } : { to: `/${spec.section}` as "/hooks" });
       else void navigate({ to: "/projects/$id", params: { id: scope }, search: {}, hash: spec.section });
     },
   });
