@@ -1,23 +1,10 @@
-import type { ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
-import { ago, when } from "@/lib/format";
 import { featureById, type Feature, type FeatureId } from "@/lib/features";
-import type { PendingRequest, Session } from "@/lib/types";
 import { Page } from "@/components/Panes";
-import { ErrorNote, Loading, Tag } from "@/components/ui";
-
-interface Overview {
-  needsYou: (
-    | { type: "live"; id: string; cwd: string; request: PendingRequest; at: string }
-    | { type: "job"; id: string; name: string | null; cwd: string | null; detail: string | null; sessionId: string | null; at: string | null }
-  )[];
-  paused: { id: string; name: string; cwd: string | null; sessionId: string | null; at: string | null }[];
-}
+import { LiveRequestRow, SessionRow, useSessionEntries } from "@/components/SessionRows";
+import { ErrorNote, Loading } from "@/components/ui";
 
 /**
  * One card per row of the "Build your setup over time" table on code.claude.com/docs/en/features-overview
@@ -76,65 +63,11 @@ function SetupCard({ f, when: trigger, then, create }: { f: Feature; when: strin
   );
 }
 
-const folder = (cwd: string | null) => (cwd ? cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd : null);
-
-/** One line in the session list: what it is, where and when, a tag, and what you can do. */
-function Row({ title, about, tag, children }: { title: ReactNode; about: ReactNode; tag?: ReactNode; children: ReactNode }) {
-  return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
-      <div className="min-w-0 flex-1 basis-60">
-        <div className="flex min-w-0 items-center gap-2">
-          {tag}
-          <span className="min-w-0 truncate font-medium text-ink">{title}</span>
-        </div>
-        <div className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{about}</div>
-      </div>
-      <div className="flex flex-wrap gap-2">{children}</div>
-    </li>
-  );
-}
-
-const join = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
-
-function LiveRequestRow({ item }: { item: Extract<Overview["needsYou"][number], { type: "live" }> }) {
-  const qc = useQueryClient();
-  const respond = useMutation({
-    mutationFn: (decision: "allow" | "deny") => api.post(`/live/${item.id}/respond`, { requestId: item.request.requestId, decision }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["overview"] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const r = item.request;
-  const isQ = r.type === "question";
-  return (
-    <Row
-      tag={<Tag tone="attn">Needs you</Tag>}
-      title={isQ ? (r.input?.questions?.[0]?.question ?? "Claude has a question") : `Claude wants to use ${r.toolName}`}
-      about={join(folder(item.cwd), isQ ? null : r.summary, ago(item.at))}
-    >
-      {!isQ && (
-        <>
-          <Button size="sm" busy={respond.isPending} onClick={() => respond.mutate("allow")}>
-            Allow once
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => respond.mutate("deny")}>
-            Deny
-          </Button>
-        </>
-      )}
-      <Button asChild size="sm" variant="outline" className="no-underline">
-        <Link to="/live/$id" params={{ id: item.id }}>
-          {isQ ? "Answer" : "Open"}
-        </Link>
-      </Button>
-    </Row>
-  );
-}
-
-function SessionList({ o }: { o: Overview }) {
-  const recent = useQuery({ queryKey: ["sessions", "home"], queryFn: () => api.get<Session[]>("/sessions") });
-  const shownIds = new Set([...o.needsYou.flatMap((n) => (n.type === "job" && n.sessionId ? [n.sessionId] : [])), ...o.paused.flatMap((p) => (p.sessionId ? [p.sessionId] : []))]);
-  const sessions = (recent.data ?? []).filter((s) => !shownIds.has(s.sessionId)).slice(0, 6);
-  const empty = !o.needsYou.length && !o.paused.length && !sessions.length;
+function SessionList() {
+  const { requests, entries, isLoading, error } = useSessionEntries();
+  const first = entries.filter((e) => e.status === "needs" || e.status === "paused").sort((a, b) => (a.status === b.status ? 0 : a.status === "needs" ? -1 : 1));
+  const recent = entries.filter((e) => !first.includes(e)).slice(0, 6);
+  const empty = !requests.length && !first.length && !recent.length;
 
   return (
     <section aria-labelledby="home-sessions" className="flex flex-col gap-3">
@@ -147,62 +80,16 @@ function SessionList({ o }: { o: Overview }) {
           <ArrowRight className="size-3.5" aria-hidden />
         </Link>
       </div>
-      {recent.error && <ErrorNote error={recent.error} />}
-      {recent.isLoading && <Loading />}
-      {!recent.isLoading && empty && <p className="text-[13.5px] text-muted-foreground">No sessions yet. Press "New session" to give Claude a task.</p>}
-      {!empty && (
+      {error && <ErrorNote error={error} />}
+      {isLoading && <Loading />}
+      {!isLoading && empty && <p className="text-[13.5px] text-muted-foreground">No sessions yet. Press "New session" to give Claude a task.</p>}
+      {!isLoading && !empty && (
         <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
-          {o.needsYou.map((n) =>
-            n.type === "live" ? (
-              <LiveRequestRow key={"live" + n.id} item={n} />
-            ) : (
-              <Row key={"job" + n.id} tag={<Tag tone="attn">Needs you</Tag>} title={n.name ?? "Background session"} about={join(folder(n.cwd), n.detail || "Stopped and waiting for an answer before it can go on.")}>
-                {n.sessionId && (
-                  <Button asChild size="sm" className="no-underline">
-                    <Link to="/live" search={{ new: "1", resume: n.sessionId } as never}>
-                      Answer
-                    </Link>
-                  </Button>
-                )}
-                <Button asChild size="sm" variant="outline" className="no-underline">
-                  <Link to="/jobs/$id" params={{ id: n.id }}>
-                    Open
-                  </Link>
-                </Button>
-              </Row>
-            ),
-          )}
-          {o.paused.map((p) => (
-            <Row key={"paused" + p.id} tag={<Tag tone="accent">Paused</Tag>} title={p.name} about={join(folder(p.cwd), "Stopped by a usage limit that has since reset", when(p.at))}>
-              {p.sessionId && (
-                <Button asChild size="sm" className="no-underline">
-                  <Link to="/live" search={{ resume: p.sessionId } as never}>
-                    Continue
-                  </Link>
-                </Button>
-              )}
-              <Button asChild size="sm" variant="outline" className="no-underline">
-                <Link to="/jobs/$id" params={{ id: p.id }}>
-                  Open
-                </Link>
-              </Button>
-            </Row>
+          {requests.map((r) => (
+            <LiveRequestRow key={"live" + r.id} item={r} />
           ))}
-          {sessions.map((s) => (
-            <Row key={s.sessionId} tag={s.running ? <Tag tone="ok">Running</Tag> : undefined} title={s.displayTitle} about={join(folder(s.cwd), when(s.lastAt))}>
-              {!s.running && (
-                <Button asChild size="sm" variant="outline" className="no-underline">
-                  <Link to="/live" search={{ resume: s.sessionId } as never}>
-                    Continue
-                  </Link>
-                </Button>
-              )}
-              <Button asChild size="sm" variant="outline" className="no-underline">
-                <Link to="/sessions/$sid" params={{ sid: s.sessionId }} search={{} as never}>
-                  Open
-                </Link>
-              </Button>
-            </Row>
+          {[...first, ...recent].map((e) => (
+            <SessionRow key={e.key} e={e} />
           ))}
         </ul>
       )}
@@ -211,7 +98,6 @@ function SessionList({ o }: { o: Overview }) {
 }
 
 export function HomePage() {
-  const q = useQuery({ queryKey: ["overview"], queryFn: () => api.get<Overview>("/overview") });
   return (
     <Page
       title="Control Center"
@@ -245,7 +131,7 @@ export function HomePage() {
           </ul>
         </section>
 
-        {q.isLoading ? <Loading /> : q.error ? <ErrorNote error={q.error} /> : <SessionList o={q.data!} />}
+        <SessionList />
       </div>
     </Page>
   );

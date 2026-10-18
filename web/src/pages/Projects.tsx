@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Link, useParams } from "@tanstack/react-router";
-import { ChevronDown, Pencil, Plus } from "lucide-react";
+import { ArrowRight, ChevronDown, Pencil, Plus } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { api, ApiError, enc } from "@/lib/api";
 import { when } from "@/lib/format";
@@ -313,11 +313,10 @@ export function ItemRows({ items, empty, usage, scope = "global" }: { items: Lib
 }
 
 function SessionRows({ p }: { p: ProjectDetail }) {
-  const [all, setAll] = useState(false);
   if (!p.sessions.length) return <p className="text-[13.5px] text-muted-foreground">No sessions yet. Press "New session" to give Claude a task in this project.</p>;
   const plansBy = new Map<string, ProjectDetail["plans"]>();
   for (const pl of p.plans) plansBy.set(pl.sessionId, [...(plansBy.get(pl.sessionId) ?? []), pl]);
-  const shown = all ? p.sessions : p.sessions.slice(0, 5);
+  const shown = p.sessions.slice(0, 5);
   return (
     <>
       <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
@@ -351,10 +350,11 @@ function SessionRows({ p }: { p: ProjectDetail }) {
           </li>
         ))}
       </ul>
-      {!all && p.sessions.length > 5 && (
-        <Button variant="ghost" size="sm" className="mt-2" onClick={() => setAll(true)}>
+      {p.sessions.length > 5 && (
+        <Link to="/sessions" search={{ project: p.id }} className="mt-2 inline-flex items-center gap-1 text-[13px]">
           Show all {p.sessions.length} sessions
-        </Button>
+          <ArrowRight className="size-3.5" aria-hidden />
+        </Link>
       )}
     </>
   );

@@ -166,7 +166,9 @@ export function UiProvider({ children }: { children: ReactNode }) {
     setConfirm(null);
   };
   return (
-    <ThemeProvider attribute="data-theme" storageKey="cc-theme" defaultTheme="system" enableSystem disableTransitionOnChange>
+    // next-themes renders an inline script for server-rendered pages. Here it would never run (theme-init.js does
+    // that job), and React warns about any script element it renders, so it's marked as data instead.
+    <ThemeProvider attribute="data-theme" storageKey="cc-theme" defaultTheme="system" enableSystem disableTransitionOnChange scriptProps={{ type: "application/json" }}>
       <TooltipProvider>
         <ConfirmCtx.Provider value={ask}>
           {children}

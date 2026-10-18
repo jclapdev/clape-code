@@ -181,7 +181,7 @@ function Rail({ connected }: { connected: boolean }) {
   );
 }
 
-const TITLES: Record<string, string> = { "": "Home", projects: "Projects", customize: "Customize", settings: "Settings", guides: "Guides", preferences: "App preferences", live: "Session", sessions: "Sessions", jobs: "Background sessions", new: "New item", add: "Add setting", file: "File", map: "File locations", archive: "Archived items" };
+const TITLES: Record<string, string> = { "": "Home", projects: "Projects", customize: "Customize", settings: "Settings", guides: "Guides", preferences: "App preferences", live: "Session", sessions: "Sessions", jobs: "Background session", new: "New item", add: "Add setting", file: "File", archive: "Archived items" };
 
 export function Shell() {
   const connected = useLiveUpdates();

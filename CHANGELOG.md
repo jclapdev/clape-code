@@ -19,6 +19,7 @@ Notable changes to Control Center, newest first.
 - The project page is now a summary: the board, Up next, how many instructions, skills, agents, hooks and so on the project has (each opens that page filtered to the project), recent sessions, context files, changelog, docs and .worktreeinclude.
 - A Settings page for how Claude Code behaves: permission rules (allow, ask first, never allow), model, environment variables, status line, sandbox, keyboard shortcuts and themes, each with one sentence on what it does. Pick whether to change your settings for every project, a project's shared settings or your own settings for that project; the page lists the files in the order Claude Code ranks them and says which file's value is in effect when more than one sets it, with "Edit as text" for each file. Environment variable values stay hidden until you click "Show value".
 - Home says what the app is for and has a "Build your setup" panel: one card for each sign, from Claude Code's own guide, that a feature would help (such as "Claude gets a convention or a command wrong twice"), each with a button that creates that thing and a link to its page. Below it, one list of sessions: those that need you, those paused at a usage limit, then the 6 most recent, each with Continue and Open. The separate Background sessions, Projects and Changelog lists on Home are gone.
+- A Sessions page lists every session in every project, newest first, background sessions included, with a search by title, a project picker, a "Needs you" filter and New session. Each line has Continue and Open. From 1280 px wide the list stays on the left and the opened session shows on the right; on smaller screens it opens on its own with Back. A background session opens full width with its state and what it did.
 
 - A search box at the top of the menu finds sessions by what was said, plus plans, skills, agents and documents.
 - All projects shows what applies in every project: your instructions, skills, agents, commands, plugins, hooks, rules, output styles, plans and settings.
@@ -34,6 +35,8 @@ Notable changes to Control Center, newest first.
 
 - Deleting a skill, agent, command, rule, output style, plan or memory note from a project page moves it to Archived items instead of the computer's trash.
 - Opening a file to edit right after reading it no longer shows an empty editor.
+- Home's "All sessions" link opens the Sessions page, and a project page's "Show all N sessions" opens it filtered to that project.
+- Stopping or closing a live session returns to Sessions.
 
 - A project opens as one page with every section showing and a count for each, instead of tabs.
 - Files open in place as readable text; Markdown is edited in live preview, so saving changes only what you typed.
@@ -45,10 +48,13 @@ Notable changes to Control Center, newest first.
 
 - The Setup page. Its skills, agents and other lists are on the Customize pages, its settings on Settings; /setup opens Settings and /library opens Customize.
 - The command palette and its hidden keyboard shortcuts.
-- The separate Sessions, Live, Jobs, Library, Settings and Map menu entries. Old links land on the pages that replaced them.
+- The separate Sessions, Live, Jobs, Library, Settings and Map menu entries. Old links land on the pages that replaced them: /jobs and /live open Sessions, /map opens Customize, and an old Library link to one kind of item, such as agents, opens that kind's page.
+- The File locations page (/map).
 
 ### Fixed
 
+- The browser console no longer shows "Encountered a script tag while rendering React component" on every page.
+- Cancelling "Delete this session?" no longer leaves the session page.
 - Home no longer says background sessions need you when they only stopped at a usage limit that has since reset.
 
 ## 2026-10-17

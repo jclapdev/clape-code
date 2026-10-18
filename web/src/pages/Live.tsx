@@ -283,7 +283,7 @@ function LiveView({ id }: { id: string }) {
               variant={ended ? "outline" : "destructive"}
               onClick={() => {
                 call.mutate({ path: "", method: "delete" });
-                navigate({ to: "/live", search: {} });
+                navigate({ to: "/sessions", search: {} });
               }}
             >
               {ended ? "Close" : "Stop"}

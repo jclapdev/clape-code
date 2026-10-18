@@ -5,10 +5,9 @@ import { FilePage } from "./pages/File";
 import { HomePage } from "./pages/Home";
 import { JobsPage } from "./pages/Jobs";
 import { LivePage } from "./pages/Live";
-import { MapPage } from "./pages/Map";
 import { PreferencesPage } from "./pages/Preferences";
 import { ProjectsPage } from "./pages/Projects";
-import { SessionsPage } from "./pages/Sessions";
+import { SessionsPage, type SessionsSearch } from "./pages/Sessions";
 import { SettingsPage, type SettingsSearch } from "./pages/Settings";
 import { GuidesPage } from "./pages/Guides";
 import { NewItemPage, type NewKind } from "./pages/NewItem";
@@ -32,26 +31,49 @@ const project = createRoute({
   validateSearch: (s: Record<string, unknown>): { tab?: string } => ({ tab: str(s.tab) }),
 });
 
-const sessionsSearch = (s: Record<string, unknown>): { archived?: string; project?: string } => ({ archived: str(String(s.archived ?? "")), project: str(s.project) });
+const sessionsSearch = (s: Record<string, unknown>): SessionsSearch => ({ project: str(s.project), needs: s.needs === true || s.needs === "true" || s.needs === "1" || s.needs === 1 ? true : undefined, q: str(s.q) });
 const sessions = createRoute({ getParentRoute: () => root, path: "/sessions", component: SessionsPage, validateSearch: sessionsSearch });
 const session = createRoute({ getParentRoute: () => root, path: "/sessions/$sid", component: SessionsPage, validateSearch: sessionsSearch });
 
 const liveSearch = (s: Record<string, unknown>): { new?: string; project?: string; resume?: string; prompt?: string; mode?: string } => ({ new: str(String(s.new ?? "")), project: str(s.project), resume: str(s.resume), prompt: str(s.prompt), mode: str(s.mode) });
-const live = createRoute({ getParentRoute: () => root, path: "/live", component: LivePage, validateSearch: liveSearch });
+// Plain /live was the old list of live sessions; with a form to fill in or a session to resume it's the New session form.
+const live = createRoute({
+  getParentRoute: () => root,
+  path: "/live",
+  component: LivePage,
+  validateSearch: liveSearch,
+  beforeLoad: ({ search }) => {
+    if (!Object.values(search).some(Boolean)) throw redirect({ to: "/sessions", search: {} });
+  },
+});
 const liveOne = createRoute({ getParentRoute: () => root, path: "/live/$id", component: LivePage, validateSearch: liveSearch });
 
-const jobs = createRoute({ getParentRoute: () => root, path: "/jobs", component: JobsPage });
+// Background sessions are listed with the rest on Sessions; each one still opens at /jobs/<id>.
+const jobs = createRoute({ getParentRoute: () => root, path: "/jobs", beforeLoad: () => { throw redirect({ to: "/sessions", search: {} }); } });
 const job = createRoute({ getParentRoute: () => root, path: "/jobs/$id", component: JobsPage });
 
 // Old addresses land on the pages that replaced them.
-const library = createRoute({ getParentRoute: () => root, path: "/library", beforeLoad: () => { throw redirect({ to: "/customize" }); } });
+// The old Library took ?kind= and ?scope= (global or a project id); each kind now has its own page.
+const LIBRARY_KIND: Record<string, string> = { skill: "skills", command: "skills", agent: "agents", rule: "instructions", "claude-md": "instructions", "output-style": "output-styles", hook: "hooks", plan: "plans", memory: "memory", workflow: "workflows", mcp: "mcp", plugin: "plugins" };
+const library = createRoute({
+  getParentRoute: () => root,
+  path: "/library",
+  validateSearch: (s: Record<string, unknown>): { kind?: string; scope?: string } => ({ kind: str(s.kind), scope: str(s.scope) }),
+  beforeLoad: ({ search }) => {
+    const feature = LIBRARY_KIND[search.kind ?? ""];
+    const project = search.scope && search.scope !== "global" ? search.scope : undefined;
+    if (feature) throw redirect({ to: `/${feature}` as "/skills", search: project ? { project } : {} });
+    throw redirect({ to: "/customize" });
+  },
+});
+// File locations (/map) isn't linked from anywhere since the menu changed; Customize lists every kind of file.
+const map = createRoute({ getParentRoute: () => root, path: "/map", beforeLoad: () => { throw redirect({ to: "/customize" }); } });
 const settings = createRoute({
   getParentRoute: () => root,
   path: "/settings",
   component: SettingsPage,
   validateSearch: (s: Record<string, unknown>): SettingsSearch => ({ project: str(s.project), file: s.file === "local" || s.file === "shared" ? s.file : undefined }),
 });
-const map = createRoute({ getParentRoute: () => root, path: "/map", component: MapPage });
 const archive = createRoute({ getParentRoute: () => root, path: "/archive", component: ArchivePage });
 const file = createRoute({
   getParentRoute: () => root,
