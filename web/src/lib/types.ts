@@ -175,3 +175,13 @@ export interface FileData {
   access: Access;
   tooBig: boolean;
 }
+
+export interface CatalogItem extends LibraryItem {
+  projectId: string | null; // the project it applies to; null when it applies everywhere
+  projectName: string | null;
+}
+
+export interface Catalog {
+  items: CatalogItem[];
+  projects: { id: string; name: string }[];
+}

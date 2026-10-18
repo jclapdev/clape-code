@@ -40,6 +40,12 @@ describe("policy", async () => {
     expect(classify(join(proj, ".git", "config"))).toBe("app");
     expect(classify(join(root, "elsewhere.txt"))).toBe("outside");
   });
+  test("workflows, scheduled tasks and themes are editable", () => {
+    expect(classify(join(claude, "workflows", "triage.js"))).toBe("edit");
+    expect(classify(join(claude, "scheduled-tasks", "daily-review", "SKILL.md"))).toBe("edit");
+    expect(classify(join(claude, "themes", "dusk.json"))).toBe("edit");
+    expect(classify(join(claude, "workflows-old", "x.js"))).toBe("app");
+  });
 });
 
 describe("safeWrite", async () => {

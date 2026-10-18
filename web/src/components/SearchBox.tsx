@@ -102,7 +102,7 @@ export function SearchBox({ onPick }: { onPick?: () => void }) {
           } else if (e.key === "Enter" && flat[active]) go(flat[active]!);
           else if (e.key === "Escape") setOpen(false);
         }}
-        placeholder="Search sessions, plans, skills…"
+        placeholder="Search everything"
         aria-label="Search"
         className="pl-8"
       />

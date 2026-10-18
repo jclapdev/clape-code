@@ -14,6 +14,8 @@ const KIND_LABEL: Record<string, [string, string]> = {
   "output-style": ["Output style", "Output styles"],
   plan: ["Plan", "Plans"],
   memory: ["Memory note", "Memory"],
+  workflow: ["Workflow", "Workflows"],
+  "scheduled-task": ["Scheduled task", "Scheduled tasks"],
 };
 
 interface Rec {
@@ -39,7 +41,7 @@ export function ArchivePage() {
   return (
     <Page
       title="Archived items"
-      sub="Skills, agents, commands, plans and notes you archived. Claude Code doesn't load them; restore puts each back where it came from."
+      sub="Items you deleted from the app. Claude Code doesn't load them; restore puts each back where it came from."
     >
       {q.isLoading && <Loading />}
       <ErrorNote error={q.error} />
@@ -48,7 +50,7 @@ export function ArchivePage() {
         <ul className="overflow-hidden rounded-lg border border-line bg-surface">
           {q.data.map((r) => (
             <li key={r.id} className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3 last:border-0">
-              <Tag>{r.kind === "file" ? "File" : KIND_LABEL[r.kind][0]}</Tag>
+              <Tag>{KIND_LABEL[r.kind]?.[0] ?? "File"}</Tag>
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{r.name}</div>
                 <div className="truncate font-mono text-xs text-muted-foreground">{r.originalDisplay}</div>

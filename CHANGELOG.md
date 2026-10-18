@@ -6,6 +6,11 @@ Notable changes to Control Center, newest first.
 
 ### Added
 
+- A Customize section with one page for each thing that changes how Claude Code works: instructions, skills, slash commands, agents, hooks, MCP servers, plugins, plans, scheduled tasks, output styles, memory and workflows. Each page lists every item from every project and plugin, says where it applies, and has a search box, a project filter and a New button.
+- Open any item to read it, edit it in place or delete it. Deleted files go to Archived items, where you can restore them.
+- The Slash commands page lists Claude Code's own commands next to yours, each with "Run in a new session".
+- The menu has Home, Sessions, Projects, Customize, Settings and Guides. On a phone it opens full screen; on tablets it's a strip of icons.
+
 - A search box at the top of the menu finds sessions by what was said, plus plans, skills, agents and documents.
 - All projects shows what applies in every project: your instructions, skills, agents, commands, plugins, hooks, rules, output styles, plans and settings.
 - Guides shows Claude Code's official guides as formatted pages.
@@ -18,7 +23,9 @@ Notable changes to Control Center, newest first.
 
 ### Changed
 
-- The menu is Home, All projects, Guides and your projects by name.
+- Deleting a skill, agent, command, rule, output style, plan or memory note from a project page moves it to Archived items instead of the computer's trash.
+- Opening a file to edit right after reading it no longer shows an empty editor.
+
 - A project opens as one page with every section showing and a count for each, instead of tabs.
 - Files open in place as readable text; Markdown is edited in live preview, so saving changes only what you typed.
 - Skills and plugins are turned on or off from the item itself.

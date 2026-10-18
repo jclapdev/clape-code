@@ -13,6 +13,8 @@ import { SetupPage } from "./pages/Setup";
 import { GuidesPage } from "./pages/Guides";
 import { NewItemPage, type NewKind } from "./pages/NewItem";
 import { AddSettingPage, type AddWhat } from "./pages/AddSetting";
+import { CustomizePage, FeaturePage, NewProjectPage, type FeatureSearch } from "./pages/Feature";
+import { FEATURES } from "./lib/features";
 
 const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
 
@@ -21,6 +23,7 @@ const root = createRootRoute({ component: Shell });
 const home = createRoute({ getParentRoute: () => root, path: "/", component: HomePage });
 
 const projects = createRoute({ getParentRoute: () => root, path: "/projects", component: ProjectsPage });
+const newProject = createRoute({ getParentRoute: () => root, path: "/projects/new", component: NewProjectPage });
 const project = createRoute({
   getParentRoute: () => root,
   path: "/projects/$id",
@@ -41,7 +44,8 @@ const job = createRoute({ getParentRoute: () => root, path: "/jobs/$id", compone
 
 // Old addresses land on the pages that replaced them.
 const library = createRoute({ getParentRoute: () => root, path: "/library", beforeLoad: () => { throw redirect({ to: "/setup" }); } });
-const settings = createRoute({ getParentRoute: () => root, path: "/settings", beforeLoad: () => { throw redirect({ to: "/setup", hash: "settings" }); } });
+// Settings shows the Setup page until the Settings step replaces it.
+const settings = createRoute({ getParentRoute: () => root, path: "/settings", component: SetupPage });
 const map = createRoute({ getParentRoute: () => root, path: "/map", component: MapPage });
 const archive = createRoute({ getParentRoute: () => root, path: "/archive", component: ArchivePage });
 const file = createRoute({
@@ -69,7 +73,12 @@ const addSetting = createRoute({
   validateSearch: (s: Record<string, unknown>): { what?: AddWhat; scope?: string } => ({ what: (str(s.what) as AddWhat) ?? "permission", scope: str(s.scope) }),
 });
 
-const routeTree = root.addChildren([addSetting, setup, guidesRoute, guide, newItem, home, projects, project, sessions, session, live, liveOne, jobs, job, library, settings, map, archive, file, preferences]);
+// Customize: an overview, then one page per feature, all drawn by the same component.
+const customize = createRoute({ getParentRoute: () => root, path: "/customize", component: CustomizePage });
+const featureSearch = (s: Record<string, unknown>): FeatureSearch => ({ item: str(s.item), project: str(s.project), q: str(s.q) });
+const features = FEATURES.map((f) => createRoute({ getParentRoute: () => root, path: `/${f.id}`, component: FeaturePage, validateSearch: featureSearch }));
+
+const routeTree = root.addChildren([customize, ...features, newProject, addSetting, setup, guidesRoute, guide, newItem, home, projects, project, sessions, session, live, liveOne, jobs, job, library, settings, map, archive, file, preferences]);
 
 export const router = createRouter({ routeTree, defaultPreload: false });
 

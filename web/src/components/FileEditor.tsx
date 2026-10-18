@@ -35,6 +35,14 @@ export function FileEditor({ path, header, onSaved, line }: { path: string; head
   const [error, setError] = useState<string | null>(null);
   const [check, setCheck] = useState<{ output: string; overHash?: string | null } | null>(null);
 
+  // Runs before the effect below, so a file that's already loaded isn't wiped right after it's taken.
+  useEffect(() => {
+    setText(null);
+    setBase(null);
+    setConflict(null);
+    setError(null);
+  }, [path]);
+
   // Take the server's version whenever there are no unsaved edits.
   useEffect(() => {
     if (!q.data || q.data.dir || q.data.content === null) return;
@@ -47,13 +55,6 @@ export function FileEditor({ path, header, onSaved, line }: { path: string; head
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q.data?.hash, path]);
-
-  useEffect(() => {
-    setText(null);
-    setBase(null);
-    setConflict(null);
-    setError(null);
-  }, [path]);
 
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;

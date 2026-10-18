@@ -10,10 +10,11 @@ import { api, ApiError, enc } from "@/lib/api";
 import { when } from "@/lib/format";
 import type { BacklogItem, LibraryItem, Project, ProjectDetail } from "@/lib/types";
 import { openOnComputer } from "@/components/FileEditor";
+import { ItemActions } from "@/components/ItemActions";
 import { DetailHeader } from "@/components/Panes";
 import { Readable } from "@/components/Readable";
 import type { NewKind } from "./NewItem";
-import { EmptyState, ErrorNote, Loading, Md, Tag, cn, useConfirm } from "@/components/ui";
+import { EmptyState, ErrorNote, Loading, Md, Tag, cn } from "@/components/ui";
 import { SimpleSelect } from "@/components/SimpleSelect";
 import { IconButton } from "@/components/IconButton";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -259,80 +260,6 @@ export function Section({ id, title, action, children }: { id: string; title: st
 
 const STATE_LABEL: Record<string, string> = { off: "Turned off", "name-only": "Name only", "user-invocable-only": "Only when you type it" };
 
-/** A skill, agent, command, rule, hook or note: its name and full description; opens in place, readable. */
-const SKILL_STATES = [
-  { value: "on", label: "On: Claude uses it when it fits, and you can type /name" },
-  { value: "name-only", label: "Name only: Claude sees just its name" },
-  { value: "user-invocable-only", label: "Only when you type /name" },
-  { value: "off", label: "Off: Claude can't use it and it's not in the / list" },
-];
-const DELETABLE: LibraryItem["kind"][] = ["skill", "agent", "command", "rule", "output-style", "plan", "memory"];
-
-/** What you can do with one item: turn a skill or plugin on or off, check a skill, delete it. */
-function ItemActions({ i, scope }: { i: LibraryItem; scope: string }) {
-  const qc = useQueryClient();
-  const confirm = useConfirm();
-  const [check, setCheck] = useState<{ ok: boolean; output: string; available: boolean } | null>(null);
-  const done = () => void qc.invalidateQueries();
-  const state = useMutation({
-    mutationFn: (v: string) => (i.kind === "plugin" ? api.post("/library/plugin", { key: i.overrideKey, enabled: v === "on" }) : api.post("/library/skill-state", { key: i.overrideKey, state: v, scope })),
-    onSuccess: done,
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const del = useMutation({
-    mutationFn: () => api.post("/library/delete", { path: i.path, kind: i.kind }),
-    onSuccess: () => (toast.success(`Moved ${i.name} to the trash.`), done()),
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const validate = useMutation({
-    mutationFn: () => api.post<{ ok: boolean; output: string; available: boolean }>("/library/validate", { path: i.path }),
-    onSuccess: setCheck,
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const editable = i.access === "edit";
-  const canState = (i.kind === "skill" && !!i.overrideKey && i.source !== "plugin") || i.kind === "plugin";
-  const canDelete = editable && DELETABLE.includes(i.kind) && i.source !== "plugin" && i.source !== "synced";
-  if (!canState && !canDelete && i.kind !== "skill") return null;
-  return (
-    <div className="mb-4 flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        {canState && (
-          <SimpleSelect
-            label={i.kind === "plugin" ? "Plugin on or off" : "Can Claude use it"}
-            value={i.kind === "plugin" ? (i.state === "off" ? "off" : "on") : (i.state ?? "on")}
-            onChange={(v) => state.mutate(v)}
-            options={i.kind === "plugin" ? [{ value: "on", label: "On" }, { value: "off", label: "Off" }] : SKILL_STATES}
-          />
-        )}
-        {i.kind === "skill" && i.source === "plugin" && <span className="text-[13px] text-muted-foreground">Turned on or off with its plugin.</span>}
-        {i.kind === "skill" && editable && (
-          <Button size="sm" variant="outline" busy={validate.isPending} onClick={() => validate.mutate()}>
-            Check against the standard
-          </Button>
-        )}
-        {canDelete && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-danger"
-            busy={del.isPending}
-            onClick={async () => {
-              if (await confirm({ title: `Delete ${i.name}?`, body: "It moves to your computer's trash, where you can still get it back.", confirm: "Move to trash", danger: true })) del.mutate();
-            }}
-          >
-            Delete
-          </Button>
-        )}
-      </div>
-      {check && (
-        <p className={cn("rounded-md px-3 py-2 text-[13px]", check.ok ? "bg-ok-soft text-ok" : "bg-danger-soft text-danger")}>
-          {!check.available ? check.output : check.ok ? "It follows the Agent Skills standard." : `It doesn't follow the standard yet: ${check.output.split("\n").filter(Boolean).slice(-3).join(" ")}`}
-        </p>
-      )}
-    </div>
-  );
-}
-
 export function ItemRows({ items, empty, usage, scope = "global" }: { items: LibraryItem[]; empty: string; usage?: (i: LibraryItem) => string | null; scope?: string }) {
   const [open, setOpen] = useState<string | null>(null);
   if (!items.length) return <p className="text-[13.5px] text-muted-foreground">{empty}</p>;
@@ -367,7 +294,9 @@ export function ItemRows({ items, empty, usage, scope = "global" }: { items: Lib
                   </div>
                 ) : (
                   <>
-                    <ItemActions i={i} scope={scope} />
+                    <div className="mb-4">
+                      <ItemActions i={i} scope={scope} projectId={scope === "global" ? null : scope} />
+                    </div>
                     <Readable path={i.path} />
                   </>
                 )}

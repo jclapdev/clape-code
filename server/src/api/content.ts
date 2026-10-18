@@ -219,10 +219,10 @@ content.post("/library/plugin", async (c) => {
   return c.json(r);
 });
 
-/** The thing to move for an item: the folder for skills, the file for everything else. */
+/** The thing to move for an item: the folder for skills and scheduled tasks, the file for everything else. */
 async function itemTarget(path: string, kind: string) {
   const abs = untildify(path);
-  if (kind === "skill" && basename(abs) === "SKILL.md") return dirname(abs);
+  if ((kind === "skill" || kind === "scheduled-task") && basename(abs) === "SKILL.md") return dirname(abs);
   return abs;
 }
 
