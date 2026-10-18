@@ -10,6 +10,8 @@ Notable changes to Control Center, newest first.
 - Open any item to read it, edit it in place or delete it. Deleted files go to Archived items, where you can restore them.
 - The Slash commands page lists Claude Code's own commands next to yours, each with "Run in a new session".
 - The Memory page also lists the notes your agents keep for themselves (agents with `memory` set), tagged "Agent: <name>".
+- The Plugins page turns each plugin on and off and uninstalls it, using Claude Code's own plugin commands. "Find plugins" searches every marketplace you have (about 3,800 plugins), showing what each does and how many people installed it, with Install. "New plugin" makes a starter plugin in your skills folder and opens it, with its files listed. When Claude Code refuses, its own message shows.
+- Plugins you made in your skills folder show on the Plugins page. Removing one moves its folder to Archived items.
 - The menu has Home, Sessions, Projects, Customize, Settings and Guides. On a phone it opens full screen; on tablets it's a strip of icons.
 
 - A search box at the top of the menu finds sessions by what was said, plus plans, skills, agents and documents.

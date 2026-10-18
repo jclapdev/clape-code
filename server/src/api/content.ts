@@ -13,6 +13,7 @@ import { effective, type Source } from "../parsers/settings";
 import { search as searchDocs, listSessions, untitled } from "../db/index";
 import { globalLibrary, listThemes, memoryItems, projectLibrary, readKeybindings, readWorktreeInclude } from "../scan/library";
 import { catalog } from "../scan/catalog";
+import { initArgs, initResult, marketplaceCounts, parseAvailable, parseMarketplaces, pluginArgs, pluginResult, searchAvailable, skillsDirPlugins, type Available } from "../scan/plugins";
 import { buildMap, managedSettingsPath } from "../scan/map";
 import { handoffName, listProjects, projectDir, projectPathOf } from "../scan/projects";
 import { isDir, ls, readMd } from "../scan/md";
@@ -205,16 +206,6 @@ content.post("/library/skill-state", async (c) => {
     if (state === "on") delete o.skillOverrides[key];
     else o.skillOverrides[key] = state;
     if (!Object.keys(o.skillOverrides).length) delete o.skillOverrides;
-  });
-  emit({ area: "library" });
-  return c.json(r);
-});
-
-content.post("/library/plugin", async (c) => {
-  const { key, enabled } = await c.req.json();
-  const r = await updateJson(join(claudeDir(), "settings.json"), (o) => {
-    o.enabledPlugins ??= {};
-    o.enabledPlugins[key] = !!enabled;
   });
   emit({ area: "library" });
   return c.json(r);
@@ -626,62 +617,60 @@ content.post("/mcp/remove", async (c) => {
 
 // ---- Plugins, through Claude Code's own plugin commands ----
 
-type Available = { pluginId: string; name: string; marketplaceName: string; description?: string; version?: string; installCount?: number };
-let availableCache: { at: number; list: Available[] } | null = null;
+let availableCache: { at: number; list: Available[]; added: string[] } | null = null;
 
 async function availablePlugins(fresh = false) {
-  if (!fresh && availableCache && Date.now() - availableCache.at < 10 * 60_000) return availableCache.list;
-  const r = await runClaude(["plugin", "list", "--json", "--available"]);
+  if (!fresh && availableCache && Date.now() - availableCache.at < 10 * 60_000) return availableCache;
+  const [r, m] = await Promise.all([runClaude(["plugin", "list", "--json", "--available"]), runClaude(["plugin", "marketplace", "list", "--json"])]);
   if (r.code !== 0) throw new WriteError(400, (r.err || r.out).trim().split("\n")[0] || "Claude Code couldn't list the marketplaces' plugins.");
-  const parsed = JSON.parse(r.out.slice(r.out.indexOf("{")));
-  const list: Available[] = (parsed.available ?? []).map(({ source, ...a }: any) => a);
-  availableCache = { at: Date.now(), list };
-  return list;
+  availableCache = { at: Date.now(), list: parseAvailable(r.out), added: m.code === 0 ? parseMarketplaces(m.out) : [] };
+  return availableCache;
 }
 
 /** Plugins your marketplaces offer that you haven't installed, best match and most installed first. */
 content.get("/plugins/available", async (c) => {
-  const q = (c.req.query("q") ?? "").trim().toLowerCase();
-  const list = await availablePlugins();
-  const words = q.split(/\s+/).filter(Boolean);
-  const score = (a: Available) => {
-    const name = a.name.toLowerCase();
-    const text = `${name} ${(a.description ?? "").toLowerCase()}`;
-    if (!words.every((w) => text.includes(w))) return -1;
-    return (words.some((w) => name.includes(w)) ? 1e9 : 0) + (a.installCount ?? 0);
-  };
-  const hits = list.map((a) => [a, score(a)] as const).filter(([, s]) => s >= 0).sort((x, y) => y[1] - x[1]).slice(0, 40).map(([a]) => a);
-  return c.json({ total: list.length, marketplaces: [...new Set(list.map((a) => a.marketplaceName))], hits });
+  const { list, added } = await availablePlugins();
+  const { count, hits } = searchAvailable(list, (c.req.query("q") ?? "").trim().slice(0, 200));
+  return c.json({ total: list.length, marketplaces: marketplaceCounts(list, added), count, hits });
 });
 
-const PLUGIN_ID = /^[\w.-]+(@[\w.-]+)?$/;
+/**
+ * A plugin in your skills folder isn't installed, so it's removed by moving its folder to the app's archive
+ * (the docs: "To stop loading a scaffolded plugin, delete its directory"). Its on/off entry goes from your settings too.
+ */
+async function removeSkillsDirPlugin(id: string) {
+  const name = id.slice(0, -"@skills-dir".length);
+  const p = (await skillsDirPlugins(join(claudeDir(), "skills"))).find((x) => x.name === name);
+  if (!p) throw new WriteError(404, `There's no plugin called ${name} in ${tildify(join(claudeDir(), "skills"))}.`);
+  await archiveItem(p.dir, "plugin");
+  const settings = join(claudeDir(), "settings.json");
+  const cur = await readWithHash(settings);
+  if (cur && JSON.parse(cur.content)?.enabledPlugins?.[id] !== undefined) {
+    await updateJson(settings, (o) => {
+      delete o.enabledPlugins[id];
+      if (!Object.keys(o.enabledPlugins).length) delete o.enabledPlugins;
+    });
+  }
+  emit({ area: "archive" });
+  return `Moved ${tildify(p.dir)} to Archived items.`;
+}
 
 content.post("/plugins/:action", async (c) => {
   const action = c.req.param("action");
   const { id } = await c.req.json();
-  if (!["install", "uninstall", "enable", "disable"].includes(action)) throw new WriteError(404, "Unknown plugin action.");
-  if (!PLUGIN_ID.test(String(id ?? ""))) throw new WriteError(400, "That plugin name isn't valid.");
-  const r = await runClaude(["plugin", action, String(id), "--json"]);
-  const last = r.out.trim().split("\n").pop() ?? "";
-  let res: { outcome?: string; message?: string } = {};
-  try {
-    res = JSON.parse(last);
-  } catch {}
-  if (r.code !== 0 || res.outcome === "failed") throw new WriteError(400, res.message || (r.err || r.out).trim().split("\n")[0] || `Claude Code couldn't ${action} the plugin.`);
+  const args = pluginArgs(action, id);
+  let message: string;
+  if (action === "uninstall" && String(id).endsWith("@skills-dir")) message = await removeSkillsDirPlugin(String(id));
+  else ({ message } = pluginResult(action, await runClaude(args)));
   availableCache = null;
   emit({ area: "library" });
-  return c.json({ ok: true, message: res.message ?? "" });
+  return c.json({ ok: true, message });
 });
 
 content.post("/plugins-new", async (c) => {
-  const { name, description, with: parts } = await c.req.json();
-  if (!SLUG.test(String(name ?? ""))) throw new WriteError(400, "Use a name of lowercase letters, numbers and single hyphens, such as my-helper.");
-  const allowed = ["skills", "agents", "hooks", "mcp", "output-style"];
-  const withArgs = (Array.isArray(parts) ? parts : []).filter((p: string) => allowed.includes(p));
-  const args = ["plugin", "init", String(name), ...(description ? ["--description", String(description)] : []), ...(withArgs.length ? ["--with", ...withArgs] : [])];
-  const r = await runClaude(args);
-  if (r.code !== 0) throw new WriteError(400, (r.err || r.out).trim().split("\n")[0] || "Claude Code couldn't create the plugin.");
+  const { name, args } = initArgs(await c.req.json());
+  const skills = join(claudeDir(), "skills");
+  const { message, notes, path } = initResult(await runClaude(args), name, skills);
   emit({ area: "library" });
-  const path = join(claudeDir(), "skills", String(name));
-  return c.json({ ok: true, path, display: tildify(path), message: r.out.trim().split("\n")[0] });
+  return c.json({ ok: true, id: `${name}@skills-dir`, path, manifest: join(path, ".claude-plugin", "plugin.json"), display: tildify(path), message, notes });
 });

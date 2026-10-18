@@ -29,11 +29,14 @@ const ARCHIVABLE: Partial<Record<LibraryItem["kind"], string>> = {
   hook: "file",
 };
 
-type How = { by: "archive"; kind: string } | { by: "hook" } | { by: "mcp" } | { by: "plugin" } | { by: "synced" } | null;
+type How = { by: "archive"; kind: string } | { by: "hook" } | { by: "mcp" } | { by: "uninstall" } | { by: "plugin" } | { by: "synced" } | null;
+
+/** A plugin kept as a folder in your skills folder (`claude plugin init`), rather than installed from a marketplace. */
+export const isSkillsDirPlugin = (i: LibraryItem) => i.kind === "plugin" && typeof i.overrideKey === "string" && i.overrideKey.endsWith("@skills-dir");
 
 /** How an item is deleted, or why it can't be. */
 export function deleteHow(i: LibraryItem): How {
-  if (i.kind === "plugin") return null;
+  if (i.kind === "plugin") return i.overrideKey ? { by: "uninstall" } : null;
   if (i.source === "plugin") return { by: "plugin" };
   if (i.source === "synced") return { by: "synced" };
   if (i.kind === "mcp") return i.meta?.scope === "plugin" ? { by: "plugin" } : { by: "mcp" };
@@ -53,8 +56,14 @@ export function ItemActions({ i, scope, projectId, onDeleted }: { i: LibraryItem
   const [check, setCheck] = useState<{ ok: boolean; output: string; available: boolean } | null>(null);
   const done = () => void qc.invalidateQueries();
   const state = useMutation({
-    mutationFn: (v: string) => (i.kind === "plugin" ? api.post("/library/plugin", { key: i.overrideKey, enabled: v === "on" }) : api.post("/library/skill-state", { key: i.overrideKey, state: v, scope })),
-    onSuccess: done,
+    mutationFn: (v: string) =>
+      i.kind === "plugin"
+        ? api.post<{ message: string }>(`/plugins/${v === "on" ? "enable" : "disable"}`, { id: i.overrideKey })
+        : api.post<{ message?: string }>("/library/skill-state", { key: i.overrideKey, state: v, scope }),
+    onSuccess: (r) => {
+      if (i.kind === "plugin" && r?.message) toast.success(r.message);
+      done();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const how = deleteHow(i);
@@ -62,10 +71,12 @@ export function ItemActions({ i, scope, projectId, onDeleted }: { i: LibraryItem
     mutationFn: () => {
       if (how?.by === "hook") return api.post("/hooks/remove", { path: i.path, event: i.meta.event, group: i.meta.group, index: i.meta.index });
       if (how?.by === "mcp") return api.post("/mcp/remove", { name: i.name, scope: i.meta.scope, project: projectId ?? undefined });
+      if (how?.by === "uninstall") return api.post<{ message: string }>("/plugins/uninstall", { id: i.overrideKey });
       return api.post("/library/archive", { path: i.path, kind: how?.by === "archive" ? how.kind : "file" });
     },
-    onSuccess: () => {
-      toast.success(how?.by === "archive" ? `Moved ${i.name} to Archived items.` : `Removed ${i.name}.`);
+    onSuccess: (r) => {
+      const said = (r as { message?: string } | undefined)?.message;
+      toast.success(said || (how?.by === "archive" ? `Moved ${i.name} to Archived items.` : `Removed ${i.name}.`));
       onDeleted?.();
       done();
     },
@@ -78,7 +89,7 @@ export function ItemActions({ i, scope, projectId, onDeleted }: { i: LibraryItem
   });
   const editable = i.access === "edit";
   const canState = (i.kind === "skill" && !!i.overrideKey && i.source !== "plugin" && i.source !== "synced") || i.kind === "plugin";
-  const canDelete = how?.by === "archive" || how?.by === "hook" || how?.by === "mcp";
+  const canDelete = how?.by === "archive" || how?.by === "hook" || how?.by === "mcp" || how?.by === "uninstall";
   const canCheck = i.kind === "skill" && editable;
   const note =
     how?.by === "plugin" ? `Comes with the plugin ${i.sourceName}, so it's turned on, off or removed with the plugin.` : how?.by === "synced" ? "Comes from your claude.ai account, so it's changed there." : null;
@@ -87,6 +98,9 @@ export function ItemActions({ i, scope, projectId, onDeleted }: { i: LibraryItem
   const ask = () => {
     if (how?.by === "hook") return { body: `It's taken out of ${i.display}. The previous version of that file is kept as a backup.`, confirm: "Delete" };
     if (how?.by === "mcp") return { body: "Claude Code removes it from its settings. You can add it again later with Add server.", confirm: "Remove" };
+    if (how?.by === "uninstall" && isSkillsDirPlugin(i))
+      return { body: `Its folder, ${i.display.replace(/[\\/]\.claude-plugin[\\/]plugin\.json$/, "")}, moves to Archived items, where Claude Code no longer loads it. You can restore it from there.`, confirm: "Move to archive" };
+    if (how?.by === "uninstall") return { body: "Claude Code uninstalls it and deletes the options and data it saved. You can install it again from Find plugins.", confirm: "Uninstall" };
     return { body: "It moves to Archived items, where Claude Code no longer loads it. You can restore it from there.", confirm: "Move to archive" };
   };
 
@@ -116,10 +130,10 @@ export function ItemActions({ i, scope, projectId, onDeleted }: { i: LibraryItem
             busy={del.isPending}
             onClick={async () => {
               const a = ask();
-              if (await confirm({ title: `Delete ${i.name}?`, body: a.body, confirm: a.confirm, danger: true })) del.mutate();
+              if (await confirm({ title: `${how?.by === "uninstall" ? (isSkillsDirPlugin(i) ? "Remove" : "Uninstall") : "Delete"} ${i.name}?`, body: a.body, confirm: a.confirm, danger: true })) del.mutate();
             }}
           >
-            Delete
+            {how?.by === "uninstall" ? (isSkillsDirPlugin(i) ? "Remove" : "Uninstall") : "Delete"}
           </Button>
         )}
       </div>

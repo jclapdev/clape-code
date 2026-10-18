@@ -1,9 +1,10 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { jsonProblem } from "../errors";
 import { claudeDir, tildify } from "../fs/paths";
 import { classify, type Access } from "../fs/policy";
 import { hooksIn } from "./hooks";
+import { skillsDirPlugins } from "./plugins";
 import { firstLine, isDir, ls, mtimeOf, readJson, readMd } from "./md";
 
 export type Kind = "skill" | "agent" | "command" | "rule" | "output-style" | "hook" | "hook-def" | "settings" | "claude-md" | "plan" | "memory" | "plugin" | "mcp" | "scheduled-task" | "workflow";
@@ -143,6 +144,12 @@ export async function listPlugins(enabled: Record<string, boolean>): Promise<Plu
       description: manifest?.description ?? "",
     });
   }
+  // Plugins in your skills folder (what `claude plugin init` makes) load as <name>@skills-dir without an install.
+  // They follow the manifest's defaultEnabled unless a settings file sets their id.
+  for (const p of await skillsDirPlugins(join(claudeDir(), "skills"))) {
+    const key = `${p.name}@skills-dir`;
+    out.push({ key, name: p.name, marketplace: "skills-dir", version: p.version, installPath: p.dir, enabled: typeof enabled[key] === "boolean" ? enabled[key] : p.defaultEnabled, description: p.description });
+  }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -152,6 +159,22 @@ async function syncedSkills(overrides: Record<string, string>): Promise<LibraryI
   for (const bucket of await ls(root)) {
     out.push(...(await skillItems(join(root, bucket), { base: root, source: "synced", sourceName: "claude.ai", skillPrefix: "anthropic-skills:" }, overrides)));
   }
+  return out;
+}
+
+/** A plugin's files, relative to its folder, so its page can show what's in it. */
+async function pluginFiles(root: string, max = 60): Promise<string[]> {
+  const out: string[] = [];
+  const walk = async (dir: string, rel: string) => {
+    for (const f of (await readdir(dir).catch(() => [] as string[])).sort()) {
+      if (out.length >= max) return;
+      if (["node_modules", ".git", ".DS_Store", "__pycache__"].includes(f)) continue;
+      const p = join(dir, f);
+      if (await isDir(p)) await walk(p, rel ? `${rel}/${f}` : f);
+      else out.push(rel ? `${rel}/${f}` : f);
+    }
+  };
+  await walk(root, "");
   return out;
 }
 
@@ -180,7 +203,8 @@ export async function globalLibrary(): Promise<{ items: LibraryItem[]; plugins: 
         sourceName: p.marketplace,
         state: p.enabled ? "on" : "off",
         overrideKey: p.key,
-        meta: { version: p.version, marketplace: p.marketplace },
+        folder: p.installPath,
+        meta: { version: p.version, marketplace: p.marketplace, files: await pluginFiles(p.installPath) },
       }),
     );
   }

@@ -75,7 +75,7 @@ const addSetting = createRoute({
 
 // Customize: an overview, then one page per feature, all drawn by the same component.
 const customize = createRoute({ getParentRoute: () => root, path: "/customize", component: CustomizePage });
-const featureSearch = (s: Record<string, unknown>): FeatureSearch => ({ item: str(s.item), project: str(s.project), q: str(s.q) });
+const featureSearch = (s: Record<string, unknown>): FeatureSearch => ({ item: str(s.item), project: str(s.project), q: str(s.q), panel: s.panel === "find" || s.panel === "new" ? s.panel : undefined });
 const features = FEATURES.map((f) => createRoute({ getParentRoute: () => root, path: `/${f.id}`, component: FeaturePage, validateSearch: featureSearch }));
 
 const routeTree = root.addChildren([customize, ...features, newProject, addSetting, setup, guidesRoute, guide, newItem, home, projects, project, sessions, session, live, liveOne, jobs, job, library, settings, map, archive, file, preferences]);

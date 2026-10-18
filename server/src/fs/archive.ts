@@ -5,7 +5,7 @@ import { archiveDir, statePath } from "./paths";
 import { canWrite, classify } from "./policy";
 import { backup, exists, WriteError } from "./safeWrite";
 
-export type ArchiveKind = "agent" | "skill" | "command" | "plan" | "memory" | "rule" | "output-style" | "workflow" | "scheduled-task" | "file";
+export type ArchiveKind = "agent" | "skill" | "command" | "plan" | "memory" | "rule" | "output-style" | "workflow" | "scheduled-task" | "plugin" | "file";
 
 export interface ArchiveRecord {
   id: string;

@@ -16,6 +16,7 @@ const KIND_LABEL: Record<string, [string, string]> = {
   memory: ["Memory note", "Memory"],
   workflow: ["Workflow", "Workflows"],
   "scheduled-task": ["Scheduled task", "Scheduled tasks"],
+  plugin: ["Plugin", "Plugins"],
 };
 
 interface Rec {

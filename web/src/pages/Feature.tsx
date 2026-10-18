@@ -3,7 +3,7 @@
 // they sit side by side and scroll on their own.
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
-import { ChevronLeft, Play, Plus, Search } from "lucide-react";
+import { ChevronLeft, FolderOpen, PackageSearch, Play, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { FEATURES, featureById, type Feature, type FeatureId } from "@/lib/features";
@@ -11,7 +11,9 @@ import { plural } from "@/lib/format";
 import { useMediaQuery } from "@/lib/prefs";
 import type { Catalog, CatalogItem, SlashCommand } from "@/lib/types";
 import { FileEditor } from "@/components/FileEditor";
-import { ItemActions } from "@/components/ItemActions";
+import { ItemActions, isSkillsDirPlugin } from "@/components/ItemActions";
+import { FindPlugins, NewPlugin } from "./PluginPanels";
+import { toast } from "sonner";
 import { Page } from "@/components/Panes";
 import { Readable } from "@/components/Readable";
 import { SimpleSelect } from "@/components/SimpleSelect";
@@ -23,6 +25,7 @@ export interface FeatureSearch {
   item?: string;
   project?: string;
   q?: string;
+  panel?: "find" | "new"; // Plugins page: Find plugins or New plugin, shown where an opened item goes
 }
 
 const STATE_LABEL: Record<string, string> = { off: "Turned off", "name-only": "Name only", "user-invocable-only": "Only when you type it" };
@@ -38,7 +41,7 @@ interface Row {
   command?: string; // what you type to run it, for the Slash commands page
 }
 
-const keyOf = (i: CatalogItem) => [i.kind, i.path, i.name, i.projectId ?? "", i.meta?.group ?? "", i.meta?.index ?? ""].join("|");
+const keyOf = (i: Pick<CatalogItem, "kind" | "path" | "name" | "projectId" | "meta">) => [i.kind, i.path, i.name, i.projectId ?? "", i.meta?.group ?? "", i.meta?.index ?? ""].join("|");
 const baseName = (i: CatalogItem) => (i.folder ? i.folder.split(/[\\/]/).filter(Boolean).pop()! : i.name).replace(/\.md$/, "");
 const slashOf = (i: CatalogItem) => (i.kind === "workflow" ? String(i.meta?.command ?? `/${i.name}`) : `/${i.source === "plugin" ? `${i.sourceName}:` : ""}${baseName(i)}`);
 
@@ -96,6 +99,7 @@ function RowTags({ r, f }: { r: Row; f: Feature }) {
     <>
       <Tag tone={i ? "muted" : "accent"}>{whereLabel(i)}</Tag>
       {agentLabel(i) && <Tag>{agentLabel(i)}</Tag>}
+      {i?.kind === "plugin" && <Tag className="max-w-full break-all">{isSkillsDirPlugin(i) ? "Your skills folder" : `From ${String(i.meta?.marketplace ?? i.sourceName)}`}</Tag>}
       {i && f.kinds.length > 1 && KIND_LABEL[i.kind] && f.kinds[0] !== i.kind && <Tag>{KIND_LABEL[i.kind]}</Tag>}
       {i?.state && i.state !== "on" && <Tag>{STATE_LABEL[i.state] ?? i.state}</Tag>}
       {i?.error && <Tag tone="danger">Has a mistake</Tag>}
@@ -117,6 +121,24 @@ function NewLink({ f, project }: { f: Feature; project: string }) {
         <Plus aria-hidden /> {f.create.label}
       </Link>
     </Button>
+  );
+}
+
+function PluginLinks() {
+  const search = useSearch({ strict: false }) as FeatureSearch;
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button asChild variant={search.panel === "find" ? "default" : "outline"} className="no-underline">
+        <Link to="/plugins" search={{ ...search, item: undefined, panel: "find" } as never}>
+          <PackageSearch aria-hidden /> Find plugins
+        </Link>
+      </Button>
+      <Button asChild variant={search.panel === "new" ? "default" : "outline"} className="no-underline">
+        <Link to="/plugins" search={{ ...search, item: undefined, panel: "new" } as never}>
+          <Plus aria-hidden /> New plugin
+        </Link>
+      </Button>
+    </div>
   );
 }
 
@@ -178,10 +200,65 @@ function ItemBody({ r }: { r: Row }) {
       />
     );
   }
+  if (i.kind === "plugin") return <PluginBody i={i} />;
   return <Readable path={i.path} editLink={false} />;
 }
 
-const canEdit = (i: CatalogItem | null) => !!i && i.access === "edit" && i.kind !== "plugin";
+/** A plugin: where it comes from, the files in its folder (each opens readable and editable where allowed), and its manifest. */
+function PluginBody({ i }: { i: CatalogItem }) {
+  const files = Array.isArray(i.meta.files) ? (i.meta.files as string[]) : [];
+  const folder = i.folder ?? i.path.replace(/[\\/]\.claude-plugin[\\/]plugin\.json$/, "");
+  const folderShown = i.display.replace(/[\\/]\.claude-plugin[\\/]plugin\.json$/, "");
+  const sep = folder.includes("\\") ? "\\" : "/";
+  const open = async () => {
+    try {
+      await api.post("/open", { path: folder });
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-4">
+      <Fields
+        rows={[
+          ["Id", <code className="break-all">{i.overrideKey}</code>],
+          ["Version", String(i.meta.version ?? "Not given")],
+          ["Comes from", isSkillsDirPlugin(i) ? "Your skills folder. It loads without installing." : `The ${String(i.meta.marketplace)} marketplace`],
+          ["Folder", <span className="break-all font-mono text-[12.5px]">{folderShown}</span>],
+        ]}
+      />
+      <section aria-label="Files in the plugin" className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-[15px] font-semibold">Files</h3>
+          <Button size="sm" variant="outline" onClick={open}>
+            <FolderOpen aria-hidden /> Open folder
+          </Button>
+        </div>
+        {files.length ? (
+          <ul className="flex flex-col rounded-md border border-line bg-surface text-[13px]">
+            {files.map((f) => (
+              <li key={f} className="border-b border-line last:border-b-0">
+                <Link to="/file" search={{ path: `${folder}${sep}${f.split("/").join(sep)}` }} className="block break-all px-3 py-1.5 font-mono no-underline hover:bg-sunken">
+                  {f}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[13.5px] text-muted-foreground">No files found.</p>
+        )}
+        {files.length >= 60 && <p className="text-[13px] text-muted-foreground">Showing the first 60 files.</p>}
+      </section>
+      <section aria-label="Manifest" className="flex flex-col gap-2">
+        <h3 className="text-[15px] font-semibold">Manifest</h3>
+        <Readable path={i.path} editLink={false} />
+      </section>
+    </div>
+  );
+}
+
+// Marketplace plugins are Claude Code's own copies; a plugin in your skills folder is yours to edit.
+const canEdit = (i: CatalogItem | null) => !!i && i.access === "edit" && (i.kind !== "plugin" || isSkillsDirPlugin(i));
 
 function ItemView({ r, f, back, onDeleted }: { r: Row; f: Feature; back: ReactNode; onDeleted: () => void }) {
   const [editing, setEditing] = useState(false);
@@ -234,7 +311,7 @@ function ListHead({ f, count, total, q, setQ, project, setProject, projects }: {
     <div className="flex flex-col gap-3 px-4 pb-3 pt-5 md:px-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-[24px] font-semibold tracking-[-0.01em]">{f.label}</h1>
-        <NewLink f={f} project={project} />
+        {f.id === "plugins" ? <PluginLinks /> : <NewLink f={f} project={project} />}
       </div>
       <p className="leading-relaxed text-ink-2">
         {f.intro}
@@ -292,6 +369,16 @@ export function FeaturePage() {
 
   const selected = rows.find((r) => r.key === search.item) ?? null;
   const close = () => go({ item: undefined });
+  const panel = f.id === "plugins" && !selected ? search.panel : undefined;
+  const panelView = (back: ReactNode) =>
+    panel === "find" ? (
+      <FindPlugins back={back} />
+    ) : panel === "new" ? (
+      <NewPlugin
+        back={back}
+        onCreated={(r, name) => go({ panel: undefined, q: undefined, project: undefined, item: keyOf({ kind: "plugin", path: r.manifest, name, projectId: null, meta: {} }) })}
+      />
+    ) : null;
 
   const list = (
     <>
@@ -307,7 +394,7 @@ export function FeaturePage() {
               <li key={r.key}>
                 <Link
                   to={`/${f.id}`}
-                  search={{ ...search, item: r.key } as never}
+                  search={{ ...search, item: r.key, panel: undefined } as never}
                   aria-current={on ? "true" : undefined}
                   className={cn("flex flex-col gap-1 px-4 py-3 text-ink no-underline hover:bg-sunken", on && "bg-accent hover:bg-accent")}
                 >
@@ -336,6 +423,8 @@ export function FeaturePage() {
         <div className="h-full min-w-0">
           {selected ? (
             <ItemView key={selected.key} r={selected} f={f} back={null} onDeleted={close} />
+          ) : panel ? (
+            panelView(null)
           ) : (
             <p className="p-6 text-muted-foreground">Pick an item on the left to read it here.</p>
           )}
@@ -350,6 +439,13 @@ export function FeaturePage() {
       </Link>
     );
     return <ItemView key={selected.key} r={selected} f={f} back={back} onDeleted={close} />;
+  }
+  if (panel) {
+    return panelView(
+      <Link to={`/${f.id}`} search={{ ...search, panel: undefined } as never} className="flex h-11 items-center gap-1 border-b border-line px-3 text-[13.5px] no-underline">
+        <ChevronLeft className="size-4" aria-hidden /> {f.label}
+      </Link>,
+    );
   }
   return <section aria-label={f.label} className="h-full overflow-auto">{list}</section>;
 }
