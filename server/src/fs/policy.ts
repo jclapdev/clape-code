@@ -28,6 +28,9 @@ const EDITABLE = [
   /^hooks(\/|$)/,
   /^agents(\/|$)/,
   /^plans(\/|$)/,
+  /^workflows(\/|$)/,
+  /^scheduled-tasks(\/|$)/,
+  /^themes(\/|$)/,
   /^projects\/[^/]+\/memory(\/|$)/,
 ];
 

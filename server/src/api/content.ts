@@ -12,6 +12,7 @@ import { addEntry, isKeepAChangelog, parseChangelog } from "../parsers/changelog
 import { effective, type Source } from "../parsers/settings";
 import { search as searchDocs, listSessions, untitled } from "../db/index";
 import { globalLibrary, memoryItems, projectLibrary } from "../scan/library";
+import { catalog } from "../scan/catalog";
 import { buildMap, managedSettingsPath } from "../scan/map";
 import { handoffName, listProjects, projectDir, projectPathOf } from "../scan/projects";
 import { isDir, ls, readMd } from "../scan/md";
@@ -572,4 +573,113 @@ content.get("/search", async (c) => {
     ? projects.filter((p) => p.name.toLowerCase().includes(lower)).slice(0, 5).map((p) => ({ kind: "project", ref: p.id, title: p.name, subtitle: p.path, snippet: "", link: `/projects/${encodeURIComponent(p.id)}`, display: p.path }))
     : [];
   return c.json([...projectHits, ...hits]);
+});
+
+// ---- Everything, for the feature pages ----
+
+content.get("/catalog", async (c) => c.json(await catalog()));
+
+/** Removes one hook from a settings file, and its event entry when it was the last one. */
+export function removeHook(o: Record<string, any>, event: string, group: number, index: number) {
+  const groups = o.hooks?.[event];
+  const g = Array.isArray(groups) ? groups[group] : null;
+  if (!g || !Array.isArray(g.hooks) || !g.hooks[index]) throw new WriteError(409, "That hook has already changed. Reload and try again.");
+  g.hooks.splice(index, 1);
+  if (!g.hooks.length) groups.splice(group, 1);
+  if (!groups.length) delete o.hooks[event];
+  if (!Object.keys(o.hooks).length) delete o.hooks;
+}
+
+content.post("/hooks/remove", async (c) => {
+  const { path, event, group, index } = await c.req.json();
+  const abs = untildify(String(path ?? ""));
+  if (!/settings(\.local)?\.json$/.test(abs)) throw new WriteError(400, "Hooks are removed from settings files only.");
+  const r = await updateJson(abs, (o) => removeHook(o, String(event), Number(group), Number(index)));
+  emit({ area: "library" });
+  return c.json(r);
+});
+
+/** Runs a Claude Code command and returns its output, or an error in its own words. */
+async function runClaude(args: string[], cwd?: string) {
+  const claude = findClaude();
+  if (!claude) throw new WriteError(400, "Claude Code isn't installed where the app can find it.");
+  const p = Bun.spawn([claude, ...args], { cwd: cwd ?? claudeDir(), stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+  const timer = setTimeout(() => p.kill(), 120_000);
+  const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+  const code = await p.exited;
+  clearTimeout(timer);
+  return { code, out, err };
+}
+
+content.post("/mcp/remove", async (c) => {
+  const { name, scope, project } = await c.req.json();
+  if (!/^[\w.-]+$/.test(String(name ?? ""))) throw new WriteError(400, "That server name isn't valid.");
+  if (!["user", "project", "local"].includes(scope)) throw new WriteError(400, "Servers from a plugin are removed with the plugin.");
+  const cwd = scope === "user" ? claudeDir() : await requireProject(String(project ?? ""));
+  const r = await runClaude(["mcp", "remove", String(name), "--scope", scope], cwd);
+  if (r.code !== 0) throw new WriteError(400, (r.err || r.out).trim().split("\n")[0] || "Claude Code couldn't remove the server.");
+  emit({ area: "library" });
+  return c.json({ ok: true });
+});
+
+// ---- Plugins, through Claude Code's own plugin commands ----
+
+type Available = { pluginId: string; name: string; marketplaceName: string; description?: string; version?: string; installCount?: number };
+let availableCache: { at: number; list: Available[] } | null = null;
+
+async function availablePlugins(fresh = false) {
+  if (!fresh && availableCache && Date.now() - availableCache.at < 10 * 60_000) return availableCache.list;
+  const r = await runClaude(["plugin", "list", "--json", "--available"]);
+  if (r.code !== 0) throw new WriteError(400, (r.err || r.out).trim().split("\n")[0] || "Claude Code couldn't list the marketplaces' plugins.");
+  const parsed = JSON.parse(r.out.slice(r.out.indexOf("{")));
+  const list: Available[] = (parsed.available ?? []).map(({ source, ...a }: any) => a);
+  availableCache = { at: Date.now(), list };
+  return list;
+}
+
+/** Plugins your marketplaces offer that you haven't installed, best match and most installed first. */
+content.get("/plugins/available", async (c) => {
+  const q = (c.req.query("q") ?? "").trim().toLowerCase();
+  const list = await availablePlugins();
+  const words = q.split(/\s+/).filter(Boolean);
+  const score = (a: Available) => {
+    const name = a.name.toLowerCase();
+    const text = `${name} ${(a.description ?? "").toLowerCase()}`;
+    if (!words.every((w) => text.includes(w))) return -1;
+    return (words.some((w) => name.includes(w)) ? 1e9 : 0) + (a.installCount ?? 0);
+  };
+  const hits = list.map((a) => [a, score(a)] as const).filter(([, s]) => s >= 0).sort((x, y) => y[1] - x[1]).slice(0, 40).map(([a]) => a);
+  return c.json({ total: list.length, marketplaces: [...new Set(list.map((a) => a.marketplaceName))], hits });
+});
+
+const PLUGIN_ID = /^[\w.-]+(@[\w.-]+)?$/;
+
+content.post("/plugins/:action", async (c) => {
+  const action = c.req.param("action");
+  const { id } = await c.req.json();
+  if (!["install", "uninstall", "enable", "disable"].includes(action)) throw new WriteError(404, "Unknown plugin action.");
+  if (!PLUGIN_ID.test(String(id ?? ""))) throw new WriteError(400, "That plugin name isn't valid.");
+  const r = await runClaude(["plugin", action, String(id), "--json"]);
+  const last = r.out.trim().split("\n").pop() ?? "";
+  let res: { outcome?: string; message?: string } = {};
+  try {
+    res = JSON.parse(last);
+  } catch {}
+  if (r.code !== 0 || res.outcome === "failed") throw new WriteError(400, res.message || (r.err || r.out).trim().split("\n")[0] || `Claude Code couldn't ${action} the plugin.`);
+  availableCache = null;
+  emit({ area: "library" });
+  return c.json({ ok: true, message: res.message ?? "" });
+});
+
+content.post("/plugins-new", async (c) => {
+  const { name, description, with: parts } = await c.req.json();
+  if (!SLUG.test(String(name ?? ""))) throw new WriteError(400, "Use a name of lowercase letters, numbers and single hyphens, such as my-helper.");
+  const allowed = ["skills", "agents", "hooks", "mcp", "output-style"];
+  const withArgs = (Array.isArray(parts) ? parts : []).filter((p: string) => allowed.includes(p));
+  const args = ["plugin", "init", String(name), ...(description ? ["--description", String(description)] : []), ...(withArgs.length ? ["--with", ...withArgs] : [])];
+  const r = await runClaude(args);
+  if (r.code !== 0) throw new WriteError(400, (r.err || r.out).trim().split("\n")[0] || "Claude Code couldn't create the plugin.");
+  emit({ area: "library" });
+  const path = join(claudeDir(), "skills", String(name));
+  return c.json({ ok: true, path, display: tildify(path), message: r.out.trim().split("\n")[0] });
 });

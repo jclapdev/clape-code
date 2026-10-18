@@ -12,7 +12,15 @@ Where Control Center stands, for whoever picks it up next. Read this first; upda
 
 ## In progress
 
-- [ ] John reviews the 2026-10-18 overhaul (branch design-overhaul, not committed yet).
+Reorganising the app around Claude Code's features. The approved plan is `~/.claude/plans/encapsulated-mixing-clarke.md`; follow it step by step. The 2026-10-18 overhaul is committed as 7412c68; work since then is in the "WIP" commit after it.
+
+- [x] 1. Checkpoint commit.
+- [ ] 2. Shell and menu: `web/src/components/Shell.tsx` rewritten (phone full-screen menu, 768–1279 px icon strip, 1280 px+ full menu with Projects and Customize groups). Not yet checked in a browser. Its links point at routes that don't exist yet (`/sessions`, `/customize`, `/settings`, `/projects/new`, one per feature), so the web typecheck fails until step 3 adds them.
+- [ ] 3. Feature pages: `web/src/lib/features.ts` lists the 12 Customize features (name, intro from the docs, item kinds, New button, guide). Still to write: `web/src/pages/Feature.tsx` (search, project filter, list, open item, delete into the archive via `/library/archive`), the `/customize` overview page, and the routes in `web/src/router.tsx`. Move `ItemActions` out of `pages/Projects.tsx` into a shared component. `ArchiveKind` in `server/src/fs/archive.ts` needs `workflow` and `scheduled-task` added.
+- [ ] 4. Server: done so far: `server/src/scan/catalog.ts` (every item across home folder, projects and plugins, including MCP servers, workflows and scheduled tasks, each tagged with its project); endpoints `/catalog`, `/hooks/remove`, `/mcp/remove`, `/plugins/available?q=`, `/plugins/{install,uninstall,enable,disable}` and `/plugins-new` in `server/src/api/content.ts`; workflows/, scheduled-tasks/ and themes/ made editable in `server/src/fs/policy.ts`; hooks carry their group and index. Still to do: tests for these in `server/test/`, and the Slash commands list (reuse `/live-commands`).
+- [ ] 5–11 as in the plan: plugins page, projects (new project, board from PROGRESS.md, add context, cka-prep and sharepoint backlog move), Settings page, Home, Sessions page, redirects, notes.
+
+Facts checked against the live docs on 2026-10-18: plugin commands take `--json`; `claude plugin list --json --available` prints one pretty-printed object (about 3,800 plugins, 2.2 MB, so it's cached for 10 minutes); `claude plugin init <name>` creates `~/.claude/skills/<name>/`; MCP servers live in `~/.claude.json` (user, and local under `projects[path]`), in `.mcp.json` (project), and in a plugin's `.mcp.json` or `plugin.json`; workflows are `.js` files with `export const meta = { name, description }`; Desktop scheduled tasks keep only name, description and prompt in `~/.claude/scheduled-tasks/<name>/SKILL.md`. Before building "create a scheduled task", test whether the Desktop app picks up a folder the app makes, and ask John if it doesn't.
 
 ## Next
 

@@ -5,6 +5,7 @@ import { WriteError } from "../fs/safeWrite";
 import type { Env } from "./env";
 
 export const GUIDES = [
+  { slug: "features", title: "What you can customize", about: "When to use instructions, skills, agents, hooks, MCP servers and plugins, and how they fit together.", url: "https://code.claude.com/docs/en/features-overview.md" },
   { slug: "best-practices", title: "Best practices for Claude Code", about: "How to get good results: verify work, plan first, manage context, run sessions in parallel.", url: "https://code.claude.com/docs/en/best-practices.md" },
   { slug: "workflows", title: "Common workflows", about: "Step by step: explore code, fix bugs, refactor, write tests, open pull requests.", url: "https://code.claude.com/docs/en/common-workflows.md" },
   { slug: "sessions", title: "Sessions", about: "Name, resume, branch and find past conversations.", url: "https://code.claude.com/docs/en/sessions.md" },
@@ -16,6 +17,10 @@ export const GUIDES = [
   { slug: "output-styles", title: "Output styles", about: "Changing how Claude writes its replies for a whole session.", url: "https://code.claude.com/docs/en/output-styles.md" },
   { slug: "mcp", title: "MCP servers", about: "Connecting Claude to outside tools and services.", url: "https://code.claude.com/docs/en/mcp.md" },
   { slug: "hooks", title: "Hooks", about: "Running your own commands automatically at set moments.", url: "https://code.claude.com/docs/en/hooks-guide.md" },
+  { slug: "plugins", title: "Plugins", about: "Installing bundles of skills, agents, hooks and MCP servers, and making your own.", url: "https://code.claude.com/docs/en/plugins/overview.md" },
+  { slug: "commands", title: "Slash commands", about: "Every built-in command you can type after /.", url: "https://code.claude.com/docs/en/commands.md" },
+  { slug: "scheduled-tasks", title: "Scheduled tasks", about: "Having the desktop app run a prompt for you on a schedule.", url: "https://code.claude.com/docs/en/desktop-scheduled-tasks.md" },
+  { slug: "dynamic-workflows", title: "Dynamic workflows", about: "Scripts that run many agents at once and return one result.", url: "https://code.claude.com/docs/en/workflows.md" },
   { slug: "settings", title: "Settings", about: "Which settings file to use and which value wins.", url: "https://code.claude.com/docs/en/settings.md" },
   { slug: "permissions", title: "Permission modes", about: "Plan mode, auto mode and when Claude asks before acting.", url: "https://code.claude.com/docs/en/permission-modes.md" },
 ];

@@ -4,7 +4,7 @@ import { classify, type Access } from "../fs/policy";
 import { hooksIn } from "./hooks";
 import { firstLine, isDir, ls, mtimeOf, readJson, readMd } from "./md";
 
-export type Kind = "skill" | "agent" | "command" | "rule" | "output-style" | "hook" | "hook-def" | "settings" | "claude-md" | "plan" | "memory" | "plugin";
+export type Kind = "skill" | "agent" | "command" | "rule" | "output-style" | "hook" | "hook-def" | "settings" | "claude-md" | "plan" | "memory" | "plugin" | "mcp" | "scheduled-task" | "workflow";
 
 export interface LibraryItem {
   kind: Kind;
@@ -246,7 +246,7 @@ async function hookDefs(files: string[], source: LibraryItem["source"], sourceNa
           source,
           sourceName,
           line: h.line,
-          meta: { event: h.event, matcher: h.matcher, type: h.type, timeout: h.timeout, if: h.condition, file: basename(f) },
+          meta: { event: h.event, matcher: h.matcher, type: h.type, timeout: h.timeout, if: h.condition, file: basename(f), group: h.group, index: h.index },
         }),
       );
     }
