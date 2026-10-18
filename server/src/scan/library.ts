@@ -1,4 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { jsonProblem } from "../errors";
 import { claudeDir, tildify } from "../fs/paths";
 import { classify, type Access } from "../fs/policy";
 import { hooksIn } from "./hooks";
@@ -184,6 +186,7 @@ export async function globalLibrary(): Promise<{ items: LibraryItem[]; plugins: 
   }
   items.push(...(await planItems()));
   items.push(...(await memoryItems()));
+  items.push(...(await agentMemoryItems(join(cd, "agent-memory"), "user", "user", null)));
   if (await Bun.file(join(cd, "CLAUDE.md")).exists()) {
     items.push(await item({ kind: "claude-md", name: "CLAUDE.md (all projects)", path: join(cd, "CLAUDE.md"), source: "user" }));
   }
@@ -212,6 +215,8 @@ export async function projectLibrary(dir: string): Promise<LibraryItem[]> {
     const p = join(dir, f);
     if (await Bun.file(p).exists()) items.push(await item({ kind: "claude-md", name: f.replace(/\\/g, "/"), path: p, source: "project", sourceName: name }));
   }
+  items.push(...(await agentMemoryItems(join(base, "agent-memory"), "project", "project", name)));
+  items.push(...(await agentMemoryItems(join(base, "agent-memory-local"), "local", "project", name)));
   items.push(...(await hookScripts(join(base, "hooks"), "project", name)));
   const settingsFiles = [join(base, "settings.json"), join(base, "settings.local.json")];
   for (const p of settingsFiles) {
@@ -276,28 +281,135 @@ export async function planItems(): Promise<LibraryItem[]> {
   return out.sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0));
 }
 
+/** One memory note. MEMORY.md is the index; other notes may carry a name and description in frontmatter. */
+async function memoryNote(p: string, f: string, sourceName: string | null, source: LibraryItem["source"], meta: Record<string, unknown>) {
+  const md = await readMd(p);
+  return item({
+    kind: "memory",
+    name: f === "MEMORY.md" ? "MEMORY.md (index)" : String(md?.data.name ?? f.replace(/\.md$/, "")),
+    description: String(md?.data.description ?? ""),
+    path: p,
+    source,
+    sourceName,
+    error: md?.error ?? null,
+    meta: { ...(md?.data ?? {}), ...meta },
+  });
+}
+
 export async function memoryItems(): Promise<LibraryItem[]> {
   const root = join(claudeDir(), "projects");
   const out: LibraryItem[] = [];
   for (const proj of await ls(root)) {
     const dir = join(root, proj, "memory");
     for (const f of await ls(dir)) {
-      if (!f.endsWith(".md")) continue;
-      const p = join(dir, f);
-      const md = await readMd(p);
-      out.push(
-        await item({
-          kind: "memory",
-          name: f === "MEMORY.md" ? "MEMORY.md (index)" : String(md?.data.name ?? f.replace(/\.md$/, "")),
-          description: String(md?.data.description ?? ""),
-          path: p,
-          source: "user",
-          sourceName: proj,
-          error: md?.error ?? null,
-          meta: { ...(md?.data ?? {}), folder: proj },
-        }),
-      );
+      if (f.endsWith(".md")) out.push(await memoryNote(join(dir, f), f, proj, "user", { folder: proj }));
     }
   }
   return out;
+}
+
+export type AgentMemoryScope = "user" | "project" | "local";
+
+/**
+ * Notes a subagent keeps when its frontmatter sets `memory`: one folder per agent under
+ * ~/.claude/agent-memory/ (user), .claude/agent-memory/ (project) or .claude/agent-memory-local/ (local).
+ */
+export async function agentMemoryItems(root: string, scope: AgentMemoryScope, source: LibraryItem["source"], sourceName: string | null): Promise<LibraryItem[]> {
+  const out: LibraryItem[] = [];
+  for (const agent of await ls(root)) {
+    const dir = join(root, agent);
+    if (!(await isDir(dir))) continue;
+    for (const f of await ls(dir)) {
+      if (f.endsWith(".md")) out.push(await memoryNote(join(dir, f), f, sourceName, source, { agent, scope }));
+    }
+  }
+  return out;
+}
+
+// ---- Keyboard shortcuts, themes and .worktreeinclude ----
+
+export interface KeyBlock {
+  context: string;
+  bindings: { key: string; action: string | null }[]; // null unbinds a default shortcut
+}
+
+/** The `bindings` blocks of a keybindings.json. Entries that aren't a context with a key map are skipped. */
+export function parseKeybindings(obj: unknown): KeyBlock[] {
+  const blocks = (obj as { bindings?: unknown })?.bindings;
+  if (!Array.isArray(blocks)) return [];
+  const out: KeyBlock[] = [];
+  for (const b of blocks) {
+    if (!b || typeof b.context !== "string" || !b.bindings || typeof b.bindings !== "object") continue;
+    out.push({
+      context: b.context,
+      bindings: Object.entries(b.bindings as Record<string, unknown>).map(([key, action]) => ({ key, action: typeof action === "string" ? action : null })),
+    });
+  }
+  return out;
+}
+
+/** ~/.claude/keybindings.json: your keyboard shortcuts in the Claude Code terminal. */
+export async function readKeybindings() {
+  const path = join(claudeDir(), "keybindings.json");
+  const text = await readFile(path, "utf8").catch(() => null);
+  const error = text === null ? null : jsonProblem(text);
+  return {
+    path,
+    display: tildify(path),
+    exists: text !== null,
+    access: classify(path),
+    error,
+    blocks: text === null || error ? [] : parseKeybindings(JSON.parse(text)),
+  };
+}
+
+export interface ThemeInfo {
+  slug: string; // the file name without .json; chosen in Claude Code as custom:<slug>
+  name: string;
+  base: string | null;
+  overrides: number; // how many colours it changes
+  path: string;
+  display: string;
+  access: Access;
+  error: string | null;
+}
+
+/** Custom colour themes in ~/.claude/themes/*.json: a built-in `base` plus `overrides` of colour tokens. */
+export async function listThemes(): Promise<ThemeInfo[]> {
+  const dir = join(claudeDir(), "themes");
+  const out: ThemeInfo[] = [];
+  for (const f of await ls(dir)) {
+    if (!f.endsWith(".json")) continue;
+    const path = join(dir, f);
+    const text = await readFile(path, "utf8").catch(() => "");
+    const error = jsonProblem(text);
+    const t = error ? null : (JSON.parse(text) as { name?: unknown; base?: unknown; overrides?: unknown });
+    const slug = f.replace(/\.json$/, "");
+    out.push({
+      slug,
+      name: typeof t?.name === "string" && t.name ? t.name : slug,
+      base: typeof t?.base === "string" ? t.base : null,
+      overrides: t?.overrides && typeof t.overrides === "object" ? Object.keys(t.overrides).length : 0,
+      path,
+      display: tildify(path),
+      access: classify(path),
+      error,
+    });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** The patterns in a .worktreeinclude, which uses .gitignore syntax: blank lines and # comments are skipped. */
+export function parseWorktreeInclude(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/(?<!\\)\s+$/, ""))
+    .filter((l) => l && !l.startsWith("#"));
+}
+
+/** A project's .worktreeinclude: the gitignored files Claude Code copies into each new worktree. */
+export async function readWorktreeInclude(dir: string) {
+  const path = join(dir, ".worktreeinclude");
+  const text = await readFile(path, "utf8").catch(() => null);
+  return { path, display: tildify(path), exists: text !== null, access: classify(path), patterns: text === null ? [] : parseWorktreeInclude(text) };
 }

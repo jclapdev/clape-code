@@ -95,8 +95,8 @@ export async function catalog(): Promise<Catalog> {
   const items: CatalogItem[] = [];
   for (const i of globalItems) {
     if (SKIP.has(i.kind)) continue;
-    // Memory notes live under ~/.claude but each belongs to one project folder.
-    if (i.kind === "memory") {
+    // Auto memory notes live under ~/.claude but each belongs to one project folder. Agent memory there applies everywhere.
+    if (i.kind === "memory" && !i.meta.agent) {
       const p = dirs.find((d) => i.sourceName === encOf(d.dir) || i.sourceName?.startsWith(`${encOf(d.dir)}--claude-worktrees-`));
       items.push(tag(i, p ?? null));
       continue;

@@ -9,6 +9,7 @@ Notable changes to Control Center, newest first.
 - A Customize section with one page for each thing that changes how Claude Code works: instructions, skills, slash commands, agents, hooks, MCP servers, plugins, plans, scheduled tasks, output styles, memory and workflows. Each page lists every item from every project and plugin, says where it applies, and has a search box, a project filter and a New button.
 - Open any item to read it, edit it in place or delete it. Deleted files go to Archived items, where you can restore them.
 - The Slash commands page lists Claude Code's own commands next to yours, each with "Run in a new session".
+- The Memory page also lists the notes your agents keep for themselves (agents with `memory` set), tagged "Agent: <name>".
 - The menu has Home, Sessions, Projects, Customize, Settings and Guides. On a phone it opens full screen; on tablets it's a strip of icons.
 
 - A search box at the top of the menu finds sessions by what was said, plus plans, skills, agents and documents.

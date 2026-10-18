@@ -90,8 +90,31 @@ export interface ProjectDetail extends Omit<Project, "sessions" | "backlog" | "d
   plans: { path: string; title: string; sessionId: string; sessionTitle: string; at: string | null; open: string[] }[];
   memory: LibraryItem[];
   mcpServers: { path: string; servers: { name: string; type: string; runs: string }[]; error?: string | null };
+  worktreeInclude: { path: string; display: string; exists: boolean; access: string; patterns: string[] };
   worktrees: { name: string; path: string }[];
   sessions: (Session & { worktree: boolean })[];
+}
+
+/** ~/.claude/keybindings.json, as GET /settings returns it. A null action unbinds a default shortcut. */
+export interface Keybindings {
+  path: string;
+  display: string;
+  exists: boolean;
+  access: string;
+  error: string | null;
+  blocks: { context: string; bindings: { key: string; action: string | null }[] }[];
+}
+
+/** One custom theme in ~/.claude/themes/, as GET /settings returns it. */
+export interface Theme {
+  slug: string;
+  name: string;
+  base: string | null;
+  overrides: number;
+  path: string;
+  display: string;
+  access: string;
+  error: string | null;
 }
 
 export type Kind = "skill" | "agent" | "command" | "rule" | "output-style" | "hook" | "hook-def" | "settings" | "claude-md" | "plan" | "memory" | "plugin" | "mcp" | "scheduled-task" | "workflow";

@@ -11,7 +11,7 @@ import { addItem, editItemText, parseBacklog, toggleItem } from "../parsers/back
 import { addEntry, isKeepAChangelog, parseChangelog } from "../parsers/changelog";
 import { effective, type Source } from "../parsers/settings";
 import { search as searchDocs, listSessions, untitled } from "../db/index";
-import { globalLibrary, memoryItems, projectLibrary } from "../scan/library";
+import { globalLibrary, listThemes, memoryItems, projectLibrary, readKeybindings, readWorktreeInclude } from "../scan/library";
 import { catalog } from "../scan/catalog";
 import { buildMap, managedSettingsPath } from "../scan/map";
 import { handoffName, listProjects, projectDir, projectPathOf } from "../scan/projects";
@@ -64,6 +64,7 @@ content.get("/projects/:id", async (c) => {
     plans: await projectPlans(all),
     memory: (await memoryItems()).filter((m) => m.sourceName && isMemoryOf(m.sourceName, dir)),
     mcpServers: await mcpServersIn(join(dir, ".mcp.json")),
+    worktreeInclude: await readWorktreeInclude(dir),
     worktrees,
     sessions,
   });
@@ -534,7 +535,8 @@ content.get("/settings", async (c) => {
     }
     sources.push({ source: f.source, path: f.path, display: tildify(f.path), exists: !!cur, access: classify(f.path), error });
   }
-  return c.json({ sources, entries: effective(parsed) });
+  // Keyboard shortcuts and themes exist only for all projects, so they come with every settings view.
+  return c.json({ sources, entries: effective(parsed), keybindings: await readKeybindings(), themes: await listThemes() });
 });
 
 // ---- Map and search ----

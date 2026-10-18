@@ -11,10 +11,10 @@ function areaOf(abs: string): Area | null {
   const cd = claudeDir();
   if (!isInside(abs, cd)) return "projects";
   const rel = relative(cd, abs).split(sep).join("/");
-  if (/^projects\/[^/]+\/memory\//.test(rel)) return "memory";
+  if (/^projects\/[^/]+\/memory\//.test(rel) || /^agent-memory\//.test(rel)) return "memory";
   if (/^projects\//.test(rel)) return "sessions";
   if (/^(jobs|sessions)\//.test(rel)) return "jobs";
-  if (/^settings(\.local)?\.json$/.test(rel)) return "settings";
+  if (/^(settings(\.local)?\.json|keybindings\.json)$/.test(rel) || /^themes\//.test(rel)) return "settings";
   if (/^(commands|skills|agents|rules|output-styles|hooks|plans|plugins)\b/.test(rel) || rel === "CLAUDE.md") return "library";
   return null;
 }

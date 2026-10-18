@@ -32,6 +32,7 @@ const EDITABLE = [
   /^scheduled-tasks(\/|$)/,
   /^themes(\/|$)/,
   /^projects\/[^/]+\/memory(\/|$)/,
+  /^agent-memory(\/|$)/,
 ];
 
 let projectDirs: string[] = [];

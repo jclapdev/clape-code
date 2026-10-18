@@ -42,6 +42,9 @@ const keyOf = (i: CatalogItem) => [i.kind, i.path, i.name, i.projectId ?? "", i.
 const baseName = (i: CatalogItem) => (i.folder ? i.folder.split(/[\\/]/).filter(Boolean).pop()! : i.name).replace(/\.md$/, "");
 const slashOf = (i: CatalogItem) => (i.kind === "workflow" ? String(i.meta?.command ?? `/${i.name}`) : `/${i.source === "plugin" ? `${i.sourceName}:` : ""}${baseName(i)}`);
 
+/** For a subagent's memory note, the agent that keeps it. */
+const agentLabel = (i: CatalogItem | null) => (i?.kind === "memory" && i.meta?.agent ? `Agent: ${i.meta.agent}` : null);
+
 /** Where an item applies, in the words the menu uses. */
 export function whereLabel(i: CatalogItem | null) {
   if (!i) return "Built into Claude Code";
@@ -79,7 +82,7 @@ function matches(r: Row, q: string, project: string) {
   if (project === "global" && r.projectId) return false;
   if (project && project !== "global" && r.projectId !== project) return false;
   if (!q) return true;
-  const hay = `${r.name} ${r.description} ${whereLabel(r.item)}`.toLowerCase();
+  const hay = `${r.name} ${r.description} ${whereLabel(r.item)} ${agentLabel(r.item) ?? ""}`.toLowerCase();
   return q
     .toLowerCase()
     .split(/\s+/)
@@ -92,6 +95,7 @@ function RowTags({ r, f }: { r: Row; f: Feature }) {
   return (
     <>
       <Tag tone={i ? "muted" : "accent"}>{whereLabel(i)}</Tag>
+      {agentLabel(i) && <Tag>{agentLabel(i)}</Tag>}
       {i && f.kinds.length > 1 && KIND_LABEL[i.kind] && f.kinds[0] !== i.kind && <Tag>{KIND_LABEL[i.kind]}</Tag>}
       {i?.state && i.state !== "on" && <Tag>{STATE_LABEL[i.state] ?? i.state}</Tag>}
       {i?.error && <Tag tone="danger">Has a mistake</Tag>}
