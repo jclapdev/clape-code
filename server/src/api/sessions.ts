@@ -1,12 +1,10 @@
 import { Hono } from "hono";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { indexSessions, listSessions, sessionById, untitled, type IndexedSession } from "../db/index";
 import { emit } from "../events";
 import { readState, trashItem, writeState } from "../fs/archive";
 import { isInside, tildify, untildify } from "../fs/paths";
 import { WriteError } from "../fs/safeWrite";
-import { parseChangelog } from "../parsers/changelog";
 import { TurnBuilder } from "../parsers/transcript";
 import { readLines } from "../fs/lines";
 import { getSession, knownCommands, listLive, removeSession, startSession, waitingCount } from "../live/sessions";
@@ -152,7 +150,7 @@ export function isStaleLimit(j: { detail: string | null; updatedAt: string | nul
 }
 
 sessions.get("/overview", async (c) => {
-  const [jobs, projects] = await Promise.all([listJobs(false), listProjects()]);
+  const jobs = await listJobs(false);
   const live = listLive();
   const named = (j: (typeof jobs)[number]) => j.name ?? `Session in ${j.cwd ? j.cwd.split(/[\\/]/).filter(Boolean).pop() : "an unknown folder"}`;
   const blocked = jobs.filter((j) => j.state === "blocked");
@@ -162,26 +160,10 @@ sessions.get("/overview", async (c) => {
   ];
   // Stopped by a usage limit that has long since reset: nothing to answer, just something to continue.
   const paused = blocked.filter((j) => isStaleLimit(j)).map((j) => ({ id: j.id, name: named(j), cwd: j.cwd, sessionId: j.sessionId, at: j.updatedAt }));
-  const changes: { project: string; projectId: string; date: string; text: string }[] = [];
-  for (const p of projects.filter((p) => p.group === "root" && p.docs.includes("CHANGELOG.md"))) {
-    try {
-      const { days } = parseChangelog(await readFile(join(untildify(p.id), "CHANGELOG.md"), "utf8"));
-      for (const d of days.slice(0, 1)) for (const e of d.entries.slice(0, 2)) changes.push({ project: p.name, projectId: p.id, date: d.date, text: e });
-    } catch {}
-  }
-  // "Unreleased" (Keep a Changelog) is newer than any dated section.
-  const when = (d: string) => (/^unreleased$/i.test(d) ? Infinity : Date.parse(d) || 0);
-  changes.sort((a, b) => when(b.date) - when(a.date));
-  const counts: Record<string, number> = {};
-  for (const j of jobs) counts[j.state] = (counts[j.state] ?? 0) + 1;
   return c.json({
     needsYou,
     paused,
-    jobs: jobs.slice(0, 6).map((j) => ({ ...j, name: named(j) })),
-    jobCounts: counts,
     live: live.filter((l) => l.status !== "stopped").length,
-    projects: projects.filter((p) => p.group === "root" && !p.empty).slice(0, 6),
-    changes: changes.slice(0, 6),
     waiting: waitingCount(),
   });
 });
