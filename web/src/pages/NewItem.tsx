@@ -152,9 +152,9 @@ export function NewItemPage() {
       }),
     onSuccess: () => {
       void qc.invalidateQueries();
-      const hash = `#${spec.section}`;
-      if (scope === "global") void navigate({ to: `/${spec.section === "rules" ? "instructions" : spec.section}` as "/skills" });
-      else void navigate({ to: "/projects/$id", params: { id: scope }, search: {}, hash: hash.slice(1) });
+      // The project page no longer lists items, so a project's new item opens its Customize page filtered to that project.
+      const to = `/${spec.section === "rules" ? "instructions" : spec.section}` as "/skills";
+      void navigate({ to, search: scope === "global" ? {} : { project: scope } });
     },
   });
 
@@ -164,6 +164,21 @@ export function NewItemPage() {
   ];
   const nameOk = !spec.name || /^[a-z0-9]+(-[a-z0-9]+)*$/.test(name);
   const ready = !!scope && nameOk && (!spec.name || !!name) && (!spec.description?.required || !!description.trim()) && (kind === "skill" || kind === "command" || kind === "agent" || kind === "output-style" || !!body.trim());
+
+  const guidePanel = (
+    <>
+      <div className="flex flex-wrap gap-1 border-b border-line p-2">
+        {spec.guides.map((g) => (
+          <button key={g.slug} type="button" onClick={() => setGuide(g.slug)} className={cn("rounded-md px-2.5 py-1.5 text-[13px]", guide === g.slug ? "bg-accent text-accent-foreground" : "text-ink-2 hover:bg-sunken")}>
+            {g.label}
+          </button>
+        ))}
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto px-5 py-4 text-[14px]">
+        <GuideText slug={guide} />
+      </div>
+    </>
+  );
 
   return (
     <div className="flex h-full">
@@ -249,18 +264,15 @@ export function NewItemPage() {
             </Button>
           </div>
         </form>
+        <div className="mx-auto max-w-[760px] px-6 pb-8 xl:hidden">
+        <details className="rounded-md border border-line bg-panel">
+          <summary className="cursor-pointer px-4 py-3 text-[14px] font-medium">How to write a good one</summary>
+          <div className="flex max-h-[70vh] flex-col border-t border-line">{guidePanel}</div>
+        </details>
+        </div>
       </div>
-      <aside aria-label="Guide" className="hidden w-[440px] flex-none flex-col border-l border-line bg-panel lg:flex">
-        <div className="flex flex-wrap gap-1 border-b border-line p-2">
-          {spec.guides.map((g) => (
-            <button key={g.slug} type="button" onClick={() => setGuide(g.slug)} className={cn("rounded-md px-2.5 py-1.5 text-[13px]", guide === g.slug ? "bg-accent text-accent-foreground" : "text-ink-2 hover:bg-sunken")}>
-              {g.label}
-            </button>
-          ))}
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto px-5 py-4 text-[14px]">
-          <GuideText slug={guide} />
-        </div>
+      <aside aria-label="Guide" className="hidden w-[440px] flex-none flex-col border-l border-line bg-panel xl:flex">
+        {guidePanel}
       </aside>
     </div>
   );

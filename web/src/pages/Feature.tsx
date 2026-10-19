@@ -262,6 +262,8 @@ const canEdit = (i: CatalogItem | null) => !!i && i.access === "edit" && (i.kind
 
 function ItemView({ r, f, back, onDeleted }: { r: Row; f: Feature; back: ReactNode; onDeleted: () => void }) {
   const [editing, setEditing] = useState(false);
+  // While deleting, stop showing (and re-fetching) the file: the watcher reports the move before the reply arrives.
+  const [gone, setGone] = useState(false);
   const i = r.item;
   const header = (
     <header className="flex flex-col gap-3 border-b border-line px-4 py-4 md:px-6">
@@ -282,9 +284,16 @@ function ItemView({ r, f, back, onDeleted }: { r: Row; f: Feature; back: ReactNo
         </div>
       </div>
       {i?.kind === "workflow" && !editing && i.description && <p className="leading-relaxed text-ink-2">{i.description}</p>}
-      {i && <ItemActions i={i} scope={i.projectId ?? "global"} projectId={i.projectId} onDeleted={onDeleted} />}
+      {i && <ItemActions i={i} scope={i.projectId ?? "global"} projectId={i.projectId} onDeleting={setGone} onDeleted={onDeleted} />}
     </header>
   );
+  if (gone)
+    return (
+      <div className="h-full overflow-auto">
+        {back}
+        {header}
+      </div>
+    );
   if (editing && i) {
     return (
       <div className="flex h-full flex-col">

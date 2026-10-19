@@ -50,7 +50,7 @@ export function deleteHow(i: LibraryItem): How {
  * What you can do with one item: turn a skill or plugin on or off, check a skill against the standard, delete it.
  * `scope` is the project id, or "global" for what applies everywhere.
  */
-export function ItemActions({ i, scope, projectId, onDeleted }: { i: LibraryItem; scope: string; projectId?: string | null; onDeleted?: () => void }) {
+export function ItemActions({ i, scope, projectId, onDeleting, onDeleted }: { i: LibraryItem; scope: string; projectId?: string | null; onDeleting?: (on: boolean) => void; onDeleted?: () => void }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const [check, setCheck] = useState<{ ok: boolean; output: string; available: boolean } | null>(null);
@@ -68,6 +68,7 @@ export function ItemActions({ i, scope, projectId, onDeleted }: { i: LibraryItem
   });
   const how = deleteHow(i);
   const del = useMutation({
+    onMutate: () => onDeleting?.(true),
     mutationFn: () => {
       if (how?.by === "hook") return api.post("/hooks/remove", { path: i.path, event: i.meta.event, group: i.meta.group, index: i.meta.index });
       if (how?.by === "mcp") return api.post("/mcp/remove", { name: i.name, scope: i.meta.scope, project: projectId ?? undefined });
@@ -78,9 +79,14 @@ export function ItemActions({ i, scope, projectId, onDeleted }: { i: LibraryItem
       const said = (r as { message?: string } | undefined)?.message;
       toast.success(said || (how?.by === "archive" ? `Moved ${i.name} to Archived items.` : `Removed ${i.name}.`));
       onDeleted?.();
-      done();
+      // The item's own file is gone; re-fetching it while its view closes would only fail.
+      const gone = how?.by === "archive";
+      void qc.invalidateQueries({ predicate: (q) => !(gone && q.queryKey[0] === "file" && q.queryKey[1] === i.path) });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      onDeleting?.(false);
+      toast.error(e.message);
+    },
   });
   const validate = useMutation({
     mutationFn: () => api.post<{ ok: boolean; output: string; available: boolean }>("/library/validate", { path: i.path }),

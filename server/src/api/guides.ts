@@ -33,9 +33,24 @@ export function cleanDoc(md: string): string {
   const out: string[] = [];
   let inExport = false;
   let inFence = false;
-  for (const line of md.split("\n")) {
-    if (/^```/.test(line.trim())) inFence = !inFence;
-    if (inFence) {
+  // Text inside a component (<Tabs>, <Tab>, <Steps> …) is indented under its tag. Markdown would read
+  // four spaces as a code block, so each component's own indent is taken off, keeping nesting inside it.
+  const indents: (number | null)[] = [];
+  for (const raw of md.split("\n")) {
+    let line = raw;
+    const close = /^\s*<\/[A-Z][\w.]*>\s*$/.test(raw);
+    const open = !close && /^\s*<[A-Z][\w.]*(\s[^>]*)?>\s*$/.test(raw) && !/\/>\s*$/.test(raw);
+    if (close) indents.pop();
+    else if (!open && indents.length && raw.trim()) {
+      const lead = raw.length - raw.trimStart().length;
+      const base = (indents[indents.length - 1] ??= lead);
+      line = raw.slice(Math.min(lead, base));
+    }
+    if (open) indents.push(null);
+    const fence = /^```/.test(line.trim());
+    if (fence) inFence = !inFence;
+    // The closing fence keeps its indent too, or a fence inside a list item never closes.
+    if (inFence || fence) {
       out.push(line.replace(/\s+theme=\{null\}/, "").replace(/^(```\w*)\s+.*$/, "$1"));
       continue;
     }

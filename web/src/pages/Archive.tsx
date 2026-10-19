@@ -52,8 +52,8 @@ export function ArchivePage() {
           {q.data.map((r) => (
             <li key={r.id} className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3 last:border-0">
               <Tag>{KIND_LABEL[r.kind]?.[0] ?? "File"}</Tag>
-              <div className="min-w-0 flex-1">
-                <div className="font-medium">{r.name}</div>
+              <div className="min-w-0 flex-1 basis-[200px]">
+                <div className="break-words font-medium">{r.name}</div>
                 <div className="truncate font-mono text-xs text-muted-foreground">{r.originalDisplay}</div>
               </div>
               <span className="text-xs text-muted-foreground">archived {when(r.archivedAt)}</span>

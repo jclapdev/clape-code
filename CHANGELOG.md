@@ -53,6 +53,11 @@ Notable changes to Control Center, newest first.
 
 ### Fixed
 
+- Guides show lists, tables and bold lines inside the docs' tabs as formatted text instead of raw code, and a code block inside a list item no longer swallows the text after it.
+- The "How to write a good one" guide on the New forms folds under the form below 1280 px wide, so phones and tablets can read it too, and sits beside the form from 1280 px.
+- After creating something for one project, the app opens that feature's page filtered to the project, instead of the project page, which no longer lists those items.
+- Deleting an open item no longer reports errors in the browser console while its view closes.
+- Archived items on a phone show each name on one line, with the date and Restore below.
 - The browser console no longer shows "Encountered a script tag while rendering React component" on every page.
 - Cancelling "Delete this session?" no longer leaves the session page.
 - Home no longer says background sessions need you when they only stopped at a usage limit that has since reset.

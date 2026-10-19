@@ -74,8 +74,10 @@ export function AddSettingPage() {
         : api.post("/settings/add", { scope, local: local === "local", what, list, rule, event, matcher, command }),
     onSuccess: () => {
       void qc.invalidateQueries();
-      if (scope === "global") void navigate(what === "permission" ? { to: "/settings", search: {}, hash: "permissions" } : { to: `/${spec.section}` as "/hooks" });
-      else void navigate({ to: "/projects/$id", params: { id: scope }, search: {}, hash: spec.section });
+      // The project page no longer lists rules, hooks or servers, so a project's opens Settings or the Customize page filtered to it.
+      const project = scope === "global" ? undefined : scope;
+      if (what === "permission") void navigate({ to: "/settings", search: project ? { project } : {}, hash: "permissions" });
+      else void navigate({ to: `/${spec.section}` as "/hooks", search: project ? { project } : {} });
     },
   });
 
@@ -176,8 +178,16 @@ export function AddSettingPage() {
             </Button>
           </div>
         </form>
+        <div className="mx-auto max-w-[720px] px-6 pb-8 xl:hidden">
+        <details className="rounded-md border border-line bg-panel">
+          <summary className="cursor-pointer px-4 py-3 text-[14px] font-medium">How to write a good one</summary>
+          <div className="max-h-[70vh] overflow-auto border-t border-line px-4 py-3 text-[14px]">
+            <GuideText slug={spec.guide} />
+          </div>
+        </details>
+        </div>
       </div>
-      <aside aria-label="Guide" className="hidden w-[440px] flex-none overflow-auto border-l border-line bg-panel px-5 py-4 text-[14px] lg:block">
+      <aside aria-label="Guide" className="hidden w-[440px] flex-none overflow-auto border-l border-line bg-panel px-5 py-4 text-[14px] xl:block">
         <GuideText slug={spec.guide} />
       </aside>
     </div>

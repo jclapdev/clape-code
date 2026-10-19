@@ -41,6 +41,14 @@ describe("guides", () => {
     expect(out).toContain("#### Plan");
     expect(out).toContain("```bash\nls\n```");
   });
+  test("lists, tables and code inside tabs aren't turned into code blocks", () => {
+    const md = '<Tabs>\n  <Tab title="A vs B">\n    Two things:\n\n    * **A** is one\n      * nested\n\n    | x | y |\n    | - | - |\n\n    **Bold** start.\n\n    ```bash\n    ls\n      indented\n    ```\n  </Tab>\n</Tabs>\n\nAfter.';
+    const out = cleanDoc(md);
+    expect(out).toBe("Two things:\n\n* **A** is one\n  * nested\n\n| x | y |\n| - | - |\n\n**Bold** start.\n\n```bash\nls\n  indented\n```\n\nAfter.");
+  });
+  test("a code block inside a list item keeps its closing fence's indent", () => {
+    expect(cleanDoc("* Test it:\n  ```bash theme={null}\n  ls\n  ```\n* Next")).toBe("* Test it:\n  ```bash\n  ls\n  ```\n* Next");
+  });
 });
 
 describe("adding to settings", () => {
