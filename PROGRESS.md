@@ -91,7 +91,6 @@ Things done or skipped while John was away on 2026-10-18, for him to check. Each
   3. Slash commands lists Claude Code's own commands from what the last session reported, not from the commands reference page. Plugin commands and MCP prompts show only if that session reported them, and then they're tagged "Built into Claude Code". Say if you want the list taken from the docs page and plugin/MCP commands tagged by source.
   4. Guides has no links to what's out of scope (cloud routines, Code Review on GitHub, Slack, gateways, organisation-managed settings, the Agent SDK), which the plan says it should link to. Add them to `GUIDES` in `server/src/api/guides.ts` or as plain links on the Guides page.
   5. Plans weren't edited or deleted in the check: a plan can only be made by running a session, and none was run. One was opened read-only and looked right. "New plan" opens a New session form; it wasn't pressed.
-  6. The Control Center memory note isn't updated yet (new menu; boards live in PROGRESS.md). It's outside this worktree, so the final-check agent left it.
 - **Skipped until you're back:**
   - the cka-prep and sharepoint backlog move (it deletes files in other projects);
   - installing or uninstalling a real marketplace plugin (only tested on Claude Code's documented output);
