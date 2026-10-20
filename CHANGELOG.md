@@ -7,22 +7,21 @@ Notable changes to Control Center, newest first.
 ### Added
 
 - The Control Center window also works with home network mode on. It connects over a local-only address that other devices can't reach; phones and other computers still use the https address and the password.
-- Control Center is an app in Applications: open it from there or from Spotlight, with its own icon and name in the Dock. It has the usual menus (Quit, Undo, Redo, Cut, Copy, Paste, Select All, Minimize, Close). `bun run app` rebuilds it and reinstalls it after code changes; `bun run desktop` opens a development copy. Quitting it stops it.
+- Control Center is an app in Applications: open it from there or from Spotlight, with its own icon, name and menus, and quitting it stops it. `bun run app` rebuilds and reinstalls it after code changes, and `bun run desktop` opens a development copy.
 - A Customize section with one page for each thing that changes how Claude Code works: instructions, skills, slash commands, agents, hooks, MCP servers, plugins, plans, scheduled tasks, output styles, memory and workflows. Each page lists every item from every project and plugin, says where it applies, and has a search box, a project filter and a New button.
 - Open any item to read it, edit it in place or delete it. Deleted files go to Archived items, where you can restore them.
 - The Slash commands page lists Claude Code's own commands next to yours, each with "Run in a new session".
 - The Memory page also lists the notes your agents keep for themselves (agents with `memory` set), tagged "Agent: <name>".
-- The Plugins page turns each plugin on and off and uninstalls it, using Claude Code's own plugin commands. "Find plugins" searches every marketplace you have (about 3,800 plugins), showing what each does and how many people installed it, with Install. "New plugin" makes a starter plugin in your skills folder and opens it, with its files listed. When Claude Code refuses, its own message shows.
+- The Plugins page turns each plugin on and off and uninstalls it, using Claude Code's own plugin commands and showing its message when it refuses. "Find plugins" searches every marketplace you have (about 3,800 plugins) with Install, and "New plugin" makes a starter plugin in your skills folder.
 - Plugins you made in your skills folder show on the Plugins page. Removing one moves its folder to Archived items.
 - The menu has Home, Sessions, Projects, Customize, Settings and Guides. On a phone it opens full screen; on tablets it's a strip of icons.
-- Each project page opens on a board of its PROGRESS.md: Next, In progress and Done. Drag a card to another column, or use its menu ("Move to…"), which is how phones move cards. Add, edit and delete cards; a `#label` at the end of a card shows as a tag. Saving changes only the lines of that card, and the file's other sections stay as they are. A project without PROGRESS.md gets a "Start a board" button.
+- Each project page opens on a board of its PROGRESS.md (Next, In progress and Done): add, edit, delete and drag cards, or move them from a card's menu on phones, and a `#label` shows as a tag. Saving changes only that card's lines, and a project without PROGRESS.md gets a "Start a board" button.
 - New project makes a folder in your projects folder with git, a starter CLAUDE.md and an empty board, and offers "Have Claude set it up", which opens a new session with /init.
 - Add context: drop text files on a project page, or pick them, to copy them into its docs/ folder. Each file has a "Claude reads this every session" switch that adds or removes its `@docs/…` line in CLAUDE.md.
 - The project page is now a summary: the board, Up next, how many instructions, skills, agents, hooks and so on the project has (each opens that page filtered to the project), recent sessions, context files, changelog, docs and .worktreeinclude.
-- A Settings page for how Claude Code behaves: permission rules (allow, ask first, never allow), model, environment variables, status line, sandbox, keyboard shortcuts and themes, each with one sentence on what it does. Pick whether to change your settings for every project, a project's shared settings or your own settings for that project; the page lists the files in the order Claude Code ranks them and says which file's value is in effect when more than one sets it, with "Edit as text" for each file. Environment variable values stay hidden until you click "Show value".
-- Home says what the app is for and has a "Build your setup" panel: one card for each sign, from Claude Code's own guide, that a feature would help (such as "Claude gets a convention or a command wrong twice"), each with a button that creates that thing and a link to its page. Below it, one list of sessions: those that need you, those paused at a usage limit, then the 6 most recent, each with Continue and Open. The separate Background sessions, Projects and Changelog lists on Home are gone.
-- A Sessions page lists every session in every project, newest first, background sessions included, with a search by title, a project picker, a "Needs you" filter and New session. Each line has Continue and Open. An opened session is its own page with Back. A background session opens full width with its state and what it did.
-
+- A Settings page for permission rules, model, environment variables, status line, sandbox, keyboard shortcuts and themes, for every project, a project's shared settings or your own settings for it. It shows which file's value is in effect when more than one sets it, has "Edit as text" for each file, and hides environment variable values until "Show value".
+- Home has a "Build your setup" panel: one card for each sign, from Claude Code's own guide, that a feature would help, with a button that creates it. Below it is one list of sessions (those that need you, those paused at a usage limit, then the 6 most recent), replacing the separate Background sessions, Projects and Changelog lists.
+- A Sessions page lists every session in every project, newest first and background sessions included, with title search, a project picker, a "Needs you" filter and New session. An opened session is its own page with Back, and a background session opens full width with its state and what it did.
 - A search box at the top of the menu finds sessions by what was said, plus plans, skills, agents and documents.
 - All projects shows what applies in every project: your instructions, skills, agents, commands, plugins, hooks, rules, output styles, plans and settings.
 - Guides shows Claude Code's official guides as formatted pages.
@@ -39,8 +38,7 @@ Notable changes to Control Center, newest first.
 - Opening a file to edit right after reading it no longer shows an empty editor.
 - Home's "All sessions" link opens the Sessions page, and a project page's "Show all N sessions" opens it filtered to that project.
 - Stopping or closing a live session returns to Sessions.
-- Nothing sits in a second column beside the menu. On wide screens the Customize pages and Sessions list take the full width, and an item or session opens as its own page with a link back. Guides lists the guides as cards only, and a guide opens on its own page with "Guides" to go back.
-
+- Nothing sits in a second column beside the menu: the Customize pages and the Sessions list take the full width, and an item or session opens as its own page with a link back. Guides lists the guides as cards, and a guide opens on its own page.
 - A project opens as one page with every section showing and a count for each, instead of tabs.
 - Files open in place as readable text; Markdown is edited in live preview, so saving changes only what you typed.
 - Skills and plugins are turned on or off from the item itself.
@@ -66,10 +64,34 @@ Notable changes to Control Center, newest first.
 - Cancelling "Delete this session?" no longer leaves the session page.
 - Home no longer says background sessions need you when they only stopped at a usage limit that has since reset.
 
-## 2026-10-17
+## [0.1.0] - 2026-10-17
 
 ### Added
 
 - First version: your Claude Code projects, sessions, skills, agents, settings and background sessions in one place, with safe editing that keeps a backup and refuses to overwrite a file that changed since you opened it.
 - Start, continue and answer Claude sessions from the app.
 - Runs as one program on macOS, Linux and Windows, on this computer only or on your home network with a password.
+- A Library of skills, agents, commands, rules, output styles, hooks, settings files, CLAUDE.md files, plans, memory notes and plugins, for every project or one. Select many at once, filter to those unchanged for a number of days, and archive or delete them together.
+- A Hooks view listing every hook in your user, project and local settings; opening one opens its settings file at that line.
+- A Map of every file and folder Claude Code uses, with the order its settings files rank in and a preview of each folder.
+- Skills are checked with skills-ref before saving, with Keep editing or Save anyway when the check fails.
+- Search everything with Cmd+K, and save a note from it to FEEDBACK.md.
+- Press e to start editing the open file.
+- Long transcripts load as they stream in and page through, and search finds Claude's replies too.
+- Single-file builds for each platform, with install steps in the README and test steps for Windows.
+
+### Changed
+
+- The interface uses shadcn/ui components, with light and dark themes.
+
+### Fixed
+
+- Turning home network mode on or off now restarts the app as it should.
+- Commands whose frontmatter strict YAML rejects, such as `argument-hint: [name] [--project | --personal]`, show their descriptions and can be saved again.
+- Project tabs wrap on phones, and long paths no longer squeeze Home's cards.
+- The single-file build finds the installed Claude Code even when it isn't on the shell's PATH.
+
+### Security
+
+- `~/.claude.json`, which holds account details, is never read through the app.
+- Login attempts are limited by the connection's real address, so a faked header can't get around the limit.

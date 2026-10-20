@@ -4,12 +4,28 @@ Where Control Center stands, for whoever picks it up next. Read this first; upda
 
 ## Done
 
-- [x] Menu cut to Home, All projects, Guides and the projects by name; command palette and the Sessions, Live, Jobs, Library, Settings and Map menu entries removed (2026-10-18).
-- [x] One page per project with every section showing, and an All projects page for what applies everywhere (2026-10-18).
-- [x] Readable views for every file, and Markdown edited in live preview so saving changes only what was typed (2026-10-18).
-- [x] Create skills, commands, agents, rules, output styles, memory notes, instructions, hooks, permission rules and MCP servers from forms with the official guide beside them (2026-10-18).
-- [x] Slash command list in sessions, visible search in the menu, Guides page (2026-10-18).
-- [x] One column beside the menu (2026-10-19): at every width the Customize pages (all 12 drawn by `web/src/pages/Feature.tsx`) and the Sessions list take the full page width (1180 px max, like `Page`), and an item or session opens as its own page (`?item=` or `/sessions/<id>`, so browser Back works) with a link back. The wide split-pane branches and the selected-row highlight they needed are deleted (`Feature.tsx`, `Sessions.tsx`, `web/src/components/SessionRows.tsx`). Guides (`web/src/pages/Guides.tsx`) lost its left list: the card grid is the index (now in `Page`), and a guide opens on its own page with "Guides" to go back. Tested: typecheck, 153 tests and build pass; in a browser, Skills list, opening a skill, Back, Guides, opening a guide, Back at 390, 1024 and 1440 px in light and dark: no column beside the menu, nothing off the screen, no sideways scrolling. At 1280 and 1440 px, Home, Sessions, a transcript, a background session, New session, Projects, a project page, New project, Settings, Archived items, App preferences, Customize, Guides, a guide, all 12 Customize pages with their first item opened, Find plugins, New plugin and two New forms: no column beside the menu (Settings' "On this page" and the New forms' guide sit on the right, as allowed), no sideways scrolling.
+- [x] Desktop window that survives home-network switching #desktop
+- [x] Desktop window in home-network mode #desktop
+- [x] Desktop app in Applications #desktop
+- [x] Desktop window #desktop
+- [x] One column beside the menu #design
+- [x] Final check of 57 pages, with its fixes #check
+- [x] Old addresses redirected #sessions
+- [x] Sessions page #sessions
+- [x] Home with Build your setup and one session list #design
+- [x] Settings page #settings
+- [x] Project board, New project and Add context #projects
+- [x] Plugins page #customize
+- [x] Agent memory, keyboard shortcuts, themes and .worktreeinclude readers #customize
+- [x] Customize feature pages #customize
+- [x] Menu with Projects and Customize groups #design
+- [x] Checkpoint commit of the 18 Oct overhaul #process
+- [x] Menu cut to Home, All projects, Guides and the projects #design
+- [x] One page per project and an All projects page #projects
+- [x] Readable file views and live-preview Markdown #design
+- [x] Create forms with the official guide beside them #customize
+- [x] Slash command list, menu search and Guides page #sessions
+- [x] Version 0.1.0 #release
 
 ## Waiting for John
 
@@ -108,20 +124,6 @@ Plan: `~/.claude/plans/how-is-this-so-swirling-hopcroft.md` (Electrobun, approve
 
 ## In progress
 
-Reorganising the app around Claude Code's features. The approved plan is `~/.claude/plans/encapsulated-mixing-clarke.md`; follow it step by step. The 2026-10-18 overhaul is committed as 7412c68; work since then is in the "WIP" commit after it.
-
-- [x] 1. Checkpoint commit.
-- [x] 2. Shell and menu (2026-10-18): phone full-screen menu, 768–1279 px icon strip, 1280 px+ full menu with Projects and Customize groups. Checked at 390, 768, 1024 and 1440 px in light and dark: nothing runs off the screen or is clipped, and the menu scrolls as one piece.
-- [x] 3. Feature pages (2026-10-18): `web/src/pages/Feature.tsx` draws all 12 Customize pages from `web/src/lib/features.ts` and `/api/catalog`, plus the `/customize` overview and a placeholder `/projects/new`. Item, filter and search sit in the URL. Delete goes through the shared `web/src/components/ItemActions.tsx` (archive, `/hooks/remove` or `/mcp/remove`; plugin and claude.ai items say they come with their source).
-- [x] 4. Server (2026-10-18): `server/src/scan/catalog.ts` with `/catalog`, `/hooks/remove`, `/mcp/remove`, `/plugins/available?q=`, `/plugins/{install,uninstall,enable,disable}` and `/plugins-new`; the Slash commands page reads `/live-commands`. Readers in `server/src/scan/library.ts`: agent memory from `~/.claude/agent-memory/<agent>/`, `.claude/agent-memory/<agent>/` and `.claude/agent-memory-local/<agent>/` (catalog kind "memory" with `meta.agent` and `meta.scope`; the Memory page tags them "Agent: <name>"); `GET /settings` now also returns `keybindings` (`~/.claude/keybindings.json` parsed into context blocks) and `themes` (`~/.claude/themes/*.json`); `GET /projects/:id` returns `worktreeInclude` (its patterns). `classify` makes `~/.claude/agent-memory/` editable. Tests in `server/test/library.test.ts` and `server/test/fs.test.ts`.
-- [x] 5. Plugins page (2026-10-18): on/off through `POST /plugins/enable|disable`, Uninstall with a confirmation, "Find plugins" and "New plugin" panels (`web/src/pages/PluginPanels.tsx`, opened with `?panel=find|new`). Request checks and output parsing live in `server/src/scan/plugins.ts`, tested in `server/test/plugins.test.ts`. Plugins in `~/.claude/skills/` (`<name>@skills-dir`) now show on the page; removing one moves its folder to Archived items and drops its `enabledPlugins` entry. Tested for real with cc-test-plugin: created, turned off and on, removed; checked at 390, 768, 1024 and 1440 px in light and dark. Install and uninstall of marketplace plugins are tested only on parsed output.
-- [x] 6. Projects (2026-10-18), except the cka-prep and sharepoint backlog move (waiting for John, see above): the board (`web/src/pages/ProjectBoard.tsx`, parser `server/src/parsers/board.ts` on `server/src/parsers/eol.ts`, which keeps each line's own ending), New project (`web/src/pages/NewProject.tsx`, `POST /projects-new`), Add context (`web/src/pages/ProjectContext.tsx`, `POST /projects/:id/context` and `/context/import`, CLAUDE.md lines by `server/src/parsers/imports.ts`), and the summary project page in `web/src/pages/Projects.tsx`. Server routes are in `server/src/api/projectWork.ts`; round-trip tests (CRLF, mixed endings, no final newline) in `server/test/parsers.test.ts`, endpoint tests in `server/test/api.test.ts`. Tested for real with cc-test-project: created it, added a context file (a PNG was refused), switched its CLAUDE.md line on and off (CLAUDE.md back to its exact bytes), added a card, moved it Next → In progress (drag) → Done → Next (menu), edited and deleted it; git diff showed only the card's lines changed and PROGRESS.md ended byte-identical. Checked at 390, 768, 1024 and 1440 px in light and dark: nothing off the screen; only the board scrolls sideways (768–1279 px). Test project and its backups deleted.
-- [x] 7. Settings (2026-10-18): `web/src/pages/Settings.tsx` at `/settings` with Permissions, Model, Environment variables, Status line, Sandbox, Keyboard shortcuts and Themes, a picker for which file to change (`?project=<id>&file=shared|local`), the files in the order Claude Code ranks them (from `GET /map`) with "Edit as text", and per setting which file's value is in effect. Writes go through `POST /settings/change` (rules in `server/src/parsers/settingsEdit.ts`), `POST /settings/add` (adding a rule), and `POST /keybindings/set|remove`; `GET /settings/env-value` sends one variable's value on "Show value". Tests in `server/test/api.test.ts` ("Settings page writes"). `web/src/pages/Setup.tsx` is deleted; `/setup` redirects to `/settings`. Saved every section from the UI against a throwaway copy of `~/.claude`; checked at 390, 768, 1024 and 1440 px in light and dark: nothing off the screen, nothing scrolls sideways.
-- [x] 8. Home (2026-10-18): `web/src/pages/Home.tsx` has the intro with New session, "Build your setup" (9 cards, one per row of the "Build your setup over time" table on code.claude.com/docs/en/features-overview, in its order, kept in `SETUP` at the top of the file; each card has a create button and an "Open <feature>" link) and one Sessions list: needs you, paused at a usage limit, then the 6 most recent from `GET /sessions`, with an "All sessions" link. `GET /overview` now sends only `needsYou`, `paused`, `live` and `waiting`. Checked at 390, 768, 1024 and 1440 px in light and dark: nothing off the screen, nothing scrolls sideways; every card button opens the right form or panel.
-- [x] 9. Sessions page (2026-10-18): `/sessions` lists every session and background session newest first (needs you first), with title search, project picker, "Needs you" filter and New session; rows are the shared `web/src/components/SessionRows.tsx`, which Home uses too. An opened transcript is its own view with Back. Background sessions open full width at `/jobs/<id>` with Back. Home's "All sessions" opens `/sessions`; a project's "Show all N sessions" opens `/sessions?project=<id>`.
-- [x] 10. Old addresses (2026-10-18): `/jobs` and plain `/live` open Sessions, `/map` and `/library` open Customize (`/library?kind=` opens that kind's page), `/setup` opens Settings; `/settings`, `/archive`, `/projects` and `/jobs/<id>` are live pages. Checked Sessions, a filtered list, an opened transcript, a background session and every redirect at 390, 768, 1024 and 1440 px in light and dark: nothing off the screen, nothing scrolls sideways, no console errors.
-- [ ] 11. Notes and final check. **Done (2026-10-19):** typecheck, 153 tests and build pass. Scripted pass over 57 pages and views (every menu page, Customize, all 12 feature pages with an item open, each project page, New project, Settings, a session, a background session, Guides with a guide open, App preferences, Archived items, Find plugins, New plugin and four New forms) at 390, 768, 1024 and 1440 px in light and dark, 456 views: nothing off the screen, no page scrolls sideways, nothing clipped in the menu, no console errors; only code blocks and the board (768–1279 px) scroll inside themselves. By hand in claude-test: a skill (390 px), an agent (768), a CLAUDE.md (1024), a hook (1440) and a plugin from New plugin (1440) were created, found by search with the right "applies to" tag, edited and deleted; all but the hook were restored from Archived items and deleted again. A test project was created, a context file added and its CLAUDE.md line switched on and off (CLAUDE.md back to its exact bytes), and a card moved Next → In progress → Done by menu at 390 px and another dragged at 1440 px; each diff showed only the card's line and its blank line. Test items, archive copies, backups and the test project deleted. **Left:** the cka-prep and sharepoint backlog move and the cka-prep board check (waiting for John), editing and deleting a plan, the memory note, and showing John Home at 390 and 1440 px (`~/.claude/jobs/4537fe5b/tmp/home-390.png` and `home-1440.png`).
-
 Plugin facts checked against the live docs on 2026-10-18 (plugins/cli-reference, loading, create): every plugin command exits 0 or 1; with `--json`, install, uninstall, enable and disable print one object on the last line of stdout with `command`, `outcome` ("ok"/"failed") and `message`, plus `failureCode` when it applies; enabling an enabled plugin exits 1 with `failureCode: "already_in_goal_state"` (the app treats it as done); a usage error prints no JSON, only stderr; `--json --available` entries have `pluginId`, `name`, `marketplaceName`, `source`, `description`, `version`, `installCount`; `claude plugin init` takes `--with skills|agents|hooks|mcp|lsp|output-style|channel` and writes `~/.claude/skills/<name>/` with `.claude-plugin/plugin.json` and a root `SKILL.md`; a skills-dir plugin is stopped by deleting its folder or `claude plugin disable <name>@skills-dir`, and its on/off follows the manifest's `defaultEnabled` unless a settings file sets the id. Seen on this computer (v2.1.302): `init` prints an author warning before "Created plugin" when git has no user.name, and turning a skills-dir plugin back on removes its key from settings.json.
 
 Import facts checked against code.claude.com/docs/en/memory on 2026-10-18: `@path` imports load at launch with the CLAUDE.md; relative paths resolve from the file holding the import; up to four hops of nested imports; a space in a path is written `\ ` (quoted paths aren't imported); imports inside code spans and fenced code blocks don't count; an import outside the working directory needs a one-time approval per project, while `docs/` inside the project doesn't; a CLAUDE.md over 4 MiB is skipped, and each import counts as a separate file toward the length warnings.
@@ -132,10 +134,107 @@ Settings facts checked against the live docs on 2026-10-18 (settings-reference, 
 
 ## Next
 
-- [ ] Share rules between the exercise projects (cka-prep, sharepoint) without moving them. Its own session, starting with research. Found so far: the style list is already copied into both (differs by one folder name); the cold-reader, style-reader and build-exercise skill assume Kubernetes and need rewording; the two copies of the study app already differ in 33 files; Claude Code asks once per project before loading an import from outside the project folder.
-- [ ] Show on each project page what it gets from shared rules and plugins.
-- [ ] Run the Windows test steps in docs/windows-test.md on a Windows PC.
-- [ ] After a week of daily use, review Preferences > "How you use this app" and FEEDBACK.md.
+- [ ] Headings without explainer sentences #design
+  As John, I want every page, section and card to have a name for a heading and no sentence explaining it, so that pages read like any web app.
+  - [ ] AC: `Page` and `DetailHeader` in `web/src/components/Panes.tsx` have no `sub` prop; a `meta` prop takes only facts (a path, a branch, a model, a count), and the 7 pages that passed `sub` (Home.tsx:104, Settings.tsx:728, Archive.tsx:45, Feature.tsx:450, Guides.tsx:51, NewProject.tsx:73, Live.tsx:266) show no sentence under their title.
+  - [ ] AC: `intro` is gone from `web/src/lib/features.ts` and from `Feature.tsx:325` and `Feature.tsx:462`; the Customize cards show the icon, name and count only.
+  - [ ] AC: the explainer paragraphs under section headings are deleted: Home.tsx:120 ("Build your setup"), ProjectBoard.tsx:99, Settings.tsx:165 and :671 and the other Settings section paragraphs, Projects.tsx:177, Sessions.tsx:106, PluginPanels.tsx "Searching 3 marketplaces…", the item header's "Comes from your claude.ai account…" line, and the "Context for Claude" paragraph on the project page.
+  - [ ] AC: a new test in `server/test/wording.test.ts` fails when a sentence ending in "." sits directly under a heading or is passed as `meta`; it passes on the app and fails on a planted example.
+  - [ ] AC: the rule "Each page opens with one plain sentence saying what it's for." is deleted from `.claude/work/001-usability-overhaul/plan.md:17`.
+  - [ ] AC: screenshots of every page at 390 and 1440 px, light and dark, show no heading followed by a sentence explaining it.
+- [ ] Home setup cards #design
+  As John, I want the Build your setup cards on Home to all have the same parts and size, so that the panel reads as one even grid.
+  - [ ] AC: `SETUP` in `web/src/pages/Home.tsx` has one entry per feature, with no feature twice (Skills and Plugins have one card each).
+  - [ ] AC: every card has the feature's icon and name as its title, one line of at most about 8 words, and one button whose label is "New <thing>" (or "Find plugins" for Plugins); the separate "Open <feature>" link is gone.
+  - [ ] AC: at 390, 768 and 1440 px every card in a row is the same height (checked in the browser with `getBoundingClientRect`).
+  - [ ] AC: at 1440 px each card's line fits on one line.
+- [ ] README as the app is now #docs
+  As John, I want the README to describe the pages the app has today in short sections, so that I can read it at a glance.
+  - [ ] AC: the "What's in it" table in `README.md:57-69` is replaced by one `###` heading per menu page (Home, Sessions, Projects, Customize, Settings, Guides), each with one or two short sentences.
+  - [ ] AC: no deleted page (Live, Jobs, Library, Map, Archive as a menu page) is named, and no table is left.
+  - [ ] AC: `README.md:71` (⌘K, `[` and `]`, dragging dividers) and `README.md:78` ("Delete moves it to the system trash") are corrected or removed, since the command palette, the list pane and the trash are gone.
+- [ ] Board card story and criteria #board
+  As John, I want to click a board card and read its story and acceptance criteria, ticking each one, so that I can follow a story's progress without "Edit as text".
+  - [ ] AC: clicking a card in `web/src/pages/ProjectBoard.tsx` opens its indented lines rendered as Markdown.
+  - [ ] AC: each `- [ ] AC:` line shows as a checkbox; ticking one changes only that line of PROGRESS.md.
+  - [ ] AC: a round-trip test in `server/test/parsers.test.ts` ticks and unticks an AC line and leaves every other byte the same (CRLF and no-final-newline cases included).
+  - [ ] AC: checked on the control-center board at 390 and 1440 px in light and dark.
+- [ ] Drafts for typed text #design
+  As John, I want what I type to still be there when I leave a page and come back, so that I never lose a long message.
+  - [ ] AC: the session prompt box (`web/src/components/MessageBox.tsx`, used in `Live.tsx:98` and `Live.tsx:342`) keeps a draft per session in local storage.
+  - [ ] AC: the New forms (`NewItem.tsx`, `AddSetting.tsx`, `NewProject.tsx`, New plugin in `PluginPanels.tsx`) keep a draft per form.
+  - [ ] AC: unsaved edits in the file editor (`web/src/components/FileEditor.tsx`) and in a board card being edited (`ProjectBoard.tsx:159`, `:207`) survive leaving the page too.
+  - [ ] AC: a draft clears when it's sent or saved.
+  - [ ] AC: in the browser: type in each of these, go to another page, come back, and the text is still there.
+- [ ] Board and changelog kept with every story #process
+  As John, I want every finished story to update the board and the changelog, so that the board and the changelog are never empty again after days of work.
+  - [ ] AC: the `breakdown` skill is edited after reading the three agentskills.io pages, and `skills-ref validate` passes on it.
+  - [ ] AC: the skill says a story is done only when its card is in Done and CHANGELOG.md's Unreleased section has its line.
+  - [ ] AC: the `verifier` agent fails a story whose card isn't in Done or whose changelog line is missing (tried on one planted failure).
+- [ ] Choices made without John #process
+  As John, I want to go through the roughly 70 "Waiting for John" items as clickable questions a few at a time, so that I decide them instead of agents.
+  - [ ] AC: every item in PROGRESS.md's "Waiting for John" section is asked, a few per question.
+  - [ ] AC: each answer is carried out or recorded where it applies.
+  - [ ] AC: the "Waiting for John" section is then deleted from PROGRESS.md.
+- [ ] Main's saved edits from 18 Oct #cleanup
+  As John, I want the edits main had before the merge checked against the merged code, so that nothing I or an agent wrote is lost.
+  - [ ] AC: `~/.config/control-center/backups/2026-10-20/main-uncommitted.patch` is compared file by file with main.
+  - [ ] AC: anything in it that main lacks is listed for John, then applied as he decides.
+  - [ ] AC: typecheck, tests and build pass afterwards.
+- [ ] Merged worktree and branch removal #cleanup
+  As John, I want the merged design-overhaul worktree and branch removed, so that only one copy of the app is left.
+  - [ ] AC: John is asked first, because this deletes the build outputs in `.claude/worktrees/design-overhaul`.
+  - [ ] AC: `git worktree list` no longer shows it, and `git branch` no longer shows `design-overhaul`.
+  - [ ] AC: `bun run typecheck`, `bun run test` and `bun run build` pass on main afterwards.
+- [ ] App preferences without removed features #design
+  As John, I want App preferences to show only what the app still does, so that it doesn't point me at shortcuts and panes that are gone.
+  - [ ] AC: the Keyboard shortcuts list (`web/src/pages/Preferences.tsx:31-38`) shows only shortcuts that work (⌘K, `[`, `]`, `/`, `e`, `g h` have no handler in `web/src`), or is removed.
+  - [ ] AC: the pane-size sentence (`Preferences.tsx:158`) and the "Save feedback from the search box (⌘K)" sentence (`Preferences.tsx:97`) are gone, since neither feature exists.
+  - [ ] AC: "Views opened" (`Preferences.tsx:106`) doesn't show internal names of deleted pages (jobs, library, map, setup, live).
+  - [ ] AC: the "After a week of daily use" card below is changed to match, since feedback can no longer be saved from the app.
+- [ ] Session list rows #design
+  As John, I want every row in a session list to have the same parts and buttons, so that the lists on Home and Sessions look even.
+  - [ ] AC: rows in `web/src/components/SessionRows.tsx` show the same buttons in the same places (now "Answer" alone, "Open" alone, or "Continue" and "Open", lines 116, 145-161).
+  - [ ] AC: a session's title is never a cut-off raw prompt (seen: "user: The sidebar…", "ver and running the whole sweep again…", "both pages gone. Removing…").
+  - [ ] AC: at 390 px, every row keeps its buttons on the same line as the others.
+- [ ] Same left edge and width on every page #design
+  As John, I want every page's title and content to start at the same place, so that moving between pages doesn't shift the layout.
+  - [ ] AC: Projects (`web/src/pages/Projects.tsx:31`, its own 1100 px wrapper) uses `Page` like the other pages.
+  - [ ] AC: an opened item, a New form and Find plugins (`Feature.tsx:318`, `NewItem.tsx`, `PluginPanels.tsx`) start at the same left edge as `Page` (now about 10 px further left at 1440 px).
+  - [ ] AC: the empty state (`web/src/components/ui.tsx:69`, `md:pl-12`) lines up with its page's heading, as on Archived items.
+  - [ ] AC: an item's Edit and Delete sit together (now Edit top right at `Feature.tsx:278`, Delete under the tags at `Feature.tsx:287`).
+- [ ] Even cards on Projects and in lists #design
+  As John, I want cards in a grid and rows in a list to have the same shape, so that pages look tidy.
+  - [ ] AC: Projects cards (`Projects.tsx:35-40`) are the same height whether or not a project has a backlog line, and say "last session yesterday" instead of "last Yesterday".
+  - [ ] AC: on Customize lists (`Feature.tsx`), the tags sit on the name's line at 390 px or always below it, the same for every row.
+  - [ ] AC: the project header says "1 changed file" for one (`Projects.tsx:537`).
+  - [ ] AC: checked at 390, 768 and 1440 px in light and dark.
+- [ ] Project page without a second Next list #design
+  As John, I want the project page to show the board's Next column once, so that the same cards aren't listed twice.
+  - [ ] AC: "Up next" (`web/src/pages/Projects.tsx:557`) isn't shown when the project has a board, since it repeats the Next column.
+  - [ ] AC: a two-digit numbered card ("10.", "11.") shows its whole number on the board (now clipped on the left at 1440 px).
+- [ ] Readable tables in guides on phones #design
+  As John, I want tables in guides to scroll sideways on a phone instead of breaking words into letters, so that I can read them.
+  - [ ] AC: table cells in `.prose-cc` (`web/src/styles.css:205-208`, `overflow-wrap: anywhere`) break only between words; the table scrolls inside itself.
+  - [ ] AC: the "What you can customize" guide at 390 px shows "Feature" and "CLAUDE.md" on one line each.
+- [ ] Plugin files without Claude Code's lock files #design
+  As John, I want a plugin's file list to show only its own files, so that it isn't cluttered.
+  - [ ] AC: the Files list on a plugin (`web/src/pages/Feature.tsx:229`) leaves out `.in_use/` entries, which Claude Code writes while a plugin is loaded.
+  - [ ] AC: the Manifest section shows nested fields such as Author with their own label, not a second "Name".
+- [ ] cka-prep and sharepoint backlogs on the board #projects
+  Move the cka-prep and sharepoint backlogs into their PROGRESS.md boards, and check the cka-prep board. Waiting for John, since it deletes files in other projects.
+- [ ] Plan edit and delete check #check
+  Edit and delete a plan from the Plans page in a real session's plan, which the 2026-10-19 final check didn't do.
+- [ ] Home review with John #check
+  Show John Home at 390 and 1440 px (`~/.claude/jobs/4537fe5b/tmp/home-390.png` and `home-1440.png`), or new screenshots once the Home cards story lands.
+- [ ] Shared rules between the exercise projects #projects
+  Share rules between the exercise projects (cka-prep, sharepoint) without moving them. Its own session, starting with research. Found so far: the style list is already copied into both (differs by one folder name); the cold-reader, style-reader and build-exercise skill assume Kubernetes and need rewording; the two copies of the study app already differ in 33 files; Claude Code asks once per project before loading an import from outside the project folder.
+- [ ] Shared rules and plugins on each project page #projects
+  Show on each project page what it gets from shared rules and plugins.
+- [ ] Windows test #check
+  Run the Windows test steps in docs/windows-test.md on a Windows PC.
+- [ ] Feedback review after a week #process
+  After a week of daily use, review Preferences > "How you use this app" and FEEDBACK.md.
 
 ## Notes
 
