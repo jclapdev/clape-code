@@ -233,3 +233,18 @@ export interface Catalog {
   items: CatalogItem[];
   projects: { id: string; name: string }[];
 }
+
+/** The account Claude Code uses, as `GET /api/account` sends it (picked fields only). */
+export interface Account {
+  /** null for a cloud provider, whose credentials Claude Code doesn't check up front. */
+  loggedIn: boolean | null;
+  method: string;
+  methodName: string;
+  provider: string;
+  providerName: string;
+  email: string | null;
+  organization: string | null;
+  plan: string | null;
+  installed: boolean;
+  problem: string | null;
+}

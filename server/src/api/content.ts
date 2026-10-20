@@ -21,7 +21,7 @@ import { listProjects, projectDir, projectPathOf } from "../scan/projects";
 import { isDir, ls, readMd } from "../scan/md";
 import type { Env } from "./env";
 import { boardOf, contextOf } from "./projectWork";
-import { findClaude } from "../live/sessions";
+import { findClaude, runClaude } from "../live/claude";
 import { jsonProblem, MISSING_FILE } from "../errors";
 
 export const content = new Hono<Env>();
@@ -652,18 +652,6 @@ content.post("/hooks/remove", async (c) => {
   emit({ area: "library" });
   return c.json(r);
 });
-
-/** Runs a Claude Code command and returns its output, or an error in its own words. */
-async function runClaude(args: string[], cwd?: string) {
-  const claude = findClaude();
-  if (!claude) throw new WriteError(400, "Claude Code isn't installed where the app can find it.");
-  const p = Bun.spawn([claude, ...args], { cwd: cwd ?? claudeDir(), stdout: "pipe", stderr: "pipe", stdin: "ignore" });
-  const timer = setTimeout(() => p.kill(), 120_000);
-  const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
-  const code = await p.exited;
-  clearTimeout(timer);
-  return { code, out, err };
-}
 
 content.post("/mcp/remove", async (c) => {
   const { name, scope, project } = await c.req.json();

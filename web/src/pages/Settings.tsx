@@ -11,6 +11,7 @@ import { SimpleSelect } from "@/components/SimpleSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Section } from "./Projects";
+import { AccountDetails } from "@/components/Account";
 
 type Source = "managed" | "local" | "project" | "user";
 type Obj = Record<string, any>;
@@ -728,6 +729,9 @@ export function SettingsPage() {
     <Page title="Settings" sub="How Claude Code behaves: what it may do, which model it uses, its sandbox, shortcuts and colors.">
       <div className="flex gap-8">
         <div className="flex min-w-0 max-w-[900px] flex-1 flex-col">
+          <Section id="account" title="Account">
+            <AccountDetails project={project} />
+          </Section>
           <div className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-4">
             <div className="flex flex-wrap items-end gap-3">
               <Field label="Change settings for">
@@ -773,7 +777,7 @@ export function SettingsPage() {
         </div>
         <nav aria-label="On this page" className="sticky top-4 hidden h-fit w-48 flex-none xl:block">
           <ul className="flex flex-col gap-0.5 text-[13.5px]">
-            {sections.map((s) => (
+            {[{ id: "account", title: "Account" }, ...sections].map((s) => (
               <li key={s.id}>
                 <a href={`#${s.id}`} className="block rounded px-2 py-1 text-ink-2 no-underline hover:bg-sunken">
                   {s.title}

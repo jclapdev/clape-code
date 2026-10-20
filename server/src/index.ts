@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { getConnInfo } from "hono/bun";
 import { readFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
+import { account } from "./api/account";
 import { content } from "./api/content";
 import { projectWork } from "./api/projectWork";
 import type { Env } from "./api/env";
@@ -49,6 +50,7 @@ app.route("/api", content);
 app.route("/api", projectWork);
 app.route("/api", sessions);
 app.route("/api", guides);
+app.route("/api", account);
 app.all("/api/*", (c) => c.json({ error: "Not found." }, 404));
 
 // ---- The web app: embedded in the compiled executable, or read from web/dist ----

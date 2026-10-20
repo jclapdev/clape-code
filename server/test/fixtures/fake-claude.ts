@@ -1,0 +1,60 @@
+// Stands in for `claude auth …` in tests, printing what Claude Code 2.1.304 printed on John's computer.
+// FAKE_CLAUDE_LOG gets one line per call: args | cwd | CLAUDE_CONFIG_DIR.
+import { appendFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
+
+const args = process.argv.slice(2);
+const dir = process.env.CLAUDE_CONFIG_DIR ?? process.env.FAKE_CLAUDE_STATE ?? "";
+if (process.env.FAKE_CLAUDE_LOG) appendFileSync(process.env.FAKE_CLAUDE_LOG, `${args.join(" ")}|${process.cwd()}|${process.env.CLAUDE_CONFIG_DIR ?? ""}\n`);
+const loggedOutFlag = join(dir || process.cwd(), "fake-logged-out");
+
+if (args[0] === "auth" && args[1] === "status") {
+  const common = { analyticsDisabled: false, projectsDirectory: join(dir, "projects"), configDirectory: dir };
+  if (basename(process.cwd()) === "bedrock-proj" || process.env.FAKE_CLAUDE_BEDROCK) {
+    console.log(JSON.stringify({ loggedIn: true, authMethod: "third_party", apiProvider: "bedrock", ...common, analyticsDisabled: true }, null, 2));
+    process.exit(0);
+  }
+  if (existsSync(loggedOutFlag)) {
+    console.log(JSON.stringify({ loggedIn: false, authMethod: "none", apiProvider: "firstParty", ...common }, null, 2));
+    process.exit(1);
+  }
+  console.log(
+    JSON.stringify(
+      { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", ...common, email: "me@example.com", orgId: "org-secret-id", orgName: "Acme", subscriptionType: "pro", accessToken: "sk-ant-oat01-secret-token" },
+      null,
+      2,
+    ),
+  );
+  process.exit(0);
+}
+
+if (args[0] === "auth" && args[1] === "login") {
+  if (process.env.FAKE_CLAUDE_SILENT) await new Promise(() => {});
+  process.stdout.write("Opening browser to sign in…\n");
+  process.stdout.write("If the browser didn't open, visit: https://claude.com/cai/oauth/authorize?code=true&state=abc\n");
+  process.stdout.write("Paste code here if prompted > ");
+  const reader = Bun.stdin.stream().getReader();
+  let buf = "";
+  while (!buf.includes("\n")) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += new TextDecoder().decode(value);
+  }
+  const code = buf.split("\n")[0].trim();
+  if (code === "good-code") {
+    if (existsSync(loggedOutFlag)) rmSync(loggedOutFlag);
+    console.log("Login successful.");
+    process.exit(0);
+  }
+  console.log("Login failed: Request failed with status code 400");
+  process.exit(1);
+}
+
+if (args[0] === "auth" && args[1] === "logout") {
+  writeFileSync(loggedOutFlag, "");
+  console.log("Successfully logged out from your Anthropic account.");
+  process.exit(0);
+}
+
+console.error(`fake claude: unknown command ${args.join(" ")}`);
+process.exit(2);

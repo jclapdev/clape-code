@@ -6,6 +6,7 @@ Notable changes to Control Center, newest first.
 
 ### Added
 
+- Settings opens with an Account section: how Claude Code signs in (Claude account, API key, Amazon Bedrock and so on), with the email, organization and plan. Pick a project under "Change settings for" to see the account Claude Code uses in that project.
 - The Control Center window also works with home network mode on. It connects over a local-only address that other devices can't reach; phones and other computers still use the https address and the password.
 - Control Center is an app in Applications: open it from there or from Spotlight, with its own icon, name and menus, and quitting it stops it. `bun run app` rebuilds and reinstalls it after code changes, and `bun run desktop` opens a development copy.
 - A Customize section with one page for each thing that changes how Claude Code works: instructions, skills, slash commands, agents, hooks, MCP servers, plugins, plans, scheduled tasks, output styles, memory and workflows. Each page lists every item from every project and plugin, says where it applies, and has a search box, a project filter and a New button.

@@ -4,9 +4,11 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile, copyFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { installFakeClaude } from "./fakeClaude";
 
 let root: string;
-const SECRETS = ["secret@example.com", "user-secret-id", "machine-secret-id", "peer-secret-token", "rv-secret", "control-secret"];
+// The last two come from the fake `claude auth status` (fixtures/fake-claude.ts).
+const SECRETS = ["org-secret-id", "sk-ant-oat01-secret-token", "secret@example.com", "user-secret-id", "machine-secret-id", "peer-secret-token", "rv-secret", "control-secret"];
 let app: any;
 
 const request = (path: string, init: RequestInit = {}, ip = "127.0.0.1") =>
@@ -18,6 +20,8 @@ beforeAll(async () => {
   process.env.CC_HOME = root;
   process.env.CC_CLAUDE_DIR = claude;
   process.env.CC_APP_DIR = join(root, "app");
+  await installFakeClaude(root);
+  process.env.FAKE_CLAUDE_LOG = join(root, "claude-calls.log");
   await mkdir(join(claude, "sessions"), { recursive: true });
   await mkdir(join(claude, "daemon"), { recursive: true });
   await mkdir(join(claude, "projects", "-demo"), { recursive: true });
@@ -40,13 +44,15 @@ beforeAll(async () => {
 afterAll(() => rm(root, { recursive: true, force: true }));
 
 describe("secrets never leave the server", () => {
-  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live"];
+  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo")];
   for (const ep of endpoints) {
     test(ep, async () => {
       const res = await request(ep);
       expect(res.status).toBe(200);
       const body = await res.text();
       for (const s of SECRETS) expect(body).not.toContain(s);
+      // The fake status also prints its config and projects folders, which only the picked fields may hide.
+      if (ep.startsWith("/api/account")) for (const s of ["configDirectory", "projectsDirectory", join(root, ".claude")]) expect(body).not.toContain(s);
     });
   }
   for (const f of ["~/.claude.json", "~/.claude/sessions/123.abc.key", "~/.claude/daemon/roster.json", "~/.claude/daemon/control.key"]) {
@@ -57,6 +63,26 @@ describe("secrets never leave the server", () => {
       for (const s of SECRETS) expect(body).not.toContain(s);
     });
   }
+});
+
+describe("account", () => {
+  test("account endpoint sends only picked fields", async () => {
+    const res = await request("/api/account");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Object.keys(body).sort()).toEqual(["email", "installed", "loggedIn", "method", "methodName", "organization", "plan", "problem", "provider", "providerName"]);
+    expect(body).toMatchObject({ loggedIn: true, methodName: "Claude account", email: "me@example.com", organization: "Acme", plan: "Claude Pro" });
+    const text = JSON.stringify(body);
+    for (const s of ["configDirectory", "projectsDirectory", "orgId", root]) expect(text).not.toContain(s);
+  });
+
+  test("project account runs in the project folder", async () => {
+    const res = await request("/api/account?project=" + encodeURIComponent("~/projects/demo"));
+    expect(res.status).toBe(200);
+    const calls = (await readFile(join(root, "claude-calls.log"), "utf8")).trim().split("\n");
+    expect(calls.at(-1)!.split("|")[1]).toEndWith(join("projects", "demo"));
+    expect((await request("/api/account?project=nope")).status).toBe(404);
+  });
 });
 
 describe("login rate limit", () => {

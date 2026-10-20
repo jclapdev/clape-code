@@ -1,10 +1,11 @@
 import { query, type PermissionMode, type PermissionResult, type Query, type SDKMessage, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { emit } from "../events";
 import { appDir, tildify } from "../fs/paths";
 import { toolSummary } from "../parsers/transcript";
+import { findClaude } from "./claude";
+
+export { findClaude };
 
 // Sessions started from the browser. Each one runs the Agent SDK in streaming-input mode so
 // follow-ups, interrupts and permission-mode changes work, and routes every approval and
@@ -78,21 +79,6 @@ const compiled = import.meta.path.includes("$bunfs") || /^[A-Z]:[\\/]~BUN/.test(
 // The compiled executable and the desktop app both embed the web app (__CC_ASSETS) and have no node_modules copy
 // of the SDK's own Claude Code.
 const embedded = () => compiled || globalThis.__CC_ASSETS !== undefined;
-
-/**
- * The installed Claude Code, for the compiled executable and the desktop app (which have no node_modules copy of it).
- * Started from Finder or at login the app may not have the shell's PATH, so the usual install folders are tried too.
- */
-export function findClaude(): string | null {
-  const onPath = Bun.which("claude");
-  if (onPath) return onPath;
-  const home = homedir();
-  const candidates =
-    process.platform === "win32"
-      ? [join(home, ".local", "bin", "claude.exe"), join(process.env.LOCALAPPDATA ?? join(home, "AppData", "Local"), "Programs", "claude", "claude.exe")]
-      : [join(home, ".local", "bin", "claude"), join(home, ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
-  return candidates.find((p) => existsSync(p)) ?? null;
-}
 
 function claudeExecutable(): string | undefined {
   if (!embedded()) return undefined; // running from source: the SDK uses its own bundled copy
