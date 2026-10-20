@@ -81,3 +81,117 @@ describe("account status", () => {
   });
 });
 
+describe("sign-in and sign-out", () => {
+  const { cancelLogin, loginState, logout, sendCode, startLogin } = require("../src/account/login") as typeof import("../src/account/login");
+  const loggedOut = () => Bun.file(join(root, "claude", "fake-logged-out")).exists();
+  const until = async (fn: () => boolean) => {
+    for (let i = 0; i < 100 && !fn(); i++) await Bun.sleep(30);
+  };
+
+  test("sign-in returns the printed address", async () => {
+    const s = await startLogin();
+    expect(s.state).toBe("waiting");
+    expect(s.url).toBe("https://claude.com/cai/oauth/authorize?code=true&state=abc");
+    expect((await calls()).at(-1)!.split("|")[0]).toBe("auth login --claudeai");
+    cancelLogin();
+  });
+
+  test("a pasted code finishes sign-in", async () => {
+    await Bun.write(join(root, "claude", "fake-logged-out"), "");
+    await startLogin();
+    expect(sendCode("good#code").state).toBe("checking");
+    await until(() => loginState().state !== "checking");
+    expect(loginState()).toEqual({ state: "done", url: null, message: "Login successful." });
+    expect(await loggedOut()).toBe(false);
+  });
+
+  test("a failed sign-in shows Claude Code's message", async () => {
+    await startLogin();
+    sendCode("wrong#code");
+    await until(() => loginState().state !== "checking");
+    expect(loginState().state).toBe("failed");
+    expect(loginState().message).toBe("Login failed: Request failed with status code 400");
+  });
+
+  test("an invalid code lets you paste again", async () => {
+    await startLogin();
+    sendCode("no-hash-code");
+    await until(() => loginState().state !== "checking");
+    expect(loginState()).toMatchObject({ state: "waiting", message: "Invalid code. Please make sure the full code was copied." });
+    expect(loginState().url).toStartWith("https://");
+    sendCode("good#code");
+    await until(() => loginState().state !== "checking");
+    expect(loginState().state).toBe("done");
+  });
+
+  test("bad codes are refused", async () => {
+    await startLogin();
+    for (const bad of ["", "   ", "a".repeat(2001), "abc\ndef"]) expect(() => sendCode(bad)).toThrow();
+    expect(loginState().state).toBe("waiting");
+    cancelLogin();
+  });
+
+  test("one sign-in at a time and cancel stops it", async () => {
+    await startLogin();
+    const { pid: first } = require("../src/account/login").currentProcess();
+    await startLogin();
+    const { pid: second } = require("../src/account/login").currentProcess();
+    expect(second).not.toBe(first);
+    expect(() => process.kill(first, 0)).toThrow(); // the first run was stopped
+    cancelLogin();
+    expect(loginState().state).toBe("idle");
+    await until(() => {
+      try {
+        process.kill(second, 0);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    expect(() => process.kill(second, 0)).toThrow();
+  });
+
+  test("sign-in stops after the time limit", async () => {
+    await startLogin({ timeoutMs: 200 });
+    await until(() => loginState().state !== "waiting");
+    expect(loginState().state).toBe("failed");
+    expect(loginState().message).toContain("took too long");
+  });
+
+  test("sign-in state sends no other output", async () => {
+    const s = await startLogin();
+    expect(Object.keys(s).sort()).toEqual(["message", "state", "url"]);
+    expect(JSON.stringify(s)).not.toContain("Opening browser");
+    expect(JSON.stringify(s)).not.toContain("Paste code");
+    cancelLogin();
+  });
+
+  test("sign-out runs claude auth logout", async () => {
+    const r = await logout();
+    expect(r.message).toBe("Successfully logged out from your Anthropic account.");
+    expect((await calls()).at(-1)!.split("|")[0]).toBe("auth logout");
+    expect(await loggedOut()).toBe(true);
+    await Bun.write(join(root, "claude", "fake-logged-out"), "").then(() => Bun.file(join(root, "claude", "fake-logged-out")).delete());
+  });
+
+  test("sign-out refused for other methods", async () => {
+    process.env.FAKE_CLAUDE_BEDROCK = "1";
+    try {
+      await expect(logout()).rejects.toThrow("Claude account");
+      expect((await calls()).at(-1)!.split("|")[0]).toBe("auth status --json");
+    } finally {
+      delete process.env.FAKE_CLAUDE_BEDROCK;
+    }
+  });
+
+  test("sign-in and sign-out say when Claude Code is missing", async () => {
+    const bin = process.env.CC_CLAUDE_BIN;
+    process.env.CC_CLAUDE_BIN = join(root, "no-such-claude");
+    try {
+      await expect(startLogin()).rejects.toThrow("Claude Code isn't installed");
+      await expect(logout()).rejects.toThrow("Claude Code isn't installed");
+    } finally {
+      process.env.CC_CLAUDE_BIN = bin;
+    }
+  });
+});

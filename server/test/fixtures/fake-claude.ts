@@ -35,18 +35,26 @@ if (args[0] === "auth" && args[1] === "login") {
   process.stdout.write("Paste code here if prompted > ");
   const reader = Bun.stdin.stream().getReader();
   let buf = "";
-  while (!buf.includes("\n")) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += new TextDecoder().decode(value);
+  let code = "";
+  // Like Claude Code 2.1.304: a code without "#" is rejected on the spot (on stderr, as is "Login failed") and it
+  // keeps waiting for another.
+  for (;;) {
+    while (!buf.includes("\n")) {
+      const { value, done } = await reader.read();
+      if (done) process.exit(1);
+      buf += new TextDecoder().decode(value);
+    }
+    code = buf.slice(0, buf.indexOf("\n")).trim();
+    buf = buf.slice(buf.indexOf("\n") + 1);
+    if (code.includes("#")) break;
+    process.stderr.write("Invalid code. Please make sure the full code was copied.\n");
   }
-  const code = buf.split("\n")[0].trim();
-  if (code === "good-code") {
+  if (code === "good#code") {
     if (existsSync(loggedOutFlag)) rmSync(loggedOutFlag);
     console.log("Login successful.");
     process.exit(0);
   }
-  console.log("Login failed: Request failed with status code 400");
+  console.error("Login failed: Request failed with status code 400");
   process.exit(1);
 }
 

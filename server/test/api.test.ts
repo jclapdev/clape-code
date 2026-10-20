@@ -44,7 +44,7 @@ beforeAll(async () => {
 afterAll(() => rm(root, { recursive: true, force: true }));
 
 describe("secrets never leave the server", () => {
-  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo")];
+  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login"];
   for (const ep of endpoints) {
     test(ep, async () => {
       const res = await request(ep);

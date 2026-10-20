@@ -43,7 +43,7 @@ describe("wording", () => {
 
   test("titles name what a section holds, not a phrase or a question", () => {
     // A confirmation dialog may ask, as every platform's dialogs do: "Delete this file?"
-    const confirm = /^(turn|delete|remove|discard|replace|archive|restore|stop|leave|move)\b.*\?$/i;
+    const confirm = /^(turn|delete|remove|discard|replace|archive|restore|stop|leave|move|sign out)\b.*\?$/i;
     expect(all.filter((t) => PHRASE_START.test(t.text) || (t.text.endsWith("?") && !confirm.test(t.text)))).toEqual([]);
   });
 
