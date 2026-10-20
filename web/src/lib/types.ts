@@ -89,6 +89,8 @@ export interface Session {
   archivedAt: string | null;
   running: boolean;
   resumeCommand: string;
+  /** Saved when the app started the session; null for sessions started elsewhere. */
+  account: SessionAccount | null;
 }
 
 export type TurnBlock =
@@ -203,6 +205,7 @@ export interface LiveSession {
   events: LiveEvent[];
   pending: PendingRequest[];
   commands: SlashCommand[];
+  account: SessionAccount | null;
 }
 
 export interface SlashCommand {
@@ -247,4 +250,13 @@ export interface Account {
   plan: string | null;
   installed: boolean;
   problem: string | null;
+}
+
+/** The account a session the app started runs on (picked fields of the Agent SDK's accountInfo()). */
+export interface SessionAccount {
+  provider: string;
+  providerName: string;
+  email: string | null;
+  organization: string | null;
+  plan: string | null;
 }

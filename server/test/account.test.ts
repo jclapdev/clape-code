@@ -195,3 +195,38 @@ describe("sign-in and sign-out", () => {
     }
   });
 });
+
+describe("session accounts", () => {
+  const mod = () => require("../src/account/sessions") as typeof import("../src/account/sessions");
+  beforeAll(() => {
+    process.env.CC_APP_DIR = join(root, "app");
+  });
+  afterAll(() => {
+    if (saved.CC_APP_DIR === undefined) delete process.env.CC_APP_DIR;
+    else process.env.CC_APP_DIR = saved.CC_APP_DIR;
+  });
+
+  test("session account keeps only picked fields", () => {
+    const a = mod().pickSessionAccount({ email: "me@example.com", organization: "Acme", subscriptionType: "Claude Pro", apiProvider: "firstParty", tokenSource: "claude.ai", apiKeySource: "none", extra: "x" });
+    expect(a).toEqual({ provider: "firstParty", providerName: "Anthropic", email: "me@example.com", organization: "Acme", plan: "Claude Pro" });
+    expect(mod().pickSessionAccount({ apiProvider: "bedrock" })).toEqual({ provider: "bedrock", providerName: "Amazon Bedrock", email: null, organization: null, plan: null });
+  });
+
+  test("session accounts are saved by session id", async () => {
+    const { saveSessionAccount, sessionAccounts } = mod();
+    await saveSessionAccount("11111111-1111-4111-8111-111111111111", { email: "me@example.com", subscriptionType: "pro", apiProvider: "firstParty" });
+    await saveSessionAccount("22222222-2222-4222-8222-222222222222", { apiProvider: "bedrock" });
+    const all = await sessionAccounts();
+    expect(all["11111111-1111-4111-8111-111111111111"]).toMatchObject({ email: "me@example.com", plan: "Claude Pro" });
+    expect(all["22222222-2222-4222-8222-222222222222"].providerName).toBe("Amazon Bedrock");
+    const file = JSON.parse(await readFile(join(root, "app", "session-accounts.json"), "utf8"));
+    expect(Object.keys(file)).toHaveLength(2);
+  });
+
+  test("sessions use the app's Claude folder", () => {
+    const { sessionEnv } = require("../src/live/sessions") as typeof import("../src/live/sessions");
+    expect(sessionEnv()?.CLAUDE_CONFIG_DIR).toBe(join(root, "claude"));
+    delete process.env.CC_CLAUDE_DIR;
+    expect(sessionEnv()).toBeUndefined();
+  });
+});

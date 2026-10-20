@@ -51,3 +51,11 @@ export const modelName = (m: string | null | undefined) =>
     .replace(/^./, (c) => c.toUpperCase());
 
 export const plural = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+
+/** A session's account in a few words: "me@example.com (Claude Pro)", or the provider, such as "Amazon Bedrock". */
+export function accountLabel(a: { email: string | null; plan: string | null; providerName: string; loggedIn?: boolean | null } | null | undefined): string | null {
+  if (!a) return null;
+  if (a.loggedIn === false) return "Not signed in";
+  if (!a.email) return a.providerName;
+  return a.plan ? `${a.email} (${a.plan})` : a.email;
+}

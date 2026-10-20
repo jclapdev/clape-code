@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
-import { ago, modelName, money } from "@/lib/format";
+import { accountLabel, ago, modelName, money } from "@/lib/format";
+import { useAccount } from "@/components/Account";
 import type { LiveSession, PendingRequest, Project, Session, SlashCommand } from "@/lib/types";
 import { DetailHeader } from "@/components/Panes";
 import { Dot, ErrorNote, Loading, Md, cn } from "@/components/ui";
@@ -40,6 +41,7 @@ function NewSession({ project, resume, initialPrompt, initialMode }: { project?:
   const [model, setModel] = useState("");
   const [mode, setMode] = useState(initialMode ?? "default");
   const [prompt, setPrompt] = useState(initialPrompt ?? "");
+  const account = useAccount(proj || resumed.data?.project || undefined);
   const cmds = useQuery({ queryKey: ["live-commands", proj || resumed.data?.project || ""], queryFn: () => api.get<SlashCommand[]>(`/live-commands?project=${encodeURIComponent(proj || resumed.data?.project || "")}`) });
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -93,6 +95,12 @@ function NewSession({ project, resume, initialPrompt, initialMode }: { project?:
           <SimpleSelect label="Permissions" value={mode} onChange={setMode} options={MODES} className="w-full" />
         </div>
       </div>
+      {(proj || resume) && account.data && !account.data.problem && (
+        <div className="flex flex-wrap gap-x-2 text-[13px]">
+          <span className="text-ink-2">Account</span>
+          <span className="break-all">{accountLabel(account.data)}</span>
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-ink-2">{resume ? "Your next message" : "First message"}</span>
         <MessageBox
@@ -264,11 +272,12 @@ function LiveView({ id }: { id: string }) {
       <DetailHeader
         title={(s.events.find((e) => e.kind === "user") as { text?: string } | undefined)?.text?.split("\n")[0]?.slice(0, 90) ?? "Session"}
         sub={
-          <span className="flex items-center gap-2">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Dot tone={tone} /> {label}
             <span>· {s.cwd.split("/").pop()}</span>
             {s.model && <span>· {modelName(s.model)}</span>}
             <span>· started {ago(s.startedAt)}</span>
+            {s.account && <span className="break-all">· {accountLabel(s.account)}</span>}
           </span>
         }
         actions={

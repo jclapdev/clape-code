@@ -8,7 +8,7 @@ import { installFakeClaude } from "./fakeClaude";
 
 let root: string;
 // The last two come from the fake `claude auth status` (fixtures/fake-claude.ts).
-const SECRETS = ["org-secret-id", "sk-ant-oat01-secret-token", "secret@example.com", "user-secret-id", "machine-secret-id", "peer-secret-token", "rv-secret", "control-secret"];
+const SECRETS = ["token-source-secret", "org-secret-id", "sk-ant-oat01-secret-token", "secret@example.com", "user-secret-id", "machine-secret-id", "peer-secret-token", "rv-secret", "control-secret"];
 let app: any;
 
 const request = (path: string, init: RequestInit = {}, ip = "127.0.0.1") =>
@@ -35,6 +35,9 @@ beforeAll(async () => {
   await copyFile(join(import.meta.dir, "fixtures", "transcript.jsonl"), join(claude, "projects", "-demo", "0f8d3c8e-0000-4000-8000-000000000000.jsonl"));
   await copyFile(join(import.meta.dir, "fixtures", "BACKLOG.md"), join(root, "projects", "demo", "BACKLOG.md"));
 
+  // A session started from the app saved its account; the stray field must never reach the browser.
+  await mkdir(join(root, "app"), { recursive: true });
+  await writeFile(join(root, "app", "session-accounts.json"), JSON.stringify({ "e2644826-95f0-4880-8af9-8169d229cf1d": { provider: "firstParty", providerName: "Anthropic", email: "me@example.com", organization: "Acme", plan: "Claude Pro", tokenSource: "token-source-secret" } }));
   ({ app } = await import("../src/index"));
   const { indexSessions } = await import("../src/db/index");
   const { listProjects } = await import("../src/scan/projects");
@@ -44,7 +47,7 @@ beforeAll(async () => {
 afterAll(() => rm(root, { recursive: true, force: true }));
 
 describe("secrets never leave the server", () => {
-  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login"];
+  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d"];
   for (const ep of endpoints) {
     test(ep, async () => {
       const res = await request(ep);
@@ -82,6 +85,29 @@ describe("account", () => {
     const calls = (await readFile(join(root, "claude-calls.log"), "utf8")).trim().split("\n");
     expect(calls.at(-1)!.split("|")[1]).toEndWith(join("projects", "demo"));
     expect((await request("/api/account?project=nope")).status).toBe(404);
+  });
+});
+
+describe("session accounts", () => {
+  test("session endpoints include the saved account", async () => {
+    const list = await (await request("/api/sessions?empty=1")).json();
+    const s = list.find((x: any) => x.sessionId === "e2644826-95f0-4880-8af9-8169d229cf1d");
+    expect(s.account).toEqual({ provider: "firstParty", providerName: "Anthropic", email: "me@example.com", organization: "Acme", plan: "Claude Pro" });
+    const one = await (await request("/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d")).json();
+    expect(one.account.email).toBe("me@example.com");
+    const live = await (await request("/api/live")).json();
+    expect(Array.isArray(live)).toBe(true);
+    // Without a saved account (a session started elsewhere) the field is null.
+    const file = join(root, "app", "session-accounts.json");
+    const kept = await readFile(file, "utf8");
+    await writeFile(file, "{}");
+    try {
+      const bare = (await (await request("/api/sessions?empty=1")).json()).find((x: any) => x.sessionId === "e2644826-95f0-4880-8af9-8169d229cf1d");
+      expect(bare.account).toBeNull();
+      expect((await (await request("/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d")).json()).account).toBeNull();
+    } finally {
+      await writeFile(file, kept);
+    }
   });
 });
 

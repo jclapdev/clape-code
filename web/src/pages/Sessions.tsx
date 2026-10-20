@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { Archive, ArchiveRestore, ChevronDown, ChevronLeft, Copy, Plus, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { compact, modelName, money, plural, when } from "@/lib/format";
+import { accountLabel, compact, modelName, money, plural, when } from "@/lib/format";
 import { copyCommand } from "@/lib/resume";
 import type { Session, Turn } from "@/lib/types";
 import { DetailHeader } from "@/components/Panes";
@@ -113,6 +113,7 @@ function SessionDetail({ sid }: { sid: string }) {
               <span>{s.cwd}</span>
             )}
             {s.model && <span>{modelName(s.model)}</span>}
+            {s.account && <span className="break-all">{accountLabel(s.account)}</span>}
             <span>{when(s.firstAt)}</span>
             <span>{compact(tokens)} tokens</span>
             {s.costUSD != null && <span>{money(s.costUSD)}</span>}

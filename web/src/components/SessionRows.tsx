@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { ago, when } from "@/lib/format";
+import { accountLabel, ago, when } from "@/lib/format";
 import type { Job, PendingRequest, Session } from "@/lib/types";
 import { Tag } from "@/components/ui";
 
@@ -137,7 +137,7 @@ export function SessionRow({ e, search }: { e: SessionEntry; search?: Record<str
       ? join(folder(e.project ?? e.cwd), e.job?.detail || "Stopped and waiting for an answer before it can go on.")
       : e.status === "paused"
         ? join(folder(e.project ?? e.cwd), "Stopped by a usage limit that has since reset", when(e.at))
-        : join(folder(e.project ?? e.cwd), e.job && "Background", when(e.at));
+        : join(folder(e.project ?? e.cwd), e.job && "Background", when(e.at), accountLabel(e.session?.account));
   return (
     <Row tag={e.status ? TAGS[e.status] : undefined} title={e.title} about={about}>
       {e.status === "needs" && sid && (

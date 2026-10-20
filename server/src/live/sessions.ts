@@ -3,9 +3,13 @@ import { join } from "node:path";
 import { emit } from "../events";
 import { appDir, tildify } from "../fs/paths";
 import { toolSummary } from "../parsers/transcript";
-import { findClaude } from "./claude";
+import { pickSessionAccount, saveSessionAccount, type SessionAccount } from "../account/sessions";
+import { claudeEnv, findClaude } from "./claude";
 
 export { findClaude };
+
+/** The environment for sessions: the app's Claude folder when it points at another one (tests, checks). */
+export const sessionEnv = () => claudeEnv();
 
 // Sessions started from the browser. Each one runs the Agent SDK in streaming-input mode so
 // follow-ups, interrupts and permission-mode changes work, and routes every approval and
@@ -47,6 +51,7 @@ export interface LiveSessionView {
   events: LiveEvent[];
   pending: PendingRequest[];
   commands: { name: string; description: string; argumentHint: string }[];
+  account: SessionAccount | null;
 }
 
 class AsyncQueue<T> implements AsyncIterable<T> {
@@ -101,6 +106,7 @@ class LiveSession {
   // Slash commands this session accepts, from Claude Code itself. Terminal-only ones (exit, statusline…) are left out.
   commands: LiveSessionView["commands"] = [];
   terminalOnly = new Set<string>();
+  account: SessionAccount | null = null;
 
   constructor(
     public cwd: string,
@@ -118,6 +124,7 @@ class LiveSession {
         abortController: this.abort,
         settingSources: ["user", "project", "local"],
         pathToClaudeCodeExecutable: claudeExecutable(),
+        env: sessionEnv(),
         canUseTool: (toolName, input, opts) => this.ask(toolName, input, opts as any),
       },
     });
@@ -136,6 +143,7 @@ class LiveSession {
       events: this.events,
       pending: [...this.waiters.values()].map((w) => w.req),
       commands: this.commands,
+      account: this.account,
     };
   }
 
@@ -237,6 +245,15 @@ class LiveSession {
       this.terminalOnly = new Set((m as any).terminal_slash_commands ?? []);
       this.q.supportedCommands().then(
         (c) => this.setCommands(c),
+        () => {},
+      );
+      // The account this session runs on, kept by session id so its transcript can show it after it ends.
+      this.q.accountInfo().then(
+        (info) => {
+          this.account = pickSessionAccount(info);
+          if (this.sessionId) void saveSessionAccount(this.sessionId, info).catch(() => {});
+          this.changed();
+        },
         () => {},
       );
       this.setStatus(this.waiters.size ? "waiting" : "working");

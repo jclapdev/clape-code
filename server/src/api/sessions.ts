@@ -7,6 +7,7 @@ import { isInside, tildify, untildify } from "../fs/paths";
 import { WriteError } from "../fs/safeWrite";
 import { TurnBuilder } from "../parsers/transcript";
 import { readLines } from "../fs/lines";
+import { sessionAccounts, type SessionAccount } from "../account/sessions";
 import { getSession, knownCommands, listLive, removeSession, startSession, waitingCount } from "../live/sessions";
 import { globalLibrary, projectLibrary } from "../scan/library";
 import { listJobs, listLiveProcesses } from "../scan/jobs";
@@ -18,7 +19,7 @@ export const sessions = new Hono<Env>();
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
-function publicSession(s: IndexedSession, archived: Record<string, string>, running: Set<string>, projectOf: (cwd: string | null) => string | null) {
+function publicSession(s: IndexedSession, archived: Record<string, string>, running: Set<string>, projectOf: (cwd: string | null) => string | null, accounts: Record<string, SessionAccount> = {}) {
   const { file, ...rest } = s;
   return {
     ...rest,
@@ -27,28 +28,29 @@ function publicSession(s: IndexedSession, archived: Record<string, string>, runn
     project: projectOf(s.cwd),
     archivedAt: archived[s.sessionId] ?? null,
     running: running.has(s.sessionId),
+    account: accounts[s.sessionId] ?? null,
     resumeCommand: s.cwd ? `cd "${s.cwd}" && claude --resume ${s.sessionId}` : `claude --resume ${s.sessionId}`,
   };
 }
 
 async function context() {
-  const [state, procs, projects] = await Promise.all([readState(), listLiveProcesses(), listProjects()]);
+  const [state, procs, projects, accounts] = await Promise.all([readState(), listLiveProcesses(), listProjects(), sessionAccounts()]);
   const running = new Set(procs.map((p) => p.sessionId));
   for (const l of listLive()) if (l.sessionId && l.status !== "stopped") running.add(l.sessionId);
   const dirs = projects.map((p) => ({ id: p.id, dir: untildify(p.id) }));
   const projectOf = (cwd: string | null) => (cwd ? dirs.find((d) => isInside(projectPathOf(cwd), d.dir))?.id ?? null : null);
-  return { archived: state.archivedSessions, running, projectOf, state };
+  return { archived: state.archivedSessions, running, projectOf, state, accounts };
 }
 
 sessions.get("/sessions", async (c) => {
   const showArchived = c.req.query("archived") === "1";
   const includeEmpty = c.req.query("empty") === "1";
   const project = c.req.query("project");
-  const { archived, running, projectOf } = await context();
+  const { archived, running, projectOf, accounts } = await context();
   const list = listSessions()
     .filter((s) => includeEmpty || s.prompts > 0)
     .filter((s) => (showArchived ? !!archived[s.sessionId] : !archived[s.sessionId]))
-    .map((s) => publicSession(s, archived, running, projectOf))
+    .map((s) => publicSession(s, archived, running, projectOf, accounts))
     .filter((s) => !project || s.project === project);
   return c.json(list);
 });
@@ -58,7 +60,7 @@ sessions.get("/sessions/:sid", async (c) => {
   if (!UUID.test(sid)) throw new WriteError(400, "That isn't a valid session link.");
   const s = sessionById(sid);
   if (!s) throw new WriteError(404, "No such session.");
-  const { archived, running, projectOf } = await context();
+  const { archived, running, projectOf, accounts } = await context();
   // Turns come in pages so long sessions open quickly; the client asks for more with ?offset=.
   const offset = Math.max(0, Number(c.req.query("offset") ?? 0) || 0);
   const limit = Math.min(1000, Math.max(1, Number(c.req.query("limit") ?? 200) || 200));
@@ -71,7 +73,7 @@ sessions.get("/sessions/:sid", async (c) => {
     subagents.push({ agentId: f.replace(/^agent-/, "").replace(/\.meta\.json$/, ""), type: meta?.agentType ?? null, description: meta?.description ?? null });
   }
   return c.json({
-    ...publicSession(s, archived, running, projectOf),
+    ...publicSession(s, archived, running, projectOf, accounts),
     turns: builder.turns.slice(offset, offset + limit),
     totalTurns: builder.turns.length,
     offset,
