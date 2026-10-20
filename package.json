@@ -9,6 +9,10 @@
     "start": "bun run build && bun server/src/index.ts",
     "test": "bun test server/test",
     "typecheck": "bun run --filter '*' typecheck",
-    "compile": "bun run build && bun scripts/compile.ts"
+    "compile": "bun run build && bun scripts/compile.ts",
+    "desktop": "bun run build && electrobun dev"
+  },
+  "devDependencies": {
+    "electrobun": "2.0.4"
   }
 }

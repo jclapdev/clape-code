@@ -6,6 +6,7 @@ Notable changes to Control Center, newest first.
 
 ### Added
 
+- Control Center opens in its own window: `bun run desktop` starts it as a desktop app, with no browser. Closing the window stops it.
 - A Customize section with one page for each thing that changes how Claude Code works: instructions, skills, slash commands, agents, hooks, MCP servers, plugins, plans, scheduled tasks, output styles, memory and workflows. Each page lists every item from every project and plugin, says where it applies, and has a search box, a project filter and a New button.
 - Open any item to read it, edit it in place or delete it. Deleted files go to Archived items, where you can restore them.
 - The Slash commands page lists Claude Code's own commands next to yours, each with "Run in a new session".

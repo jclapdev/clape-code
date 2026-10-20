@@ -1,0 +1,21 @@
+{
+  // Types for the desktop entry point (src/bun) and electrobun.config.ts. Electrobun's types live in the generated
+  // .hutch/devkit (created by the first `bun run desktop`). Its own tsconfig sets baseUrl, which TypeScript 7
+  // rejects, so the two import paths used here are mapped directly instead of extending it.
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["bun"],
+    "typeRoots": ["./server/node_modules/@types"],
+    "lib": ["ESNext", "DOM"],
+    "paths": {
+      "electrobun": ["./.hutch/devkit/api/sdks/main/index.ts"],
+      "electrobun/main": ["./.hutch/devkit/api/sdks/main/index.ts"]
+    }
+  },
+  "include": ["src", "electrobun.config.ts"]
+}

@@ -75,9 +75,12 @@ class AsyncQueue<T> implements AsyncIterable<T> {
 
 const now = () => new Date().toISOString();
 const compiled = import.meta.path.includes("$bunfs") || /^[A-Z]:[\\/]~BUN/.test(import.meta.path);
+// The compiled executable and the desktop app both embed the web app (__CC_ASSETS) and have no node_modules copy
+// of the SDK's own Claude Code.
+const embedded = () => compiled || globalThis.__CC_ASSETS !== undefined;
 
 /**
- * The installed Claude Code, for the compiled executable (which has no node_modules copy of it).
+ * The installed Claude Code, for the compiled executable and the desktop app (which have no node_modules copy of it).
  * Started from Finder or at login the app may not have the shell's PATH, so the usual install folders are tried too.
  */
 export function findClaude(): string | null {
@@ -92,7 +95,7 @@ export function findClaude(): string | null {
 }
 
 function claudeExecutable(): string | undefined {
-  if (!compiled) return undefined; // running from source: the SDK uses its own bundled copy
+  if (!embedded()) return undefined; // running from source: the SDK uses its own bundled copy
   const p = findClaude();
   if (!p) throw new Error("Claude Code isn't installed, or the app can't find it. Install Claude Code, or start the app from a terminal where `claude` works.");
   return p;

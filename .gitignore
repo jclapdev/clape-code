@@ -10,3 +10,6 @@ server/src/assets.gen.ts
 .claude/work/
 .claude/lessons.md
 .claude/agent-memory-local/
+.hutch/
+build/
+artifacts/
