@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
+import { ChevronLeft } from "lucide-react";
 import { api } from "@/lib/api";
-import { ErrorNote, Loading, Md, cn } from "@/components/ui";
+import { Page } from "@/components/Panes";
+import { ErrorNote, Loading, Md } from "@/components/ui";
 
 export interface GuideInfo {
   slug: string;
@@ -31,42 +33,30 @@ export function GuideText({ slug }: { slug: string }) {
 
 export function GuidesPage() {
   const { slug } = useParams({ strict: false }) as { slug?: string };
-  const list = useQuery({ queryKey: ["guides"], queryFn: () => api.get<GuideInfo[]>("/guides") });
-  return (
-    <div className="flex h-full">
-      <nav aria-label="Guides" className="hidden w-72 flex-none overflow-auto border-r border-line bg-panel p-3 md:block">
-        <h1 className="px-2 pb-2 pt-1 text-[18px] font-semibold">Guides</h1>
-        <ul className="flex flex-col gap-0.5">
-          {(list.data ?? []).map((g) => (
-            <li key={g.slug}>
-              <Link to="/guides/$slug" params={{ slug: g.slug }} className={cn("block rounded-md px-2.5 py-2 text-ink no-underline hover:bg-sunken", slug === g.slug && "bg-accent text-accent-foreground hover:bg-accent")}>
-                <span className="block text-[14px] font-medium">{g.title}</span>
-                <span className="block text-[12.5px] text-muted-foreground">{g.about}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <div className="min-w-0 flex-1 overflow-auto">
-        <div className="mx-auto max-w-[760px] px-6 py-8">
-          {slug ? (
+  const list = useQuery({ queryKey: ["guides"], queryFn: () => api.get<GuideInfo[]>("/guides"), enabled: !slug });
+  if (slug)
+    return (
+      <div className="flex h-full flex-col">
+        <Link to="/guides" className="flex h-11 flex-none items-center gap-1 border-b border-line px-3 text-[13.5px] no-underline">
+          <ChevronLeft className="size-4" aria-hidden /> Guides
+        </Link>
+        <div className="min-h-0 flex-1 overflow-auto">
+          <div className="mx-auto max-w-[760px] px-6 py-8">
             <GuideText slug={slug} />
-          ) : (
-            <>
-              <h1 className="text-[24px] font-semibold">Guides</h1>
-              <p className="mt-1 text-muted-foreground">The official guides for Claude Code and for writing skills, shown here so you don't have to leave the app.</p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {(list.data ?? []).map((g) => (
-                  <Link key={g.slug} to="/guides/$slug" params={{ slug: g.slug }} className="rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-line-strong">
-                    <span className="block font-medium">{g.title}</span>
-                    <span className="mt-1 block text-[13px] text-muted-foreground">{g.about}</span>
-                  </Link>
-                ))}
-              </div>
-            </>
-          )}
+          </div>
         </div>
       </div>
-    </div>
+    );
+  return (
+    <Page title="Guides" sub="The official guides for Claude Code and for writing skills, shown here so you don't have to leave the app.">
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+        {(list.data ?? []).map((g) => (
+          <Link key={g.slug} to="/guides/$slug" params={{ slug: g.slug }} className="rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-line-strong">
+            <span className="block font-medium">{g.title}</span>
+            <span className="mt-1 block text-[13px] text-muted-foreground">{g.about}</span>
+          </Link>
+        ))}
+      </div>
+    </Page>
   );
 }

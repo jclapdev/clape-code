@@ -18,7 +18,6 @@ import { IconButton } from "@/components/IconButton";
 import { Input } from "@/components/ui/input";
 import { SimpleSelect } from "@/components/SimpleSelect";
 import { LiveRequestRow, SessionRow, folder, useSessionEntries } from "@/components/SessionRows";
-import { useMediaQuery } from "@/lib/prefs";
 
 const TURNS_PER_PAGE = 200;
 
@@ -204,7 +203,7 @@ export type SessionsSearch = { project?: string; needs?: boolean; q?: string };
 /** "none" picks sessions outside every project. */
 const OUTSIDE = "none";
 
-function SessionsList({ selected, search }: { selected: string | null; search: SessionsSearch }) {
+function SessionsList({ search }: { search: SessionsSearch }) {
   const { requests, entries, isLoading, error } = useSessionEntries();
   const navigate = useNavigate();
   const [q, setQLocal] = useState(search.q ?? "");
@@ -267,7 +266,7 @@ function SessionsList({ selected, search }: { selected: string | null; search: S
                 <LiveRequestRow key={"live" + r.id} item={r} />
               ))}
               {ordered.map((e) => (
-                <SessionRow key={e.key} e={e} current={!!selected && e.session?.sessionId === selected} search={search} />
+                <SessionRow key={e.key} e={e} search={search} />
               ))}
             </ul>
           ) : (
@@ -279,31 +278,24 @@ function SessionsList({ selected, search }: { selected: string | null; search: S
   );
 }
 
-/**
- * Below 1280 px the list and an opened session are separate views, with Back on the session.
- * From 1280 px the list stays on the left and the opened session shows on the right.
- */
+/** The list takes the full page width; an opened session is its own page with Back. */
 export function SessionsPage() {
   const { sid } = useParams({ strict: false }) as { sid?: string };
   const search = useSearch({ strict: false }) as SessionsSearch;
-  const wide = useMediaQuery("(min-width: 1280px)");
-  const list = <SessionsList selected={sid ?? null} search={search} />;
-  const detail = sid && <SessionDetail key={sid} sid={sid} />;
-  if (wide) {
+  if (!sid)
     return (
-      <div className="grid h-full grid-cols-[minmax(360px,460px)_minmax(0,1fr)]">
-        <section aria-label="Sessions" className="h-full overflow-auto border-r border-line">
-          {list}
-        </section>
-        <div className="h-full min-w-0 overflow-auto">{detail || <p className="p-6 text-muted-foreground">Open a session on the left to read it here.</p>}</div>
-      </div>
+      <section aria-label="Sessions" className="h-full overflow-auto">
+        <div className="mx-auto max-w-[1180px] md:px-2">
+          <SessionsList search={search} />
+        </div>
+      </section>
     );
-  }
-  if (!sid) return <section aria-label="Sessions" className="h-full overflow-auto">{list}</section>;
   return (
     <div className="flex h-full flex-col">
       <BackBar search={search} />
-      <div className="min-h-0 flex-1 overflow-auto">{detail}</div>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <SessionDetail key={sid} sid={sid} />
+      </div>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { ago, when } from "@/lib/format";
 import type { Job, PendingRequest, Session } from "@/lib/types";
-import { Tag, cn } from "@/components/ui";
+import { Tag } from "@/components/ui";
 
 export interface Overview {
   needsYou: (
@@ -71,9 +71,9 @@ export const folder = (cwd: string | null) => (cwd ? cwd.split(/[\\/]/).filter(B
 const join = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
 
 /** One line in a session list: what it is, where and when, a tag, and what you can do. */
-function Row({ title, about, tag, current, children }: { title: ReactNode; about: ReactNode; tag?: ReactNode; current?: boolean; children: ReactNode }) {
+function Row({ title, about, tag, children }: { title: ReactNode; about: ReactNode; tag?: ReactNode; children: ReactNode }) {
   return (
-    <li aria-current={current ? "true" : undefined} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3", current && "bg-accent")}>
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
       <div className="min-w-0 flex-1 basis-60">
         <div className="flex min-w-0 items-center gap-2">
           {tag}
@@ -130,7 +130,7 @@ const TAGS = {
  * A session's line. A background session opens on its own page (state, what it's doing, transcript link);
  * any other opens its transcript. `search` is kept on the transcript link so a filtered list stays filtered.
  */
-export function SessionRow({ e, current, search }: { e: SessionEntry; current?: boolean; search?: Record<string, string | boolean | undefined> }) {
+export function SessionRow({ e, search }: { e: SessionEntry; search?: Record<string, string | boolean | undefined> }) {
   const sid = e.session?.sessionId ?? null;
   const about =
     e.status === "needs"
@@ -139,7 +139,7 @@ export function SessionRow({ e, current, search }: { e: SessionEntry; current?: 
         ? join(folder(e.project ?? e.cwd), "Stopped by a usage limit that has since reset", when(e.at))
         : join(folder(e.project ?? e.cwd), e.job && "Background", when(e.at));
   return (
-    <Row tag={e.status ? TAGS[e.status] : undefined} title={e.title} about={about} current={current}>
+    <Row tag={e.status ? TAGS[e.status] : undefined} title={e.title} about={about}>
       {e.status === "needs" && sid && (
         <Button asChild size="sm" className="no-underline">
           <Link to="/live" search={{ new: "1", resume: sid } as never}>

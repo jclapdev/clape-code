@@ -1,6 +1,6 @@
 // One page per Customize feature: what it is, every item wherever it applies, and each item readable,
-// editable and deletable. Below 1280 px the list and an opened item are separate views; from 1280 px
-// they sit side by side and scroll on their own.
+// editable and deletable. The list takes the full page width; an opened item is its own page with a
+// link back to the list.
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { ChevronLeft, FolderOpen, PackageSearch, Play, Plus, Search } from "lucide-react";
@@ -8,7 +8,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { FEATURES, featureById, type Feature, type FeatureId } from "@/lib/features";
 import { plural } from "@/lib/format";
-import { useMediaQuery } from "@/lib/prefs";
 import type { Catalog, CatalogItem, SlashCommand } from "@/lib/types";
 import { FileEditor } from "@/components/FileEditor";
 import { ItemActions, isSkillsDirPlugin } from "@/components/ItemActions";
@@ -17,7 +16,7 @@ import { toast } from "sonner";
 import { Page } from "@/components/Panes";
 import { Readable } from "@/components/Readable";
 import { SimpleSelect } from "@/components/SimpleSelect";
-import { ErrorNote, Loading, Tag, cn } from "@/components/ui";
+import { ErrorNote, Loading, Tag } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -356,7 +355,6 @@ export function FeaturePage() {
   const f = featureById(path.split("/")[1] ?? "") ?? FEATURES[0];
   const search = useSearch({ strict: false }) as FeatureSearch;
   const navigate = useNavigate();
-  const wide = useMediaQuery("(min-width: 1280px)");
   const cat = useCatalog();
   const live = useLiveCommands(f.id === "commands");
   const project = search.project ?? "";
@@ -397,25 +395,17 @@ export function FeaturePage() {
       )}
       {shown.length ? (
         <ul className="mx-4 mb-6 divide-y divide-line rounded-lg border border-line bg-surface md:mx-6">
-          {shown.map((r) => {
-            const on = r.key === selected?.key;
-            return (
-              <li key={r.key}>
-                <Link
-                  to={`/${f.id}`}
-                  search={{ ...search, item: r.key, panel: undefined } as never}
-                  aria-current={on ? "true" : undefined}
-                  className={cn("flex flex-col gap-1 px-4 py-3 text-ink no-underline hover:bg-sunken", on && "bg-accent hover:bg-accent")}
-                >
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="min-w-0 break-words font-medium">{r.name}</span>
-                    <RowTags r={r} f={f} />
-                  </span>
-                  {r.description && <span className="line-clamp-2 text-[13.5px] leading-relaxed text-ink-2">{r.description}</span>}
-                </Link>
-              </li>
-            );
-          })}
+          {shown.map((r) => (
+            <li key={r.key}>
+              <Link to={`/${f.id}`} search={{ ...search, item: r.key, panel: undefined } as never} className="flex flex-col gap-1 px-4 py-3 text-ink no-underline hover:bg-sunken">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-0 break-words font-medium">{r.name}</span>
+                  <RowTags r={r} f={f} />
+                </span>
+                {r.description && <span className="line-clamp-2 text-[13.5px] leading-relaxed text-ink-2">{r.description}</span>}
+              </Link>
+            </li>
+          ))}
         </ul>
       ) : (
         <p className="mx-4 mb-6 text-[13.5px] text-muted-foreground md:mx-6">{rows.length ? "Nothing matches. Try other words or another project." : `No ${f.label.toLowerCase()} yet.`}</p>
@@ -423,24 +413,6 @@ export function FeaturePage() {
     </>
   );
 
-  if (wide) {
-    return (
-      <div className="grid h-full grid-cols-[minmax(340px,440px)_minmax(0,1fr)]">
-        <section aria-label={f.label} className="h-full overflow-auto border-r border-line">
-          {list}
-        </section>
-        <div className="h-full min-w-0">
-          {selected ? (
-            <ItemView key={selected.key} r={selected} f={f} back={null} onDeleted={close} />
-          ) : panel ? (
-            panelView(null)
-          ) : (
-            <p className="p-6 text-muted-foreground">Pick an item on the left to read it here.</p>
-          )}
-        </div>
-      </div>
-    );
-  }
   if (selected) {
     const back = (
       <Link to={`/${f.id}`} search={{ ...search, item: undefined } as never} className="flex h-11 items-center gap-1 border-b border-line px-3 text-[13.5px] no-underline">
@@ -456,7 +428,11 @@ export function FeaturePage() {
       </Link>,
     );
   }
-  return <section aria-label={f.label} className="h-full overflow-auto">{list}</section>;
+  return (
+    <section aria-label={f.label} className="h-full overflow-auto">
+      <div className="mx-auto max-w-[1180px] md:px-2">{list}</div>
+    </section>
+  );
 }
 
 /** Counts per feature, for the Customize overview. */
