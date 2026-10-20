@@ -1,19 +1,21 @@
 // Desktop entry point: runs the Control Center server inside this process and shows it in a native window.
 // Electrobun bundles this file into the app, so the built web app is copied in by electrobun.config.ts
 // (build.copy) and handed to the server the same way the compiled executable does it.
-import Electrobun, { BrowserWindow } from "electrobun/main";
+import Electrobun, { ApplicationMenu, BrowserWindow } from "electrobun/main";
 import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { main } from "../../server/src/index";
+import { main, serverAddress } from "../../server/src/index";
 import { stopAll } from "../../server/src/live/sessions";
 
-const PORT = 4317;
-const URL = `http://127.0.0.1:${PORT}`;
+process.env.PORT = "4317";
+// http://127.0.0.1:4317, or https://localhost:4317 when home-network mode is on (the server decides).
+const { url: URL } = await serverAddress();
 
-/** Is a Control Center already answering on the port? Then this launch is a second copy. */
+/** Is a Control Center already answering at that address? Then this launch is a second copy. */
 async function alreadyRunning(): Promise<boolean> {
   try {
-    await fetch(`${URL}/api/config`, { signal: AbortSignal.timeout(1000) });
+    // In home-network mode the server's certificate is one it made itself, so it can't be verified.
+    await fetch(`${URL}/api/config`, { signal: AbortSignal.timeout(1000), tls: { rejectUnauthorized: false } });
     return true;
   } catch {
     return false;
@@ -40,8 +42,25 @@ if (await alreadyRunning()) {
 }
 
 globalThis.__CC_ASSETS = webAssets(join(import.meta.dir, "..", "web"));
-process.env.PORT = String(PORT);
 await main({ open: false });
+
+// macOS takes the first menu as the app menu. Roles are the operating system's own commands and shortcuts.
+ApplicationMenu.setApplicationMenu([
+  { label: "Control Center", submenu: [{ role: "quit" }] },
+  {
+    label: "Edit",
+    submenu: [
+      { role: "undo" },
+      { role: "redo" },
+      { type: "separator" },
+      { role: "cut" },
+      { role: "copy" },
+      { role: "paste" },
+      { role: "selectAll" },
+    ],
+  },
+  { label: "Window", submenu: [{ role: "minimize" }, { role: "close" }] },
+]);
 
 const win = new BrowserWindow({
   title: "Control Center",

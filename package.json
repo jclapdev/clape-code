@@ -8,9 +8,10 @@
     "build": "bun run --filter web build",
     "start": "bun run build && bun server/src/index.ts",
     "test": "bun test server/test",
-    "typecheck": "bun run --filter '*' typecheck",
+    "typecheck": "bun run --filter '*' typecheck && bun scripts/typecheck-desktop.ts",
     "compile": "bun run build && bun scripts/compile.ts",
-    "desktop": "bun run build && electrobun dev"
+    "desktop": "bun run build && electrobun dev",
+    "app": "bun run build && electrobun build --env=stable && bun scripts/install-app.ts"
   },
   "devDependencies": {
     "electrobun": "2.0.4"

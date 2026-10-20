@@ -15,5 +15,15 @@ export default {
     copy: {
       "web/dist": "web",
     },
+    // Made from web/public/favicon.svg. macOS takes the iconset; Windows and Linux take its 1024 px PNG.
+    mac: {
+      icons: "assets/icon.iconset",
+    },
+    win: {
+      icon: "assets/icon.iconset/icon_512x512@2x.png",
+    },
+    linux: {
+      icon: "assets/icon.iconset/icon_512x512@2x.png",
+    },
   },
 } satisfies ElectrobunConfig;

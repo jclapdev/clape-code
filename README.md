@@ -4,9 +4,33 @@ A local web app for seeing and managing everything Claude Code keeps on your com
 
 It runs on macOS, Linux and Windows. Your files stay where they are; the app reads them and writes them back.
 
-## Install
+## Start it
 
-There are no published downloads; the repository has no remote. Build the executables with [Bun](https://bun.sh):
+Open Control Center from Applications (or Spotlight). It opens in its own window; quitting it (Cmd+Q) stops it.
+
+The first time, macOS asks whether "launcher" may open files in folders such as Documents, Desktop or iCloud Drive. Those questions come from Control Center reading projects kept there.
+
+## After changing the code
+
+Run this in this folder to rebuild the app and reinstall it in `~/Applications`:
+
+```shell
+bun run app
+```
+
+Quit Control Center before running it, then open it again.
+
+## Development
+
+```shell
+bun install
+bun run desktop      # builds the web app and opens a development copy of the app window
+bun run dev          # server on 4317 with reload, web app on http://localhost:5317 in your browser
+```
+
+## Single file for another computer
+
+Build one executable per platform with [Bun](https://bun.sh):
 
 ```shell
 bun install
@@ -14,7 +38,7 @@ bun run compile                      # all platforms, into dist/
 bun run compile darwin-arm64         # or just the ones you need
 ```
 
-Then run the one for your computer:
+Then run the one for that computer:
 
 ```shell
 ./dist/control-center-darwin-arm64     # macOS on Apple silicon (tested)
@@ -26,14 +50,7 @@ dist\control-center-windows-x64.exe    # Windows (built, not run; see docs/windo
 
 The browser opens at `http://127.0.0.1:4317`. Add `--no-open` to skip that.
 
-To run from source instead:
-
-```shell
-bun install
-bun run start        # builds the web app and serves it on port 4317
-```
-
-### Claude Code is required for live sessions
+## Claude Code is required for live sessions
 
 Starting and answering sessions uses the Claude Code installed on the computer, found on your PATH or in its usual install folder, with your Claude Code settings. That includes Amazon Bedrock set up with `/setup-bedrock`, which saves its settings in `~/.claude/settings.json`. Bedrock set up only with `export` lines in your shell profile applies only when the app is started from that shell.
 
@@ -65,16 +82,14 @@ App data lives in `~/.config/control-center` (macOS and Linux) or `%APPDATA%\con
 
 ## Home network mode
 
-By default only this computer can open the app. To use it from your phone at home, open Preferences on this computer, set a password and turn on home network mode. The app restarts on HTTPS with a certificate it makes itself, so your browser warns the first time. Other devices sign in with the password; logins are rate limited.
+By default only this computer can open the app. To use it from your phone at home, open Preferences on this computer, set a password and turn on home network mode. The app restarts on HTTPS with a certificate it makes itself, so your browser warns the first time. Other devices sign in with the password; logins are rate limited. While it's on, the Control Center window stays blank because it doesn't accept that certificate; open https://localhost:4317 in a browser on this computer instead.
 
-## Develop
+## Checks
 
 ```shell
-bun install
-bun run dev          # server on 4317 with reload, web app on http://localhost:5317
+bun run typecheck    # server, web app and the desktop entry point
 bun run test         # server tests
-bun run typecheck
-bun run compile      # executables for every platform in dist/
+bun run build
 ```
 
 The server is TypeScript on Bun with Hono, SQLite for the search index, and the Claude Agent SDK for live sessions. The web app is React with shadcn/ui (Radix), TanStack Router and Query, Tailwind and CodeMirror.

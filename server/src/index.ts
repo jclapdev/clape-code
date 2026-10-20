@@ -138,13 +138,19 @@ async function boot() {
 
 let server: ReturnType<typeof Bun.serve> | null = null;
 
-/** Everything the server needs, loaded up front so starting it is synchronous. */
-async function serveOptions() {
+/** The address this computer opens the server at: https on localhost in home-network mode, else http on 127.0.0.1. */
+export async function serverAddress() {
   const cfg = await getConfig();
   const port = Number(process.env.PORT ?? cfg.port);
-  const tls = cfg.lan.enabled ? await tlsFiles() : undefined;
-  const url = `${tls ? "https" : "http"}://${cfg.lan.enabled ? "localhost" : "127.0.0.1"}:${port}`;
-  return { port, hostname: cfg.lan.enabled ? "0.0.0.0" : "127.0.0.1", tls, url, lan: cfg.lan.enabled };
+  const lan = cfg.lan.enabled;
+  return { port, lan, url: `${lan ? "https" : "http"}://${lan ? "localhost" : "127.0.0.1"}:${port}` };
+}
+
+/** Everything the server needs, loaded up front so starting it is synchronous. */
+async function serveOptions() {
+  const { port, lan, url } = await serverAddress();
+  const tls = lan ? await tlsFiles() : undefined;
+  return { port, hostname: lan ? "0.0.0.0" : "127.0.0.1", tls, url, lan };
 }
 
 function listen(o: Awaited<ReturnType<typeof serveOptions>>) {
