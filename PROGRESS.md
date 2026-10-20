@@ -4,6 +4,8 @@ Where Control Center stands, for whoever picks it up next. Read this first; upda
 
 ## Done
 
+- [x] Sign-in with a Claude account, and the account each session uses #account
+  Plan: `.claude/work/003-sign-in/plan.md`, stories S1–S3 (2026-10-20, commits 46bfd7c, b01973f, 5689ddb). Settings opens with an Account section (method, email, organization, plan; per project when one is picked, since project settings can turn on Bedrock; a cloud provider shows as "Provider" without "signed in", because Claude Code doesn't check AWS credentials up front). "Sign in with a Claude account" runs `claude auth login --claudeai`, links to the sign-in page it prints and passes the pasted code on; "Sign out" runs `claude auth logout` after a confirm, only for a Claude account. Sessions started from the app save the picked fields of the SDK's `accountInfo()` in `~/.config/control-center/session-accounts.json`; the live header, the Sessions/Home row, the transcript page and the New session form show it. Bedrock sign-in (S4) is not done: see Next. Tested: typecheck, 181 tests and build pass; UI in light and dark at 390 and 1440 px through headless Chrome (the Playwright connector couldn't start: no `npx` on the session's PATH); real `claude` sign-in start, invalid code and failed code on a throwaway Claude folder; sign-out and a successful sign-in only against the fake `claude`; one real session in claude-test.
 - [x] Desktop window that survives home-network switching #desktop
 - [x] Desktop window in home-network mode #desktop
 - [x] Desktop app in Applications #desktop
@@ -134,6 +136,11 @@ Settings facts checked against the live docs on 2026-10-18 (settings-reference, 
 
 ## Next
 
+- [ ] Sign-in with Amazon Bedrock (story S4 of `.claude/work/003-sign-in/plan.md`), waiting for John: turn it on for every project like Claude Code's own wizard, or per project or per session; which AWS sign-in methods to offer (an AWS profile only, or also a Bedrock API key or access keys, which would be stored in settings.json); whether "Stop using Bedrock" also removes `AWS_PROFILE`/`AWS_REGION` set before it; and whether it may ship untested against a real AWS account (this computer has no `~/.aws` and no AWS CLI).
+- [ ] Feedback page with a Feedback button on every page, for one project or all projects. Plan: `.claude/work/002-feedback-inbox/plan.md`, story S1.
+- [ ] Session screen: a running session shows a wall of tool calls; fold them so the messages to John stay in front (John, 2026-10-20).
+- [ ] Plans: show the plan a session is following, and make the Plans page easy to find your way around: 40 files with random names, no project or status (John, 2026-10-20).
+- [ ] Feedback filed and applied on its own, with a usage report to set the limits: stories S2–S4 of `.claude/work/002-feedback-inbox/plan.md`.
 - [ ] Headings without explainer sentences #design
   As John, I want every page, section and card to have a name for a heading and no sentence explaining it, so that pages read like any web app.
   - [ ] AC: `Page` and `DetailHeader` in `web/src/components/Panes.tsx` have no `sub` prop; a `meta` prop takes only facts (a path, a branch, a model, a count), and the 7 pages that passed `sub` (Home.tsx:104, Settings.tsx:728, Archive.tsx:45, Feature.tsx:450, Guides.tsx:51, NewProject.tsx:73, Live.tsx:266) show no sentence under their title.
@@ -238,6 +245,7 @@ Settings facts checked against the live docs on 2026-10-18 (settings-reference, 
 
 ## Notes
 
+- Sign-in facts (Claude Code 2.1.304, docs read 2026-10-20: cli-reference, authentication, amazon-bedrock, agent-sdk/typescript): `claude auth status` prints JSON (loggedIn, authMethod, apiProvider, email, orgId, orgName, subscriptionType, configDirectory, projectsDirectory, analyticsDisabled) and follows the user and the current folder's project settings `env`; with Bedrock on it says logged in even for an AWS profile that doesn't exist. `claude auth login` without a terminal prints the address on stdout and waits at "Paste code here if prompted"; "Invalid code. Please make sure the full code was copied." (it keeps waiting) and "Login failed: …" (exit 1) go to stderr. The SDK's `accountInfo()` also returns `apiProvider`, which the docs page doesn't list. Transcripts record no account. Tests and checks use `CC_CLAUDE_BIN` (a fake `claude`) and `CC_CLAUDE_DIR` (passed on as `CLAUDE_CONFIG_DIR`) so they never touch the real login; don't set `CLAUDE_CONFIG_DIR` to the default folder, because the macOS Keychain entry is keyed to it.
 - No page puts a column beside the main menu. A list takes the full width and an item opens as its own page with a link back; only right-side panels (Settings' "On this page", the guide beside New forms) are allowed.
 - Run the dev server as two processes (`bun src/index.ts` in server/, `bun run dev` in web/) for browser checks. Under `bun run dev` the server was stopped by SIGTERM every few minutes on 2026-10-18 and took Vite down with it; the cause wasn't found. On 2026-10-19 Vite was stopped the same way once even as a separate process; restarting it was enough.
 - The browser check script must also flag sideways scrolling inside panes, not just the page: the first pass missed a select that pushed the item view wider than a phone.
