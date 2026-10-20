@@ -4,13 +4,13 @@
 import Electrobun, { ApplicationMenu, BrowserWindow } from "electrobun/main";
 import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { main, serverAddress } from "../../server/src/index";
+import { localListening, main, serverAddress } from "../../server/src/index";
 import { stopAll } from "../../server/src/live/sessions";
 
 process.env.PORT = "4317";
-// http://127.0.0.1:4317, or http://127.0.0.1:4318 when home-network mode is on (the server decides): the
-// web view refuses the https address's self-made certificate, so this computer uses a local-only listener.
-const { localUrl: URL } = await serverAddress();
+// http://127.0.0.1:4318, the server's local-only listener. It runs in both home-network modes, so switching the
+// mode from the window doesn't move the window's address (the main listener turns into https on all addresses).
+const { localUrl: URL, localPort } = await serverAddress();
 
 /** Is a Control Center already answering at that address? Then this launch is a second copy. */
 async function alreadyRunning(): Promise<boolean> {
@@ -62,9 +62,16 @@ ApplicationMenu.setApplicationMenu([
   { label: "Window", submenu: [{ role: "minimize" }, { role: "close" }] },
 ]);
 
+// Without the local-only listener the window has nothing to show: say why instead of a blank page.
+const failed = `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>Control Center</title>
+<body style="font:15px/1.5 -apple-system,system-ui,sans-serif;max-width:560px;margin:80px auto;padding:0 24px">
+<h1 style="font-size:20px">Control Center couldn't start its window</h1>
+<p>Port ${localPort} on this computer is already in use by another program, so the window can't connect to Control Center.
+Quit the program using port ${localPort}, then open Control Center again.</p></body>`;
+
 const win = new BrowserWindow({
   title: "Control Center",
-  url: URL,
+  ...(localListening() ? { url: URL } : { url: null, html: failed }),
   frame: { width: 1440, height: 900 },
 });
 

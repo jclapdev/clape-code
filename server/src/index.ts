@@ -141,16 +141,16 @@ let localServer: ReturnType<typeof Bun.serve> | null = null;
 
 /**
  * The addresses the server answers at. `url` is the main one: https on localhost in home-network mode, else
- * http on 127.0.0.1. `localUrl` is what this computer's own window opens: in home-network mode a second,
- * plain http listener on 127.0.0.1 and the next port, because the desktop web view refuses the self-made
- * certificate; otherwise the same as `url`.
+ * http on 127.0.0.1. `localUrl` is what this computer's own window opens: a plain http listener on 127.0.0.1
+ * and the next port, running in both modes so its address never changes when the mode is switched (and the
+ * desktop web view would refuse the https address's self-made certificate anyway).
  */
 export async function serverAddress() {
   const cfg = await getConfig();
   const port = Number(process.env.PORT ?? cfg.port);
   const lan = cfg.lan.enabled;
   const url = `${lan ? "https" : "http"}://${lan ? "localhost" : "127.0.0.1"}:${port}`;
-  const localPort = lan ? port + 1 : port;
+  const localPort = port + 1;
   return { port, lan, url, localPort, localUrl: `http://127.0.0.1:${localPort}` };
 }
 
@@ -163,6 +163,7 @@ async function serveOptions() {
 
 const handle = (req: Request, srv: ReturnType<typeof Bun.serve>) => app.fetch(req, { server: srv });
 
+/** The main listener for the current mode. */
 function listen(o: Awaited<ReturnType<typeof serveOptions>>) {
   server = Bun.serve({
     port: o.port,
@@ -172,44 +173,57 @@ function listen(o: Awaited<ReturnType<typeof serveOptions>>) {
     fetch: handle,
   });
   console.log(`Control Center is running at ${o.url}${o.lan ? " (home network mode)" : ""}`);
-  if (o.lan) {
-    // Only this computer can reach 127.0.0.1, and its requests go through the same guard as on the main
-    // listener. Requests must also name a loopback host, so a web page can't reach it by pointing its own
-    // name at 127.0.0.1 (the main listener is protected from that by its certificate).
-    try {
-      localServer = Bun.serve({
-        port: o.localPort,
-        hostname: "127.0.0.1",
-        idleTimeout: 0,
-        fetch: (req, srv) => (isLoopbackHost(req.headers.get("host") ?? "") ? handle(req, srv) : new Response("Forbidden host", { status: 403 })),
-      });
-      console.log(`This computer's window uses ${o.localUrl}`);
-    } catch (e) {
-      console.error(`Couldn't open ${o.localUrl} for this computer's window:`, e);
-    }
-  }
   return o.url;
 }
 
-/** Closes the listener(s). */
+/**
+ * This computer's local-only listener. Only this computer can reach 127.0.0.1, and its requests go through the
+ * same guard as on the main listener. Requests must also name a loopback host, so a web page can't reach it by
+ * pointing its own name at 127.0.0.1 (the https address is protected from that by its certificate).
+ */
+function listenLocal(o: Awaited<ReturnType<typeof serveOptions>>) {
+  if (localServer) return;
+  try {
+    localServer = Bun.serve({
+      port: o.localPort,
+      hostname: "127.0.0.1",
+      idleTimeout: 0,
+      fetch: (req, srv) => (isLoopbackHost(req.headers.get("host") ?? "") ? handle(req, srv) : new Response("Forbidden host", { status: 403 })),
+    });
+    console.log(`This computer's window uses ${o.localUrl}`);
+  } catch (e) {
+    console.error(`ERROR: Couldn't open ${o.localUrl} for this computer's window (is port ${o.localPort} taken?): ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+/** Is the local-only listener running? */
+export const localListening = () => localServer !== null;
+
+/** Closes both listeners. */
 export function stopServer() {
   server?.stop();
   localServer?.stop();
   server = localServer = null;
 }
 
-/** Starts the listener(s) for the current mode. */
-export const startServer = async () => listen(await serveOptions());
+/** Starts the local-only listener and the main listener for the current mode. */
+export async function startServer() {
+  const o = await serveOptions();
+  listenLocal(o);
+  return listen(o);
+}
 
 // Called from the request that changes home-network mode. Async work queued after a Bun.serve handler has
 // responded doesn't run while the server is idle, so the options are loaded here, inside the request, and the
-// returned swap is synchronous. The old server stops listening; the triggering request and any open
-// live-update streams finish on their own (waiting for that would hang on the streams).
+// returned swap is synchronous. Only the main listener is swapped; the local-only one keeps running, so this
+// computer's window keeps its address. The old main listener stops listening; the triggering request and any
+// open live-update streams finish on their own (waiting for that would hang on the streams).
 onRestart(async () => {
   const o = await serveOptions();
   return () => {
     try {
-      stopServer();
+      server?.stop();
+      server = null;
       listen(o);
     } catch (e) {
       console.error("Restart failed:", e);

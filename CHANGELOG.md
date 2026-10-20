@@ -56,6 +56,7 @@ Notable changes to Control Center, newest first.
 
 ### Fixed
 
+- The Control Center window keeps working when you turn home network mode on or off from it, instead of going unresponsive until the app is reopened. If the window's local address can't be opened, it says so instead of staying blank.
 - Guides show lists, tables and bold lines inside the docs' tabs as formatted text instead of raw code, and a code block inside a list item no longer swallows the text after it.
 - The "How to write a good one" guide on the New forms folds under the form below 1280 px wide, so phones and tablets can read it too, and sits beside the form from 1280 px.
 - After creating something for one project, the app opens that feature's page filtered to the project, instead of the project page, which no longer lists those items.
