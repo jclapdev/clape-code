@@ -90,6 +90,56 @@ describe("login rate limit", () => {
   });
 });
 
+describe("listeners in home-network mode", () => {
+  // A real connection from another device can't be made in a test; this computer's own network address is the
+  // closest stand-in, since requests to it don't come from a loopback address.
+  const lanIp = Object.values((require("node:os") as typeof import("node:os")).networkInterfaces())
+    .flat()
+    .find((i) => i && i.family === "IPv4" && !i.internal)?.address;
+
+  test.skipIf(!lanIp)("this computer's window gets a plain http listener on 127.0.0.1 only; other devices still need the password over https", async () => {
+    const { getConfig, saveConfig } = await import("../src/config");
+    const { serverAddress, startServer, stopServer } = await import("../src/index");
+    const cfg = await getConfig();
+    const port = 40000 + Math.floor(Math.random() * 20000);
+    process.env.PORT = String(port);
+    await saveConfig({ ...cfg, lan: { enabled: true, passwordHash: await Bun.password.hash("correct-password") } });
+    try {
+      expect(await serverAddress()).toMatchObject({ url: `https://localhost:${port}`, localUrl: `http://127.0.0.1:${port + 1}` });
+      await startServer();
+      const insecure = { tls: { rejectUnauthorized: false } };
+
+      // The local listener answers this computer without a password, and only for a loopback host name.
+      expect((await fetch(`http://127.0.0.1:${port + 1}/api/projects`)).status).toBe(200);
+      expect((await fetch(`http://127.0.0.1:${port + 1}/api/projects`, { headers: { host: "evil.example:80" } })).status).toBe(403);
+      // It isn't reachable on the network address.
+      expect(await fetch(`http://${lanIp}:${port + 1}/api/projects`, { signal: AbortSignal.timeout(2000) }).then(() => "answered", () => "refused")).toBe("refused");
+
+      // The https listener: from the network address the password is still needed, from this computer it isn't.
+      expect((await fetch(`https://${lanIp}:${port}/api/projects`, insecure)).status).toBe(401);
+      expect((await fetch(`https://127.0.0.1:${port}/api/projects`, insecure)).status).toBe(200);
+      const login = await fetch(`https://${lanIp}:${port}/api/auth/login`, { ...insecure, method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: "correct-password" }) });
+      expect(login.status).toBe(200);
+      const cookie = login.headers.get("set-cookie")!.split(";")[0];
+      expect((await fetch(`https://${lanIp}:${port}/api/projects`, { ...insecure, headers: { cookie } })).status).toBe(200);
+
+      // Turning the mode off closes the local listener and the main one goes back to http on 127.0.0.1.
+      stopServer();
+      await saveConfig({ ...cfg, lan: { enabled: false, passwordHash: null } });
+      expect((await serverAddress()).localUrl).toBe(`http://127.0.0.1:${port}`);
+      await startServer();
+      expect((await fetch(`http://127.0.0.1:${port}/api/projects`)).status).toBe(200);
+      expect(await fetch(`http://127.0.0.1:${port + 1}/api/projects`).then(() => "answered", () => "refused")).toBe("refused");
+    } finally {
+      stopServer();
+      delete process.env.PORT;
+      const { resetLoginAttempts } = await import("../src/auth");
+      resetLoginAttempts();
+      await saveConfig({ ...cfg, lan: { enabled: false, passwordHash: null } });
+    }
+  });
+});
+
 describe("errors", () => {
   test("permission errors are reworded", async () => {
     if (process.platform === "win32") return;

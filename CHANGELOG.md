@@ -6,6 +6,7 @@ Notable changes to Control Center, newest first.
 
 ### Added
 
+- The Control Center window also works with home network mode on. It connects over a local-only address that other devices can't reach; phones and other computers still use the https address and the password.
 - Control Center is an app in Applications: open it from there or from Spotlight, with its own icon and name in the Dock. It has the usual menus (Quit, Undo, Redo, Cut, Copy, Paste, Select All, Minimize, Close). `bun run app` rebuilds it and reinstalls it after code changes; `bun run desktop` opens a development copy. Quitting it stops it.
 - A Customize section with one page for each thing that changes how Claude Code works: instructions, skills, slash commands, agents, hooks, MCP servers, plugins, plans, scheduled tasks, output styles, memory and workflows. Each page lists every item from every project and plugin, says where it applies, and has a search box, a project filter and a New button.
 - Open any item to read it, edit it in place or delete it. Deleted files go to Archived items, where you can restore them.

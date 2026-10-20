@@ -8,14 +8,14 @@ import { main, serverAddress } from "../../server/src/index";
 import { stopAll } from "../../server/src/live/sessions";
 
 process.env.PORT = "4317";
-// http://127.0.0.1:4317, or https://localhost:4317 when home-network mode is on (the server decides).
-const { url: URL } = await serverAddress();
+// http://127.0.0.1:4317, or http://127.0.0.1:4318 when home-network mode is on (the server decides): the
+// web view refuses the https address's self-made certificate, so this computer uses a local-only listener.
+const { localUrl: URL } = await serverAddress();
 
 /** Is a Control Center already answering at that address? Then this launch is a second copy. */
 async function alreadyRunning(): Promise<boolean> {
   try {
-    // In home-network mode the server's certificate is one it made itself, so it can't be verified.
-    await fetch(`${URL}/api/config`, { signal: AbortSignal.timeout(1000), tls: { rejectUnauthorized: false } });
+    await fetch(`${URL}/api/config`, { signal: AbortSignal.timeout(1000) });
     return true;
   } catch {
     return false;

@@ -40,7 +40,7 @@ export async function verifyToken(token: string | undefined): Promise<boolean> {
 }
 
 export const isLoopbackAddr = (ip: string | undefined) => !!ip && (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1");
-const isLoopbackHost = (host: string) => /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host);
+export const isLoopbackHost = (host: string) => /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host);
 
 /** Requests per IP in the last minute, for login rate limiting. */
 const attempts = new Map<string, number[]>();

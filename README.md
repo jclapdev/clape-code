@@ -82,7 +82,7 @@ App data lives in `~/.config/control-center` (macOS and Linux) or `%APPDATA%\con
 
 ## Home network mode
 
-By default only this computer can open the app. To use it from your phone at home, open Preferences on this computer, set a password and turn on home network mode. The app restarts on HTTPS with a certificate it makes itself, so your browser warns the first time. Other devices sign in with the password; logins are rate limited. While it's on, the Control Center window stays blank because it doesn't accept that certificate; open https://localhost:4317 in a browser on this computer instead.
+By default only this computer can open the app. To use it from your phone at home, open Preferences on this computer, set a password and turn on home network mode. The app restarts on HTTPS with a certificate it makes itself, so your browser warns the first time. Other devices sign in with the password; logins are rate limited.
 
 ## Checks
 

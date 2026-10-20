@@ -8,7 +8,7 @@ import type { Env } from "./api/env";
 import { guides } from "./api/guides";
 import { sessions } from "./api/sessions";
 import { onRestart, system } from "./api/system";
-import { guard, tlsFiles } from "./auth";
+import { guard, isLoopbackHost, tlsFiles } from "./auth";
 import { getConfig } from "./config";
 import { indexSessions, replaceDocs, type Doc } from "./db/index";
 import { emit } from "./events";
@@ -137,21 +137,31 @@ async function boot() {
 // ---- Server ----
 
 let server: ReturnType<typeof Bun.serve> | null = null;
+let localServer: ReturnType<typeof Bun.serve> | null = null;
 
-/** The address this computer opens the server at: https on localhost in home-network mode, else http on 127.0.0.1. */
+/**
+ * The addresses the server answers at. `url` is the main one: https on localhost in home-network mode, else
+ * http on 127.0.0.1. `localUrl` is what this computer's own window opens: in home-network mode a second,
+ * plain http listener on 127.0.0.1 and the next port, because the desktop web view refuses the self-made
+ * certificate; otherwise the same as `url`.
+ */
 export async function serverAddress() {
   const cfg = await getConfig();
   const port = Number(process.env.PORT ?? cfg.port);
   const lan = cfg.lan.enabled;
-  return { port, lan, url: `${lan ? "https" : "http"}://${lan ? "localhost" : "127.0.0.1"}:${port}` };
+  const url = `${lan ? "https" : "http"}://${lan ? "localhost" : "127.0.0.1"}:${port}`;
+  const localPort = lan ? port + 1 : port;
+  return { port, lan, url, localPort, localUrl: `http://127.0.0.1:${localPort}` };
 }
 
 /** Everything the server needs, loaded up front so starting it is synchronous. */
 async function serveOptions() {
-  const { port, lan, url } = await serverAddress();
-  const tls = lan ? await tlsFiles() : undefined;
-  return { port, hostname: lan ? "0.0.0.0" : "127.0.0.1", tls, url, lan };
+  const a = await serverAddress();
+  const tls = a.lan ? await tlsFiles() : undefined;
+  return { ...a, hostname: a.lan ? "0.0.0.0" : "127.0.0.1", tls };
 }
+
+const handle = (req: Request, srv: ReturnType<typeof Bun.serve>) => app.fetch(req, { server: srv });
 
 function listen(o: Awaited<ReturnType<typeof serveOptions>>) {
   server = Bun.serve({
@@ -159,13 +169,37 @@ function listen(o: Awaited<ReturnType<typeof serveOptions>>) {
     hostname: o.hostname,
     tls: o.tls,
     idleTimeout: 0, // server-sent events stay open
-    fetch: (req, srv) => app.fetch(req, { server: srv }),
+    fetch: handle,
   });
   console.log(`Control Center is running at ${o.url}${o.lan ? " (home network mode)" : ""}`);
+  if (o.lan) {
+    // Only this computer can reach 127.0.0.1, and its requests go through the same guard as on the main
+    // listener. Requests must also name a loopback host, so a web page can't reach it by pointing its own
+    // name at 127.0.0.1 (the main listener is protected from that by its certificate).
+    try {
+      localServer = Bun.serve({
+        port: o.localPort,
+        hostname: "127.0.0.1",
+        idleTimeout: 0,
+        fetch: (req, srv) => (isLoopbackHost(req.headers.get("host") ?? "") ? handle(req, srv) : new Response("Forbidden host", { status: 403 })),
+      });
+      console.log(`This computer's window uses ${o.localUrl}`);
+    } catch (e) {
+      console.error(`Couldn't open ${o.localUrl} for this computer's window:`, e);
+    }
+  }
   return o.url;
 }
 
-const serve = async () => listen(await serveOptions());
+/** Closes the listener(s). */
+export function stopServer() {
+  server?.stop();
+  localServer?.stop();
+  server = localServer = null;
+}
+
+/** Starts the listener(s) for the current mode. */
+export const startServer = async () => listen(await serveOptions());
 
 // Called from the request that changes home-network mode. Async work queued after a Bun.serve handler has
 // responded doesn't run while the server is idle, so the options are loaded here, inside the request, and the
@@ -175,7 +209,7 @@ onRestart(async () => {
   const o = await serveOptions();
   return () => {
     try {
-      server?.stop();
+      stopServer();
       listen(o);
     } catch (e) {
       console.error("Restart failed:", e);
@@ -185,7 +219,7 @@ onRestart(async () => {
 
 export async function main(opts: { open?: boolean } = {}) {
   console.log(`Reading ${claudeDir()}`);
-  const url = await serve();
+  const url = await startServer();
   await boot();
   if (opts.open) {
     const cmd = process.platform === "darwin" ? ["open", url] : process.platform === "win32" ? ["cmd", "/c", "start", "", url] : ["xdg-open", url];
