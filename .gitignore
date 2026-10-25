@@ -7,9 +7,8 @@ dist/
 .playwright-mcp/
 server/src/assets.gen.ts
 *.bun-build
-.claude/work/
-.claude/lessons.md
 .claude/agent-memory-local/
+.claude/settings.local.json
 .hutch/
 build/
 artifacts/

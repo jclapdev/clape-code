@@ -19,6 +19,9 @@ browser (web/, React) -> /api (server/, Hono on Bun) -> ~/.claude, ~/.claude.jso
 - Project folder names under `~/.claude/projects` can't be decoded to paths; read `cwd` from the transcript.
 - Assistant `usage` repeats on every line of one message; count once per `message.id`.
 - Timestamps are ISO in transcripts and jobs, epoch milliseconds in `history.jsonl` and `sessions/*.json`.
+- `updateJson` in `server/src/api/content.ts` reads the file's hash itself, so it never refuses a stale browser hash; pass the browser's hash to `safeWrite`. Dotted keys such as `permissions.allow` come from `flatten` and must be written back nested.
+- A new endpoint that sends account or CLI data goes in the "secrets never leave the server" test in `server/test/api.test.ts`.
+- Projects aren't moved into each other: Claude Code files sessions and memory under the folder path, and git worktrees store absolute paths.
 
 ## Cross-platform
 
@@ -30,12 +33,11 @@ After a change, run in this order:
 1. `bun run typecheck`
 2. `bun run test`
 3. `bun run build`
-4. For UI changes: `bun run dev`, open http://localhost:5317, check light and dark themes and a 390 px wide window.
+4. For UI changes: do the task in the running app as a person would, then check light and dark themes and a 390 px wide window. Flag sideways scrolling inside panes, not only the page. If `bun run dev` gets stopped, run the server (`bun src/index.ts` in `server/`) and Vite (`bun run dev` in `web/`) as two processes.
 
-## Larger requests
+## How work runs
 
-For anything bigger than one small fix, use the `breakdown` skill. It plans the work as stories with acceptance criteria and builds and verifies one story at a time.
+Every idea or complaint goes through the `feature` skill. Status lives in five files at the repo root: `BRIEF.md` (who it's for, the jobs), `BACKLOG.md` (every idea and its verdict), `specs/`, `features.json` (every step, failing or passing) and `PROGRESS.md` (current state only, replaced each time). Read `BRIEF.md` and `PROGRESS.md` before starting.
 
-## Handoff
-
-Read `PROGRESS.md` before starting and update it after each finished item: tick what's done, move the next item up, note what you learned. Add each change a user would notice to `CHANGELOG.md` under Unreleased.
+- Finished work is merged into `main` before it counts as done: the app shows `main`.
+- Add each change a user would notice to `CHANGELOG.md` under Unreleased, and update `README.md` in the same change that adds or removes a page.
