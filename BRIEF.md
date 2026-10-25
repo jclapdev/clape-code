@@ -2,10 +2,11 @@
 
 ## Who it's for
 
-John, one person who works with Claude Code every day across the projects in
-`~/projects`. He wants "basically the same thing as what we do here in the terminal
-but with GUI components" (S5), opened from his Mac's Applications folder and
-sometimes from his phone at home (P1, A3). It must also run on Linux and Windows (A2).
+John and other Claude Code users, each running it on their own computer (A11). It is a
+GUI with the same functionality as Claude Code: everything you can see or change in
+Claude Code, such as settings, skills, agents, hooks and slash commands, you can see
+and change here (A12, S5). Opened from the Applications folder, sometimes from a phone
+on the home network (P1, A3), and it runs on Mac, Linux and Windows (A2).
 
 ## Jobs it must do
 
@@ -93,6 +94,11 @@ His answers to multiple-choice questions:
   log in with their Claude account or AWS Bedrock account."
 - **A10** 2026-10-18, "Should there be a search box?": "Visible search in the menu
   (Recommended)".
+- **A11** 2026-10-25, "Who is Control Center for?": "Me and other Claude Code users".
+- **A12** 2026-10-25, "What do you open Control Center for most?": "This is meant to
+  be a GUI view that is identical in functionality to Claude Code. I should be able to
+  see and change all claudes settings/skills/agents/anything hooks ... see slash
+  commands literally everything".
 
 Approved plans in `~/.claude/plans/`:
 
