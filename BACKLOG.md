@@ -1,0 +1,119 @@
+# Backlog
+
+Verdicts: `build`, `build instead: <what>`, `not built`, `pending` (not judged yet).
+Status: `open`, `in spec NNN`, `done`.
+
+Job numbers refer to BRIEF.md. "Transcript" means John's own message on that date in
+`~/.claude/projects/`. "PROGRESS (1cd505f)" means `PROGRESS.md` at commit 1cd505f, the
+file this backlog replaced; read it with `git show 1cd505f:PROGRESS.md`.
+
+## From John's messages and answers
+
+| # | Date | Idea (his words) | Verdict | Reason | Source | Status |
+|---|---|---|---|---|---|---|
+| 1 | 2026-10-17 | "a UI where I could monitor and manage projects, the agents that exist, the backlogs, changelogs (all the logs), plans, skills, rules, memory" | build | Jobs 3 and 7. Version 0.1.0 and the Customize, Projects and Plans pages. | Transcript; PROGRESS (1cd505f) Done: "Version 0.1.0", "Customize feature pages" | done |
+| 2 | 2026-10-17 | "edit the skills/rules/agents/config/plugins/plans" | build | Job 3. Every Customize item opens readable and editable. | PROGRESS (1cd505f) Done: "Customize feature pages", "Readable file views and live-preview Markdown" | done |
+| 3 | 2026-10-17 | "add these maps to the app too" | build instead: Customize lists every file tagged with where it applies, Settings shows which file wins | Job 3. The Map page was removed on 2026-10-19 because nothing linked to it; its two uses live on in Customize and Settings. | PROGRESS (1cd505f) Waiting for John, steps 9–10 choice 7 | done |
+| 4 | 2026-10-17 | "delete or archive old sessions/agents/skills so that things are a little cleaner" | build | Job 3. Delete moves items to Archived items. Gap: nothing links to Archived items (#60). | PROGRESS (1cd505f) Waiting for John, step 2–3 choice 1 and steps 9–10 choice 9 | done |
+| 5 | 2026-10-17 | "a dark mode toggle" | build | Serves every job; shipped in 0.1.0. | `web/src/components/ui.tsx` (next-themes ThemeProvider) | done |
+| 6 | 2026-10-17 | "expand or collapse the 3 panes" | not built | The three-pane layout is gone: lists are full width and items open as their own page (S8 in BRIEF.md). | BRIEF.md "What it will not do"; PROGRESS (1cd505f) Done: "One column beside the menu" | done |
+| 7 | 2026-10-17 | "This application should not be Mac Specific. It should run on any machine no matter what" | build | Who it's for. Never run on Windows yet (#63). | Transcript answer; `docs/windows-test.md` | open |
+| 8 | 2026-10-17 | "Also my local network, with a password" | build | Job 2 (answer from the phone). Home-network mode with a password. | PROGRESS (1cd505f) Desktop app D3–D4 | done |
+| 9 | 2026-10-18 | "I think the sessions page is extra. Dont we already get that in projects?" | pending | Contradicts his 2026-10-18 answer "arent sessions suppsoed split into projects?" against needing to find a conversation from anywhere (S5). Waits on the question in PROGRESS.md. | Transcripts 2026-10-18 01:50 and 11:56 | open |
+| 10 | 2026-10-18 | "Its not clear how to use slash commands" / "There are no slash commands that I can execute" | build | Job 6. Slash command list and a picker in the session box. | PROGRESS (1cd505f) Done: "Slash command list, menu search and Guides page" | done |
+| 11 | 2026-10-18 | "explanations of the settings instead of just weird stuff that only claude understands" | build | Job 5. Settings page with grouped, editable settings. Gap: see the page-check items below. | PROGRESS (1cd505f) Done: "Settings page" | done |
+| 12 | 2026-10-18 | "I don't know what "Jobs" means or "Library"" | build | Job 3. Both pages were renamed or merged; old addresses redirect. | PROGRESS (1cd505f) Done: "Old addresses redirected" | done |
+| 13 | 2026-10-18 | "Its got a ton of user friendly errors that need to be fixed" | build | Every job. Plain server errors, error boundary, "Try again". | `.claude/work/001-usability-overhaul/log.md` (retired; in git history of this file's commit): "S1's error work kept" | done |
+| 14 | 2026-10-18 | "I never said anything about the command pallete. I never asked for one either." | build | Removed; search is a visible box in the menu (A10). | PROGRESS (1cd505f) Done: "Slash command list, menu search and Guides page" | done |
+| 15 | 2026-10-18 | "I cant easily see plans" / "Present them in the human readable format" | build | Job 3. Plans render as Markdown. Navigating them is still hard (#33). | PROGRESS (1cd505f) Done: "Readable file views" | done |
+| 16 | 2026-10-18 | "There is no way to create a skill or agent or best practice guides anywhere." | build | Job 4. New forms with the official guide beside them, and a Guides page. | PROGRESS (1cd505f) Done: "Create forms with the official guide beside them" | done |
+| 17 | 2026-10-18 | "some sections are titled weird "What changed" is not the title of a section" | build | BRIEF.md won't-do. `server/test/wording.test.ts` fails on phrase titles. Explaining sentences under headings remain (#26). | `server/test/wording.test.ts` | done |
+| 18 | 2026-10-18 | "This is not a responsive web application." | build | Every job, phone included (job 2). Three width layouts shipped. | PROGRESS (1cd505f) Done: "Menu with Projects and Customize groups", "Final check of 57 pages" | done |
+| 19 | 2026-10-18 | "Every single thing that claude code can do should be in this app." | build instead: everything Claude Code keeps on this computer, with cloud features linked from Guides | Approved scope P2. The Guides links to the cloud features were never added (#57). | `~/.claude/plans/encapsulated-mixing-clarke.md` | done |
+| 20 | 2026-10-18 | "it's impossible to understand what this app does or why it exists" | build | Jobs 1–10. Home now leads with "Build your setup" cards; whether Home serves the jobs is checked page by page below. | PROGRESS (1cd505f) Done: "Home with Build your setup and one session list" | done |
+| 21 | 2026-10-18 | Editing Markdown: "Like Obsidian (Recommended)" | build | Job 3. Live-preview editing changes only typed lines (1 line vs 19–79 with MDXEditor). | `.claude/lessons.md` (retired) first line | done |
+| 22 | 2026-10-18 | "The changelog and backlog are meant to be quick guides for users and developers so that they dont get lost" | build | Job 7. Project board and CHANGELOG.md view. The board reads PROGRESS.md, which now holds current state only (#64). | PROGRESS (1cd505f) Done: "Project board, New project and Add context" | done |
+| 23 | 2026-10-18 | Kanban board, new projects and uploaded context | build | Job 7. | PROGRESS (1cd505f) Done: "Project board, New project and Add context" | done |
+| 24 | 2026-10-19 | "The sidebar next to the sidebar sucks so much." | build | BRIEF.md won't-do. No page has a column beside the menu. | PROGRESS (1cd505f) Done: "One column beside the menu"; Notes line 2 | done |
+| 25 | 2026-10-19 | "How do I start the damn app and why does it have to be so crytic?" | build | Job 9. Electrobun app in Applications (A8). | PROGRESS (1cd505f) Desktop app D1–D4 | done |
+| 26 | 2026-10-20 | "instead of having a heading title you are explaining what the title is for" | build | BRIEF.md won't-do. Still open on 7 pages: `Page`/`DetailHeader` take a `sub` sentence and features have an `intro`. | PROGRESS (1cd505f) Next: "Headings without explainer sentences" | open |
+| 27 | 2026-10-20 | "The descriptions in the cards on the HOME page are so fucking weird ... irregular" | build | Home's "Build your setup" cards have different parts and heights; Skills and Plugins appear twice. | PROGRESS (1cd505f) Next: "Home setup cards"; `.claude/lessons.md` (retired) | open |
+| 28 | 2026-10-20 | "The README in this project has a table thats really hard to read." | build | Job 9 (how to open and rebuild it). README names deleted pages (Live, Jobs, Library, Map, Archive). | PROGRESS (1cd505f) Next: "README as the app is now" | open |
+| 29 | 2026-10-20 | "I'm scared if I navigate away from this screen I'll loose all the text I put in here" | build | Jobs 1 and 8. No prompt box or form keeps a draft. | PROGRESS (1cd505f) Next: "Drafts for typed text" | open |
+| 30 | 2026-10-20 | "The KanBan board is empty and there is no changelog yet." | build | Job 7. Cause was unmerged work on `design-overhaul`; merged 2026-10-20. | `~/.claude/plans/logical-spinning-orbit.md` step 1; `git log` shows the merge | done |
+| 31 | 2026-10-20 | "fill out kanban cards with user stories and acceptance criteria ... build the backlog. Build the changeling" | build instead: BACKLOG.md with a verdict per idea, specs with acceptance checks, features.json, and CHANGELOG.md per shipped change | The feature process approved 2026-10-25 replaces stories in PROGRESS.md. | `~/.claude/plans/what-was-the-last-kind-balloon.md` "One place for status" | done |
+| 32 | 2026-10-20 | "There should be a section for Control Center feedback ... Feedback can apply at a global or project level" | build instead: a Feedback button on every page that adds the note as a `pending` line to the chosen project's BACKLOG.md (or `~/.claude`'s for all projects) | Job 8. The 2026-10-25 process judges every idea against the brief before building, so notes must land in BACKLOG.md, not straight in a board card as plan 002 had it. | `~/.claude/plans/what-was-the-last-kind-balloon.md` "Per idea" step 1; `~/.claude/plans/there-should-be-a-breezy-sun.md` | open |
+| 33 | 2026-10-20 | Plans: show the plan a session is following; Plans page has "40 files with random names, no project or status" | build | Job 3. | PROGRESS (1cd505f) Next: "Plans: show the plan…" | open |
+| 34 | 2026-10-20 | A running session "shows a wall of tool calls"; fold them so messages stay in front | build | Job 1. Also in the MVP plan's ideas: "collapsed tool calls". | PROGRESS (1cd505f) Next: "Session screen"; P1 | open |
+| 35 | 2026-10-20 | "Feedback should automatically be applied ... a scheduled job ... an agent monitoring usage" (plan 002 stories S2–S4) | pending | Job 8. Judge after #32 ships: limits must be "decided from facts" (his 2026-10-20 answer) and need the usage report first. | `~/.claude/plans/there-should-be-a-breezy-sun.md`; transcript answer 2026-10-20 12:47 | open |
+| 36 | 2026-10-20 | "A user should log in with their Claude account or AWS Bedrock account." (Bedrock part) | pending | Job 10. Waits on the "who is it for" question in PROGRESS.md; this computer has no `~/.aws` and no AWS CLI, so it can't be tested here. | `.claude/work/003-sign-in/plan.md` S4 (retired); PROGRESS (1cd505f) Next | open |
+| 37 | 2026-10-20 | Claude account sign-in and the account each session uses | build | Job 10. | PROGRESS (1cd505f) Done: "Sign-in with a Claude account" (46bfd7c, b01973f, 5689ddb) | done |
+| 38 | 2026-10-20 | "I have to flip to different screens to reply to a "session"? ... I keep getting lost in conversations" | build | Job 1. One page per conversation at `/sessions/<id>`, reply box at the bottom, approvals inline. The Agent SDK docs: "Continue and resume both pick up an existing session and add to it", so one session ID covers a whole conversation. | `~/.claude/plans/one-page-per-conversation.md`; https://code.claude.com/docs/en/agent-sdk/sessions.md | open |
+| 39 | 2026-10-20 | "Why is control center trying to access every single folder on my computer?" | build | BRIEF.md won't-do. The server reads folders named in transcripts and `~/.claude.json`, which set off macOS prompts for Documents and iCloud Drive. Read only `~/.claude` and the project folders he adds. | PROGRESS (1cd505f) Desktop app D2 "Waiting for John (1)"; P1 "defaulting to `~/projects` plus every folder found in transcripts and `~/.claude.json`" | open |
+| 40 | 2026-10-20 | "audit the app. What is it for, what is each page supposed to be for" (plan `twinkling-giggling-bengio.md`) | build instead: BRIEF.md plus the page-by-page check below | The 2026-10-25 plan says it "replaces the unfinished audit plan". | `~/.claude/plans/what-was-the-last-kind-balloon.md` Context | done |
+| 41 | 2026-10-20 | Use the app like a person and report what's broken (plan `glistening-honking-frost.md`) | build instead: the page-by-page check below, then a verify agent per feature step | Same reason as #40; the `feature` skill's verify agent uses the app in a browser. | `~/.claude/skills/feature/references/verify-agent.md` | done |
+| 42 | 2026-10-20 | "What agents are testing it, what are they testing and what kind of schedule" | build instead: a verify agent checks every step in the running app | How Claude works, not an app feature. | `~/.claude/skills/feature/SKILL.md` step 5 | done |
+| 43 | 2026-10-18 | Exercise projects (cka-prep, sharepoint) share rules without moving them | not built | Serves no Control Center job; it's work in those projects. Belongs in their own BACKLOG.md. | PROGRESS (1cd505f) Next: "Shared rules between the exercise projects" | open |
+
+## From PROGRESS.md "Next" (1cd505f)
+
+| # | Date | Idea | Verdict | Reason | Source | Status |
+|---|---|---|---|---|---|---|
+| 44 | 2026-10-20 | Board cards open their story and tickable acceptance criteria | not built | Stories and checks now live in `specs/` and `features.json`; PROGRESS.md no longer holds them. | `~/.claude/plans/what-was-the-last-kind-balloon.md` "One place for status" | done |
+| 45 | 2026-10-20 | Board and changelog updated with every story (`breakdown` skill, `verifier` agent) | build instead: the `feature` skill's verify agent sets steps passing; project CLAUDE.md asks for the CHANGELOG line | `breakdown` and `verifier` are retired with this change. | `~/.claude/skills/feature/SKILL.md`; `CLAUDE.md` "Handoff" | done |
+| 46 | 2026-10-20 | Go through the ~70 "Waiting for John" items as questions | not built | The 2026-10-25 plan: "He approves, reviews and checks nothing." Each item got a verdict here instead (#66–#89). | `~/.claude/plans/what-was-the-last-kind-balloon.md` | done |
+| 47 | 2026-10-20 | Check main's saved edits from 18 Oct against the merged code | build | Nothing he or an agent wrote should be lost. The patch is `~/.config/control-center/backups/2026-10-20/main-uncommitted.patch` (33,230 bytes, still there). | `ls -la ~/.config/control-center/backups/2026-10-20/` | open |
+| 48 | 2026-10-20 | Remove the merged design-overhaul worktree and branch | build | Asks John first: it deletes a worktree with build outputs. | PROGRESS (1cd505f) Next; `git worktree list` still shows it | open |
+| 49 | 2026-10-20 | App preferences lists shortcuts and features that are gone (⌘K, `[`, `]`, pane sizes, "Save feedback from the search box") | build | Every job: the page points at things that don't exist. | PROGRESS (1cd505f) Next: "App preferences without removed features" | open |
+| 50 | 2026-10-20 | Session list rows differ in buttons; titles are cut-off raw prompts ("user: The sidebar…") | build | Job 1: a session must be recognisable to find it again. | PROGRESS (1cd505f) Next: "Session list rows" | open |
+| 51 | 2026-10-20 | Same left edge and width on every page | build | Every job; layout shifts between pages. | PROGRESS (1cd505f) Next | open |
+| 52 | 2026-10-20 | Even cards on Projects and in Customize lists; "1 changed file" | build | Jobs 3 and 7. | PROGRESS (1cd505f) Next | open |
+| 53 | 2026-10-20 | Project page shows "Up next" and the board's Next column twice; two-digit card numbers clipped | build | Job 7. | PROGRESS (1cd505f) Next | open |
+| 54 | 2026-10-20 | Guide tables break words into letters on a phone | build | Job 4 (guide beside the form) on job 2's phone. | PROGRESS (1cd505f) Next: "Readable tables in guides on phones" | open |
+| 55 | 2026-10-20 | Plugin file list shows Claude Code's `.in_use/` lock files; Manifest shows a second "Name" | build | Job 3. | PROGRESS (1cd505f) Next | open |
+| 56 | 2026-10-18 | Move cka-prep and sharepoint backlogs onto their boards | not built | Work in other projects, and it deletes their files. | PROGRESS (1cd505f) Next | done |
+| 57 | 2026-10-19 | Guides links to the cloud features that are out of scope | build | BRIEF.md won't-do says Guides links to them; it doesn't yet. | PROGRESS (1cd505f) Waiting for John, final check choice 4 | open |
+| 58 | 2026-10-19 | Edit and delete a plan from the Plans page in a real session's plan | build | Job 3; never tried in the app. | PROGRESS (1cd505f) Next: "Plan edit and delete check" | open |
+| 59 | 2026-10-19 | Show John Home at 390 and 1440 px | not built | He reviews nothing (2026-10-25 plan); the verify agent checks pages. | `~/.claude/plans/what-was-the-last-kind-balloon.md` | done |
+| 60 | 2026-10-19 | Nothing links to Archived items, though delete messages point there | build | Job 3: archived items can't be restored without knowing the address `/archive`. | PROGRESS (1cd505f) Waiting for John, steps 9–10 choice 9 | open |
+| 61 | 2026-10-19 | Shared rules and plugins shown on each project page | pending | Job 3; judge after #43 is settled in those projects. | PROGRESS (1cd505f) Next | open |
+| 62 | 2026-10-19 | Feedback review after a week of use | not built | The feedback this reviewed (FEEDBACK.md from the search box) is gone; replaced by #32. | PROGRESS (1cd505f) Next; Waiting for John | done |
+| 63 | 2026-10-17 | Run the Windows test steps on a Windows PC | build | Who it's for (A2). Needs a Windows computer. | `docs/windows-test.md` | open |
+| 64 | 2026-10-25 | The board reads PROGRESS.md's Next / In progress / Done, but PROGRESS.md is now current state only, so Control Center's own board is empty | pending | Job 7. Waits on the "what should the board show" question in PROGRESS.md. | `server/src/parsers/board.ts` (`columnOf`); `~/.claude/plans/what-was-the-last-kind-balloon.md` | open |
+
+## From PROGRESS.md "Waiting for John" (1cd505f)
+
+Choices agents made on 2026-10-18 and 2026-10-19. Unless a line says otherwise, the
+verdict keeps what was built, as Claude's own call: each is reversible and serves the
+job named.
+
+| # | Date | Choice | Verdict | Reason | Source | Status |
+|---|---|---|---|---|---|---|
+| 65 | 2026-10-18 | Delete on project and Setup pages archives instead of using the system trash | build | Job 3; restorable in one place. | Claude's own call | done |
+| 66 | 2026-10-18 | CLAUDE.md and hook scripts can be deleted (archived as files) | build | Job 3. | Claude's own call | done |
+| 67 | 2026-10-18 | "Run in a new session" starts in the command's own project | build | Job 6. | Claude's own call | done |
+| 68 | 2026-10-18 | `bun run dev` gets stopped by a stop signal every few minutes | pending | Cause not found; running server and web as two processes works around it. | PROGRESS (1cd505f) Notes | open |
+| 69 | 2026-10-18 | Test backups left in `~/.config/control-center/backups/2026-10-18/projects/claude-test/` | build | Claude's own leftovers; delete them. The earlier delete was blocked by a permission check. | `ls` shows the folder still exists | open |
+| 70 | 2026-10-18 | Agent memory shown on Memory tagged "Agent: <name>"; local-scope notes not marked "Only you" | build | Job 3. Mark local notes "Only you" so they read differently from shared ones. | Claude's own call | open |
+| 71 | 2026-10-18 | Keyboard shortcuts and themes on Settings; `.worktreeinclude` on the project page; file watcher refreshes them | build | Jobs 3 and 5. | Claude's own call | done |
+| 72 | 2026-10-18 | Removing a "New plugin" plugin archives its folder and its settings key | build | Job 3; the docs only say "delete its directory" or disable it. | PROGRESS (1cd505f) In progress (plugin facts) | done |
+| 73 | 2026-10-18 | "Open the new plugin's folder" opens it in the app, not Finder; only `~/.claude/skills/` plugins listed | build | Job 3. | Claude's own call | done |
+| 74 | 2026-10-18 | Install is always user scope; marketplaces needing a confirm command fail from the app | build | Job 3; the app doesn't pass `-y` so nothing installs without him seeing it. | Claude's own call | done |
+| 75 | 2026-10-18 | Stricter plugin id check (old one let `--all` through) | build | Safety of his files. | Claude's own call | done |
+| 76 | 2026-10-18 | Board columns are only Next / In progress / Done; card moves and numbering rules (step 6 choices 1–7) | build | Job 7; see #64 for what the board should show now. | Claude's own call | done |
+| 77 | 2026-10-18 | New project only inside the projects folder; names without spaces; "Have Claude set it up" opens `/init` | build | Job 7. | Claude's own call | done |
+| 78 | 2026-10-18 | Add context takes text files only, up to 2 MB; the `@docs/…` switch edits CLAUDE.md | build | Job 3; `safeWrite` writes text, so binary files would be damaged. Import rules from https://code.claude.com/docs/en/memory. | PROGRESS (1cd505f) In progress (import facts) | done |
+| 79 | 2026-10-18 | Project page: 5 recent sessions, counts link to Customize, sections removed | build | Job 7. | Claude's own call | done |
+| 80 | 2026-10-18 | `/setup` and `/library` redirect; New forms open the item's Customize page afterwards | build | Job 4. | Claude's own call | done |
+| 81 | 2026-10-18 | Environment variable values hidden until "Show value" | build | Secrets stay on screen only when asked. | Claude's own call | done |
+| 82 | 2026-10-18 | Settings field choices: model aliases, sandbox fields, theme, save-on-change, keyboard-shortcut rules, invalid JSON refused, status line | build | Job 5; values taken from the settings, model-config and keybindings docs. | PROGRESS (1cd505f) In progress (settings facts) | done |
+| 83 | 2026-10-18 | Home's code-intelligence and plugin cards point at Find plugins / New plugin; two skill cards open the same form | build instead: one card per feature (#27) | Duplicate cards are part of #27. | PROGRESS (1cd505f) Next: "Home setup cards" | open |
+| 84 | 2026-10-18 | Home's heading is "Control Center"; session list sits ~2,200 px down on a phone | build | Job 2: on a phone, a session that needs him is out of sight. Move the session list above the cards. | PROGRESS (1cd505f) Waiting for John, step 8 choice 6 | open |
+| 85 | 2026-10-18 | Background sessions in the one list; needs-you first; project picker; filters in the address | build | Jobs 1 and 2. | Claude's own call | done |
+| 86 | 2026-10-18 | Archived sessions can't be listed anywhere | build | Job 1: an archived session must be findable to restore it. `GET /sessions?archived=1` exists. | PROGRESS (1cd505f) Waiting for John, steps 9–10 choice 4 | open |
+| 87 | 2026-10-18 | `react-resizable-panels` is unused but still in `web/package.json` | build | Removing a package installs nothing; tidy. | PROGRESS (1cd505f) Waiting for John, steps 9–10 choice 10 | open |
+| 88 | 2026-10-19 | Deleting a hook or MCP server keeps a backup but can't be restored from Archived items | build | Job 3: every other delete is restorable. | PROGRESS (1cd505f) Waiting for John, final check choice 2 | open |
+| 89 | 2026-10-19 | Slash commands lists Claude Code's own commands only from the last session's report | build instead: take built-in commands from the commands reference page; tag plugin and MCP commands by source | Job 6: with no recent session the list is empty or stale. | PROGRESS (1cd505f) Waiting for John, final check choice 3 | open |
+| 90 | 2026-10-18 | Real marketplace plugin install/uninstall never tried | pending | Installing someone else's code needs John's yes. | PROGRESS (1cd505f) Waiting for John, "Skipped" | open |
+| 91 | 2026-10-18 | Creating a Desktop scheduled task never tested | pending | Needs the Desktop app open to see whether it picks up the folder. | PROGRESS (1cd505f) Waiting for John, "Skipped" | open |
+| 92 | 2026-10-19 | Delete `dist/control-center-darwin-arm64` | build | He answered "Delete it (Recommended)" on 2026-10-20; `dist/` no longer exists. | Transcript answer 2026-10-20 00:40; `ls dist` → "No such file or directory" | done |
