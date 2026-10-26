@@ -91,7 +91,8 @@ const newItem = createRoute({
   getParentRoute: () => root,
   path: "/new",
   component: NewItemPage,
-  validateSearch: (s: Record<string, unknown>): { kind?: NewKind; scope?: string } => ({ kind: (str(s.kind) as NewKind) ?? "skill", scope: str(s.scope) }),
+  // name and body start the form filled in, as Home's suggestions do.
+  validateSearch: (s: Record<string, unknown>): { kind?: NewKind; scope?: string; name?: string; body?: string } => ({ kind: (str(s.kind) as NewKind) ?? "skill", scope: str(s.scope), name: str(s.name), body: str(s.body) }),
 });
 
 const addSetting = createRoute({

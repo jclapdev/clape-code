@@ -43,6 +43,19 @@ beforeAll(async () => {
   await job("old-limit", "2026-10-12T10:00:00Z");
   await job("new-limit", new Date().toISOString());
 
+  // Typed prompts, epoch ms like Claude Code writes them. One habit in two spellings, 11 times in all.
+  const typed = [
+    ...Array(7).fill("read your instructions"),
+    ...Array(4).fill("Read your instructions  "),
+    ...Array(6).fill("exit"),
+    ...Array(5).fill("/clear"),
+    ...Array(4).fill("wrap up"),
+    ...Array(3).fill("ship it now"),
+    ...Array(2).fill("run the tests"),
+    ...["a", "b", "c", "d", "e"].flatMap((x) => Array(3).fill(`prompt ${x}`)),
+  ];
+  await writeFile(join(claude, "history.jsonl"), typed.map((display, i) => JSON.stringify({ display, pastedContents: {}, timestamp: 1782178288164 + i, project: join(root, "projects", "demo"), sessionId: "e2644826-95f0-4880-8af9-8169d229cf1d" })).join("\n") + "\n");
+
   // A session started from the app saved its account; the stray field must never reach the browser.
   await mkdir(join(root, "app"), { recursive: true });
   await writeFile(join(root, "app", "session-accounts.json"), JSON.stringify({ "e2644826-95f0-4880-8af9-8169d229cf1d": { provider: "firstParty", providerName: "Anthropic", email: "me@example.com", organization: "Acme", plan: "Claude Pro", tokenSource: "token-source-secret" } }));
@@ -55,7 +68,7 @@ beforeAll(async () => {
 afterAll(() => rm(root, { recursive: true, force: true }));
 
 describe("secrets never leave the server", () => {
-  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d"];
+  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d", "/api/suggested"];
   for (const ep of endpoints) {
     test(ep, async () => {
       const res = await request(ep);
@@ -419,5 +432,36 @@ describe("overview", () => {
     const o = await (await request("/api/overview")).json();
     expect(o.paused).toBeUndefined();
     expect(o.needsYou.map((n: any) => n.id)).toEqual(["new-limit"]);
+  });
+});
+
+describe("suggested", () => {
+  const suggested = async () => (await (await request("/api/suggested")).json()) as { prompt: string; count: number }[];
+
+  test("counts prompts ignoring capitals and trailing spaces, skips commands and one-word prompts, most typed first, at most 5", async () => {
+    const list = await suggested();
+    expect(list[0]).toEqual({ prompt: "read your instructions", count: 11 });
+    expect(list[1]).toEqual({ prompt: "wrap up", count: 4 });
+    expect(list).toHaveLength(5);
+    const prompts = list.map((s) => s.prompt);
+    for (const p of ["exit", "/clear", "run the tests"]) expect(prompts).not.toContain(p);
+  });
+
+  test("sends only the prompt and its count", async () => {
+    const res = await request("/api/suggested");
+    const text = await res.text();
+    for (const s of [root, "e2644826", "demo", "timestamp"]) expect(text).not.toContain(s);
+    for (const s of JSON.parse(text)) expect(Object.keys(s).sort()).toEqual(["count", "prompt"]);
+  });
+
+  test("a prompt is dropped once a skill of its name exists, globally or in a project", async () => {
+    const make = (name: string, scope: string) =>
+      request("/api/library/new", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "skill", scope, name, description: "Test skill", body: name }) });
+    expect((await make("read-your-instructions", "global")).status).toBe(200);
+    expect((await suggested()).map((s) => s.prompt)).not.toContain("read your instructions");
+    expect((await make("wrap-up", "~/projects/demo")).status).toBe(200);
+    const prompts = (await suggested()).map((s) => s.prompt);
+    expect(prompts).not.toContain("wrap up");
+    expect(prompts[0]).toBe("ship it now");
   });
 });

@@ -13,6 +13,7 @@ import { globalLibrary, projectLibrary } from "../scan/library";
 import { listJobs, listLiveProcesses } from "../scan/jobs";
 import { listProjects, projectDir, projectPathOf } from "../scan/projects";
 import { ls, readJson } from "../scan/md";
+import { suggestedPrompts } from "../scan/suggested";
 import type { Env } from "./env";
 
 export const sessions = new Hono<Env>();
@@ -166,6 +167,9 @@ sessions.get("/overview", async (c) => {
     waiting: waitingCount(),
   });
 });
+
+/** Prompts typed 3 or more times that no skill covers yet: only the text and the count. */
+sessions.get("/suggested", async (c) => c.json(await suggestedPrompts()));
 
 // ---- Live sessions ----
 

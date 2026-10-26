@@ -119,16 +119,16 @@ function Field({ label, hint, htmlFor, children }: { label: string; hint?: strin
 }
 
 export function NewItemPage() {
-  const search = useSearch({ strict: false }) as { kind?: NewKind; scope?: string };
+  const search = useSearch({ strict: false }) as { kind?: NewKind; scope?: string; name?: string; body?: string };
   const kind: NewKind = search.kind && search.kind in KINDS ? search.kind : "skill";
   const spec = KINDS[kind];
   const navigate = useNavigate();
   const qc = useQueryClient();
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
   const [scope, setScope] = useState(search.scope ?? (spec.projectOnly ? "" : "global"));
-  const [name, setName] = useState("");
+  const [name, setName] = useState(search.name ?? "");
   const [description, setDescription] = useState("");
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(search.body ?? "");
   const [manualOnly, setManualOnly] = useState(false);
   const [tools, setTools] = useState<string[]>([]);
   const [model, setModel] = useState("inherit");

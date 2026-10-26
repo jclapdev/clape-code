@@ -69,7 +69,7 @@ export const folder = (cwd: string | null) => (cwd ? cwd.split(/[\\/]/).filter(B
 const join = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
 
 /** One line in a session list: what it is, where and when, a tag, and what you can do. */
-function Row({ title, about, tag, children }: { title: ReactNode; about: ReactNode; tag?: ReactNode; children: ReactNode }) {
+export function Row({ title, about, tag, children }: { title: ReactNode; about: ReactNode; tag?: ReactNode; children: ReactNode }) {
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
       <div className="min-w-0 flex-1 basis-60">

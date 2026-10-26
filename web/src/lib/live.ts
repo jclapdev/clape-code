@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 const DEPENDS: Record<string, string[][]> = {
   sessions: [["sessions"], ["session"], ["overview"], ["projects"], ["project"]],
   jobs: [["jobs"], ["job"], ["overview"]],
-  projects: [["projects"], ["project"], ["overview"], ["file"]],
-  library: [["library"], ["file"], ["project"], ["map"]],
+  projects: [["projects"], ["project"], ["overview"], ["file"], ["suggested"]],
+  library: [["library"], ["file"], ["project"], ["map"], ["suggested"]],
   settings: [["settings"], ["library"], ["file"], ["map"]],
   memory: [["library"], ["memory"], ["file"]],
   live: [["live"], ["overview"]],

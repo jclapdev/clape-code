@@ -6,6 +6,7 @@ Notable changes to Control Center, newest first.
 
 ### Added
 
+- Home has a Suggested section under Sessions when you've typed the same prompt 3 or more times (capitals and trailing spaces ignored; slash commands and one-word prompts left out). Each shows how often you typed it and "Make it a skill", which opens New skill with the name and instructions filled in. A suggestion goes once a skill of that name exists.
 - Settings opens with an Account section: how Claude Code signs in (Claude account, API key, Amazon Bedrock and so on), with the email, organization and plan. Pick a project under "Change settings for" to see the account Claude Code uses in that project.
 - Sign in with a Claude account from Settings: open the Claude sign-in page, paste the code it shows, and the Account section updates. Claude Code's own message shows when a code is wrong. "Sign out" asks first. Both run Claude Code's `claude auth login` and `claude auth logout`, so the terminal uses the same login.
 - Sessions started from Control Center show the account they run on (email and plan, or the provider such as Amazon Bedrock) in the session's header, its line on Sessions and Home, and its transcript page. The New session form shows the account the session will use. Sessions started in the terminal show none, because Claude Code doesn't record it.
