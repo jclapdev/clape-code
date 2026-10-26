@@ -48,7 +48,11 @@
       ],
       "status": "passing",
       "build_attempts": 1,
-      "screenshots": ["specs/screenshots/002-S1-A2.txt", "specs/screenshots/002-S1-A3.txt", "specs/screenshots/002-S1-A4.txt"]
+      "screenshots": [
+        "specs/screenshots/002-S1-A2.txt",
+        "specs/screenshots/002-S1-A3.txt",
+        "specs/screenshots/002-S1-A4.txt"
+      ]
     },
     {
       "id": "002-S2",
@@ -85,7 +89,20 @@
       ],
       "status": "passing",
       "build_attempts": 1,
-      "screenshots": ["specs/screenshots/002-S3-new-empty.png", "specs/screenshots/002-S3-after-first-message.png", "specs/screenshots/002-S3-from-home.png", "specs/screenshots/002-S3-from-sessions.png", "specs/screenshots/002-S3-from-sessions-project.png", "specs/screenshots/002-S3-new-plan.png", "specs/screenshots/002-S3-run-in-new-session.png", "specs/screenshots/002-S3-set-it-up.png", "specs/screenshots/002-S3-live-redirect.png", "specs/screenshots/002-S3-390-light.png", "specs/screenshots/002-S3-390-dark.png", "specs/screenshots/002-S3-390-dark-conversation.png"]
+      "screenshots": [
+        "specs/screenshots/002-S3-new-empty.png",
+        "specs/screenshots/002-S3-after-first-message.png",
+        "specs/screenshots/002-S3-from-home.png",
+        "specs/screenshots/002-S3-from-sessions.png",
+        "specs/screenshots/002-S3-from-sessions-project.png",
+        "specs/screenshots/002-S3-new-plan.png",
+        "specs/screenshots/002-S3-run-in-new-session.png",
+        "specs/screenshots/002-S3-set-it-up.png",
+        "specs/screenshots/002-S3-live-redirect.png",
+        "specs/screenshots/002-S3-390-light.png",
+        "specs/screenshots/002-S3-390-dark.png",
+        "specs/screenshots/002-S3-390-dark-conversation.png"
+      ]
     },
     {
       "id": "002-S4",
@@ -139,6 +156,47 @@
         "specs/screenshots/002-S5-A9-menu-skills-1440-light.png",
         "specs/screenshots/002-S5-A9-menu-working-1440-light.png"
       ]
+    },
+    {
+      "id": "003-S1",
+      "spec": "specs/003-backlog-board-and-feedback.md",
+      "description": "Server: the board endpoint reads the project's BACKLOG.md into Open / In spec / Done columns (number, idea, verdict, status) and attaches features.json steps to in-spec cards; a missing BACKLOG.md gives three empty columns. The PROGRESS.md board parser (server/src/parsers/board.ts) and its add/edit/move/delete/start endpoints are removed. Tests in server/test.",
+      "checks": [
+        "A1",
+        "A2",
+        "A3"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "003-S2",
+      "spec": "specs/003-backlog-board-and-feedback.md",
+      "description": "The project page's board shows the BACKLOG.md columns read-only: counts, cards with number, idea cut to two lines (full text on hover) and verdict, in-spec cards listing steps with passing/failing; no add/edit/move/delete controls remain.",
+      "checks": [
+        "A1",
+        "A2",
+        "A3",
+        "A7"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "003-S3",
+      "spec": "specs/003-backlog-board-and-feedback.md",
+      "description": "Feedback button in the menu on every page: a box with the note, a project picker (current project or All projects) and Save; the server appends a pending/open line (number = highest in any table + 1) to a '## Feedback' table at the end of that project's BACKLOG.md or ~/.claude/BACKLOG.md (created from the feature skill's template if missing), changing no other line; shows 'Added as #n'; an unsaved note survives closing the box and changing page.",
+      "checks": [
+        "A4",
+        "A5",
+        "A6",
+        "A7"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
     }
   ]
 }
