@@ -46,9 +46,9 @@
         "A3",
         "A4"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": ["specs/screenshots/002-S1-A2.txt", "specs/screenshots/002-S1-A3.txt", "specs/screenshots/002-S1-A4.txt"]
     },
     {
       "id": "002-S2",

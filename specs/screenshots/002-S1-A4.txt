@@ -1,0 +1,51 @@
+# 22:51:10 A4 part 1: approval in default (manual) permission mode
+# 22:51:10 file exists before? no
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/new -H 'content-type: application/json' -d '{"project":"~/projects/claude-test","prompt":"Use the Write tool to create the file cc-002-s1-check.txt in the current folder containing exactly the text hello from 002-S1. Then reply WROTE.","permissionMode":"default"}'
+{"sessionId":"2d2c7a18-5a0b-4423-ad5a-505b5c4f8553","liveId":"828d0ec3-b741-490b-82e1-89cc2cd81869"}
+
+# 22:51:14 GET /sessions/:sid shows the pending approval:
+$ curl -s http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553
+{"status":"waiting","permissionMode":"default","pending":[{"requestId":"a95dc47c-ed01-4f4b-8d01-b97009a6a8d8","type":"approval","toolName":"Write","summary":"/Users/john/projects/claude-test/cc-002-s1-check.txt","input":{"file_path":"/Users/john/projects/claude-test/cc-002-s1-check.txt","content":"hello from 002-S1"},"canAlwaysAllow":true,"at":"2026-10-26T02:51:13.985Z"}]}
+
+# 22:51:14 file exists while waiting? no
+# 22:51:14 answer Allow by session ID
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553/respond -H 'content-type: application/json' -d '{"requestId":"a95dc47c-ed01-4f4b-8d01-b97009a6a8d8","decision":"allow"}'
+{"ok":true}
+
+# 22:51:18 status=idle
+$ curl -s http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553
+{"status":"idle","permissionMode":"default","pending":[],"totalTurns":2,"turns":[{"role":"user","text":"Use the Write tool to create the file cc-002-s1-check.txt in the current folder containing exactly the text hello from 002-S1. Then reply WROTE."},{"role":"assistant","text":"tool:Write | WROTE"}]}
+
+# 22:51:18 file exists after Allow? yes; contents: hello from 002-S1
+# 22:51:18 A4 part 2: AskUserQuestion
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553/send -H 'content-type: application/json' -d '{"text":"Use the AskUserQuestion tool to ask me which fruit I prefer, with the options Apple and Banana. After I answer, reply with exactly CHOSEN=<my answer>."}'
+{"sessionId":"2d2c7a18-5a0b-4423-ad5a-505b5c4f8553","liveId":"828d0ec3-b741-490b-82e1-89cc2cd81869","resumed":false}
+
+# 22:51:21 GET /sessions/:sid shows the pending question:
+$ curl -s http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553
+{"status":"waiting","pending":[{"requestId":"3735dafd-4e03-4973-8505-102ad2be79c8","type":"question","toolName":"AskUserQuestion","summary":"","input":{"questions":[{"question":"Which fruit do you prefer?","header":"Fruit","options":[{"label":"Apple","description":"Apple"},{"label":"Banana","description":"Banana"}],"multiSelect":false}]},"canAlwaysAllow":false,"at":"2026-10-26T02:51:21.575Z"}]}
+
+# 22:51:21 answer it by session ID (question text: Which fruit do you prefer?)
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553/respond -H 'content-type: application/json' -d '{"requestId":"3735dafd-4e03-4973-8505-102ad2be79c8","decision":"allow","answers":{"Which fruit do you prefer?":"Banana"}}'
+{"ok":true}
+
+# 22:51:24 status=idle
+$ curl -s http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553
+{"status":"idle","permissionMode":"default","pending":[],"totalTurns":4,"turns":[{"role":"user","text":"Use the Write tool to create the file cc-002-s1-check.txt in the current folder containing exactly the text hello from 002-S1. Then reply WROTE."},{"role":"assistant","text":"tool:Write | WROTE"},{"role":"user","text":"Use the AskUserQuestion tool to ask me which fruit I prefer, with the options Apple and Banana. After I answer, reply with exactly CHOSEN=<my answer>."},{"role":"assistant","text":"tool:AskUserQuestion | CHOSEN=Banana"}]}
+
+
+# 22:51:57 A4 again on a resumed session, after restarting the server
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553/send -H 'content-type: application/json' -d '{"text":"Use the Write tool to overwrite cc-002-s1-check.txt with exactly the text second write. Then reply WROTE2."}'
+{"sessionId":"2d2c7a18-5a0b-4423-ad5a-505b5c4f8553","liveId":"99d5f6ee-1916-465a-8429-251654f3699b","resumed":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553
+{"status":"waiting","permissionMode":"default","pending":[{"type":"approval","toolName":"Write","summary":"/Users/john/projects/claude-test/cc-002-s1-check.txt"}]}
+
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553/respond -H 'content-type: application/json' -d '{"requestId":"d7adb131-35d3-4f84-98c1-f3debad015b4","decision":"allow"}'
+{"ok":true}
+
+# 22:52:06 status=idle
+# 22:52:06 file contents now: second write
+$ curl -s http://127.0.0.1:47811/api/sessions/2d2c7a18-5a0b-4423-ad5a-505b5c4f8553
+{"status":"idle","liveId":"99d5f6ee-1916-465a-8429-251654f3699b","pending":[],"totalTurns":6,"turns":[{"role":"user","text":"Use the Write tool to create the file cc-002-s1-check.txt in the current folder containing exactly the text hello from 0"},{"role":"assistant","text":"tool:Write | WROTE"},{"role":"user","text":"Use the AskUserQuestion tool to ask me which fruit I prefer, with the options Apple and Banana. After I answer, reply wi"},{"role":"assistant","text":"tool:AskUserQuestion | CHOSEN=Banana"},{"role":"user","text":"Use the Write tool to overwrite cc-002-s1-check.txt with exactly the text second write. Then reply WROTE2."},{"role":"assistant","text":"tool:Write | WROTE2"}]}
+

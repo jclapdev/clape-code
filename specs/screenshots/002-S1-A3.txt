@@ -1,0 +1,162 @@
+# 22:50:03 A3: second message while Claude works, then stop by session ID
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/new -H 'content-type: application/json' -d '{"project":"~/projects/claude-test","prompt":"First run the shell command `sleep 20` with the Bash tool, in the foreground (do not run it in the background). After it finishes, reply with exactly SLEPT.","permissionMode":"default"}'
+{"sessionId":"14d9c5d6-75fe-47e9-84f5-c8eadf989c1b","liveId":"c63cf506-892f-4301-97a9-e72ebdcb006a"}
+
+# 22:50:06 sleep 20 process is running: 94203 sleep 20
+# 22:50:06 Claude is working on sleep 20 now:
+$ curl -s http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b
+{"status":"working","pending":[]}
+
+# 22:50:06 send a second message by session ID while it works
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b/send -H 'content-type: application/json' -d '{"text":"Also: what is 2+2? Answer as FOUR=<number>."}'
+{"sessionId":"14d9c5d6-75fe-47e9-84f5-c8eadf989c1b","liveId":"c63cf506-892f-4301-97a9-e72ebdcb006a","resumed":false}
+
+# 22:50:08 still working, the sleep was not stopped:
+$ curl -s http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b
+{"status":"working"}
+
+94203 sleep 20
+# 22:50:29 status=idle
+# 22:50:29 turn finished; SLEPT and FOUR=4 both answered; the sleep 20 tool call ran its full time:
+$ curl -s http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b
+{"status":"idle","liveId":"c63cf506-892f-4301-97a9-e72ebdcb006a","pending":[],"totalTurns":4,"turns":[{"role":"user","at":"2026-10-26T02:50:03.576Z","text":"First run the shell command `sleep 20` with the Bash tool, in the foreground (do not run it in the background). After it finishes, reply with exactly "},{"role":"assistant","at":"2026-10-26T02:50:05.272Z","text":"tool:Bash sleep 20"},{"role":"user","at":"2026-10-26T02:50:06.647Z","text":"Also: what is 2+2? Answer as FOUR=<number>."},{"role":"assistant","at":"2026-10-26T02:50:27.752Z","text":"SLEPT\nFOUR=4"}]}
+
+# 22:50:29 now start a long command and stop by session ID
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b/send -H 'content-type: application/json' -d '{"text":"Run the shell command `sleep 20` with the Bash tool in the foreground, then reply with exactly WOKE."}'
+{"sessionId":"14d9c5d6-75fe-47e9-84f5-c8eadf989c1b","liveId":"c63cf506-892f-4301-97a9-e72ebdcb006a","resumed":false}
+
+# 22:50:31 sleep 20 process is running: 94392 sleep 20
+$ curl -s http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b
+{"status":"working"}
+
+# 22:50:31 stop by session ID
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b/stop -H 'content-type: application/json' -d '{}'
+{"ok":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b
+{"status":"stopped","liveId":"c63cf506-892f-4301-97a9-e72ebdcb006a","pending":[],"totalTurns":6,"turns":[{"role":"user","at":"2026-10-26T02:50:03.576Z","text":"First run the shell command `sleep 20` with the Bash tool, in the foreground (do not run it in the background). After it finishes, reply with exactly "},{"role":"assistant","at":"2026-10-26T02:50:05.272Z","text":"tool:Bash sleep 20"},{"role":"user","at":"2026-10-26T02:50:06.647Z","text":"Also: what is 2+2? Answer as FOUR=<number>."},{"role":"assistant","at":"2026-10-26T02:50:27.752Z","text":"SLEPT\nFOUR=4"},{"role":"user","at":"2026-10-26T02:50:29.170Z","text":"Run the shell command `sleep 20` with the Bash tool in the foreground, then reply with exactly WOKE."},{"role":"assistant","at":"2026-10-26T02:50:30.774Z","text":"tool:Bash sleep 20"}]}
+
+# 22:50:34 sleep 20 processes still alive after stop (empty = none):
+
+# 22:50:34 after stop, sending again resumes the same session
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b/send -H 'content-type: application/json' -d '{"text":"Reply with exactly BACK. Use no tools."}'
+{"sessionId":"14d9c5d6-75fe-47e9-84f5-c8eadf989c1b","liveId":"9d782b12-deae-4505-9108-8179515f449f","resumed":true}
+
+# 22:50:41 status=idle
+$ curl -s http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b
+{"status":"idle","liveId":"9d782b12-deae-4505-9108-8179515f449f","pending":[],"totalTurns":8,"turns":[{"role":"user","at":"2026-10-26T02:50:03.576Z","text":"First run the shell command `sleep 20` with the Bash tool, in the foreground (do not run it in the background). After it finishes, reply with exactly "},{"role":"assistant","at":"2026-10-26T02:50:05.272Z","text":"tool:Bash sleep 20"},{"role":"user","at":"2026-10-26T02:50:06.647Z","text":"Also: what is 2+2? Answer as FOUR=<number>."},{"role":"assistant","at":"2026-10-26T02:50:27.752Z","text":"SLEPT\nFOUR=4"},{"role":"user","at":"2026-10-26T02:50:29.170Z","text":"Run the shell command `sleep 20` with the Bash tool in the foreground, then reply with exactly WOKE."},{"role":"assistant","at":"2026-10-26T02:50:30.774Z","text":"tool:Bash sleep 20 | No response requested."},{"role":"user","at":"2026-10-26T02:50:35.329Z","text":"Reply with exactly BACK. Use no tools."},{"role":"assistant","at":"2026-10-26T02:50:39.455Z","text":"BACK"}]}
+
+# 22:50:41 interrupt by session ID while working also stops the turn and keeps the process
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b/send -H 'content-type: application/json' -d '{"text":"Run the shell command `sleep 20` with the Bash tool in the foreground, then reply with exactly WOKE3."}'
+{"sessionId":"14d9c5d6-75fe-47e9-84f5-c8eadf989c1b","liveId":"9d782b12-deae-4505-9108-8179515f449f","resumed":false}
+
+# 22:50:44 sleep 20 process is running: 95020 sleep 20
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b/interrupt -H 'content-type: application/json' -d '{}'
+{"ok":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/14d9c5d6-75fe-47e9-84f5-c8eadf989c1b
+{"status":"idle","liveId":"9d782b12-deae-4505-9108-8179515f449f","pending":[],"totalTurns":11,"turns":[{"role":"user","at":"2026-10-26T02:50:03.576Z","text":"First run the shell command `sleep 20` with the Bash tool, in the foreground (do not run it in the background). After it finishes, reply with exactly "},{"role":"assistant","at":"2026-10-26T02:50:05.272Z","text":"tool:Bash sleep 20"},{"role":"user","at":"2026-10-26T02:50:06.647Z","text":"Also: what is 2+2? Answer as FOUR=<number>."},{"role":"assistant","at":"2026-10-26T02:50:27.752Z","text":"SLEPT\nFOUR=4"},{"role":"user","at":"2026-10-26T02:50:29.170Z","text":"Run the shell command `sleep 20` with the Bash tool in the foreground, then reply with exactly WOKE."},{"role":"assistant","at":"2026-10-26T02:50:30.774Z","text":"tool:Bash sleep 20 | No response requested."},{"role":"user","at":"2026-10-26T02:50:35.329Z","text":"Reply with exactly BACK. Use no tools."},{"role":"assistant","at":"2026-10-26T02:50:39.455Z","text":"BACK"},{"role":"user","at":"2026-10-26T02:50:41.798Z","text":"Run the shell command `sleep 20` with the Bash tool in the foreground, then reply with exactly WOKE3."},{"role":"assistant","at":"2026-10-26T02:50:43.646Z","text":"tool:Bash sleep 20"},{"role":"user","at":"2026-10-26T02:50:44.727Z","text":"[Request interrupted by user for tool use]"}]}
+
+
+# 22:52:47 Stop by session ID during a brand-new conversation's first turn, then send again
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/new -H 'content-type: application/json' -d '{"project":"~/projects/claude-test","prompt":"Run the shell command `sleep 20` with the Bash tool in the foreground, then reply with exactly FIRST.","permissionMode":"default"}'
+{"sessionId":"29827aba-4f7b-4bf7-92f8-16789996d72d","liveId":"bc94b4ea-f4fe-4946-8126-c0bd02cac518"}
+
+# 22:52:51 sleep 20 running; stop
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/29827aba-4f7b-4bf7-92f8-16789996d72d/stop -H 'content-type: application/json' -d '{}'
+{"ok":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/29827aba-4f7b-4bf7-92f8-16789996d72d
+{"status":"stopped","totalTurns":2}
+
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/29827aba-4f7b-4bf7-92f8-16789996d72d/send -H 'content-type: application/json' -d '{"text":"Reply with exactly AGAIN. Use no tools."}'
+{"sessionId":"29827aba-4f7b-4bf7-92f8-16789996d72d","liveId":"303c519f-88b1-4b3b-8530-0e3673f9c757","resumed":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/29827aba-4f7b-4bf7-92f8-16789996d72d
+{"status":"idle","totalTurns":4,"turns":[{"role":"user","text":"Run the shell command `sleep 20` with the Bash tool in the foreground, then reply with exactly FIRST."},{"role":"assistant","text":"tool:Bash | No response requested."},{"role":"user","text":"Reply with exactly AGAIN. Use no tools."},{"role":"assistant","text":"AGAIN"}]}
+
+$ curl -s http://127.0.0.1:47811/api/live/303c519f-88b1-4b3b-8530-0e3673f9c757
+{"status":"idle","events":[{"kind":"result","at":"2026-10-26T02:53:00.042Z","costUSD":0.11868109999999998,"isError":false,"text":null}]}
+
+
+# 22:53:11 Stop by session ID within a second of starting a new conversation (before Claude has replied), then send again
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/new -H 'content-type: application/json' -d '{"project":"~/projects/claude-test","prompt":"Write a 300-word poem about rivers. Use no tools.","permissionMode":"default"}'
+{"sessionId":"a277a9ac-a5c9-47b3-a1d0-a6a51dd9540b","liveId":"f5f9b267-a673-4b65-a21c-c674074b68b0"}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/a277a9ac-a5c9-47b3-a1d0-a6a51dd9540b
+{"status":"working","totalTurns":1}
+
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/a277a9ac-a5c9-47b3-a1d0-a6a51dd9540b/stop -H 'content-type: application/json' -d '{}'
+{"ok":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/a277a9ac-a5c9-47b3-a1d0-a6a51dd9540b
+{"status":"stopped","totalTurns":1}
+
+# 22:53:14 transcript lines on disk:       24
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/a277a9ac-a5c9-47b3-a1d0-a6a51dd9540b/send -H 'content-type: application/json' -d '{"text":"Reply with exactly AGAIN. Use no tools."}'
+{"sessionId":"a277a9ac-a5c9-47b3-a1d0-a6a51dd9540b","liveId":"aa7f47cf-ab2f-4c75-b51a-9e594ec52a09","resumed":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/a277a9ac-a5c9-47b3-a1d0-a6a51dd9540b
+{"status":"idle","totalTurns":4,"turns":[{"role":"user","text":"Write a 300-word poem about rivers. Use no tools."},{"role":"assistant","text":"No response requested."},{"role":"user","text":"Reply with exactly AGAIN. Use no tools."},{"role":"assistant","text":"AGAIN"}]}
+
+$ curl -s http://127.0.0.1:47811/api/live/aa7f47cf-ab2f-4c75-b51a-9e594ec52a09
+{"status":"idle","events":[{"kind":"result","text":null}]}
+
+
+# 22:53:23 Stop by session ID immediately (0.1 s) after starting a new conversation (before Claude has replied), then send again
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/new -H 'content-type: application/json' -d '{"project":"~/projects/claude-test","prompt":"Write a 300-word poem about rivers. Use no tools.","permissionMode":"default"}'
+{"sessionId":"f9144b53-d448-48a7-b5b9-3e47921a82cf","liveId":"8f4d9933-d9c8-41c3-b0c4-3aa4709872b2"}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/f9144b53-d448-48a7-b5b9-3e47921a82cf
+{"status":"working","totalTurns":0}
+
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/f9144b53-d448-48a7-b5b9-3e47921a82cf/stop -H 'content-type: application/json' -d '{}'
+{"ok":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/f9144b53-d448-48a7-b5b9-3e47921a82cf
+{"status":"error","totalTurns":1}
+
+# 22:53:25 transcript lines on disk:       24
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/f9144b53-d448-48a7-b5b9-3e47921a82cf/send -H 'content-type: application/json' -d '{"text":"Reply with exactly AGAIN. Use no tools."}'
+{"sessionId":"f9144b53-d448-48a7-b5b9-3e47921a82cf","liveId":"734d51e1-01f2-4a86-8eea-1a525cb0ef57","resumed":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/f9144b53-d448-48a7-b5b9-3e47921a82cf
+{"status":"idle","totalTurns":4,"turns":[{"role":"user","text":"Write a 300-word poem about rivers. Use no tools."},{"role":"assistant","text":"No response requested."},{"role":"user","text":"Reply with exactly AGAIN. Use no tools."},{"role":"assistant","text":"AGAIN"}]}
+
+$ curl -s http://127.0.0.1:47811/api/live/734d51e1-01f2-4a86-8eea-1a525cb0ef57
+{"status":"idle","events":[{"kind":"result","text":null}]}
+
+
+# 22:53:37 Stop by session ID with no pause after starting, and send with no pause after stopping (the first A2 attempt did this) a new conversation (before Claude has replied), then send again
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/new -H 'content-type: application/json' -d '{"project":"~/projects/claude-test","prompt":"Write a 300-word poem about rivers. Use no tools.","permissionMode":"default"}'
+{"sessionId":"236af84a-b769-4b50-98df-c3a6f7a9dd81","liveId":"9152621e-f3f2-49fd-98af-ff1a353ce9b4"}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/236af84a-b769-4b50-98df-c3a6f7a9dd81
+{"status":"working","totalTurns":0}
+
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/236af84a-b769-4b50-98df-c3a6f7a9dd81/stop -H 'content-type: application/json' -d '{}'
+{"ok":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/236af84a-b769-4b50-98df-c3a6f7a9dd81
+{"status":"stopped","totalTurns":0}
+
+# 22:53:37 transcript lines on disk: no file
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/236af84a-b769-4b50-98df-c3a6f7a9dd81/send -H 'content-type: application/json' -d '{"text":"Reply with exactly AGAIN. Use no tools."}'
+{"sessionId":"236af84a-b769-4b50-98df-c3a6f7a9dd81","liveId":"40bafcc3-cb3e-4324-96bb-1ea6e5203f19","resumed":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/236af84a-b769-4b50-98df-c3a6f7a9dd81
+{"status":"error","totalTurns":1,"turns":[{"role":"user","text":"Write a 300-word poem about rivers. Use no tools."}]}
+
+$ curl -s http://127.0.0.1:47811/api/live/40bafcc3-cb3e-4324-96bb-1ea6e5203f19
+{"status":"error","events":[{"kind":"result","text":"error_during_execution"},{"kind":"error","text":"Claude Code returned an error result: No conversation found with session ID: 236af84a-b769-4b50-98df-c3a6f7a9dd81"}]}
+
+# 22:53:56 send once more to the same conversation; transcript file now: 236af84a-b769-4b50-98df-c3a6f7a9dd81.jsonl
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/236af84a-b769-4b50-98df-c3a6f7a9dd81/send -H 'content-type: application/json' -d '{"text":"Reply with exactly THIRD. Use no tools."}'
+{"sessionId":"236af84a-b769-4b50-98df-c3a6f7a9dd81","liveId":"178abcab-75bf-4584-9a2e-955fa9212543","resumed":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/236af84a-b769-4b50-98df-c3a6f7a9dd81
+{"status":"idle","totalTurns":4,"turns":[{"role":"user","text":"Write a 300-word poem about rivers. Use no tools."},{"role":"assistant","text":"No response requested."},{"role":"user","text":"Reply with exactly THIRD. Use no tools."},{"role":"assistant","text":"THIRD"}]}
+
+$ curl -s http://127.0.0.1:47811/api/live/178abcab-75bf-4584-9a2e-955fa9212543
+{"status":"idle","events":[{"kind":"result","text":null}]}
+

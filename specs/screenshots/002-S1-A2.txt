@@ -1,0 +1,88 @@
+# A2: resume a finished session by its session ID (Sun Oct 25 22:44:29 EDT 2026)
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/new -H 'content-type: application/json' -d '{"project":"~/projects/claude-test","prompt":"Reply with exactly the word PINEAPPLE and nothing else. Use no tools.","permissionMode":"default"}'
+{"sessionId":"428079d3-1854-45a0-869a-132b029f40f0","liveId":"83f422f3-1320-473d-9649-ede85e3733ec"}
+
+# (waited; status=idle)
+$ curl -s http://127.0.0.1:47811/api/sessions/428079d3-1854-45a0-869a-132b029f40f0
+{"sessionId":"428079d3-1854-45a0-869a-132b029f40f0","status":"idle","liveId":"83f422f3-1320-473d-9649-ede85e3733ec","fromScript":false,"archived":false,"pending":[],"totalTurns":2,"turns":[{"role":"user","text":"Reply with exactly the word PINEAPPLE and nothing else. Use no tools."},{"role":"assistant","text":"PINEAPPLE"}]}
+
+# stop the live process so the session is finished, not open
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/428079d3-1854-45a0-869a-132b029f40f0/stop -H 'content-type: application/json' -d '{}'
+{"ok":true}
+
+$ curl -s http://127.0.0.1:47811/api/sessions/428079d3-1854-45a0-869a-132b029f40f0
+{"status":"stopped","liveId":"83f422f3-1320-473d-9649-ede85e3733ec"}
+
+# send a new message by session ID
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/428079d3-1854-45a0-869a-132b029f40f0/send -H 'content-type: application/json' -d '{"text":"Now reply with exactly the word MANGO and nothing else. Use no tools."}'
+{"sessionId":"428079d3-1854-45a0-869a-132b029f40f0","liveId":"ac5bcdef-e3dd-492f-a950-b23341ea1106","resumed":true}
+
+# (waited; status=idle)
+$ curl -s http://127.0.0.1:47811/api/sessions/428079d3-1854-45a0-869a-132b029f40f0
+{"sessionId":"428079d3-1854-45a0-869a-132b029f40f0","status":"idle","liveId":"ac5bcdef-e3dd-492f-a950-b23341ea1106","fromScript":false,"archived":false,"pending":[],"totalTurns":4,"turns":[{"role":"user","text":"Reply with exactly the word PINEAPPLE and nothing else. Use no tools."},{"role":"assistant","text":"PINEAPPLE"},{"role":"user","text":"Now reply with exactly the word MANGO and nothing else. Use no tools."},{"role":"assistant","text":"MANGO"}]}
+
+# transcript files for this session ID in claude-test's project folder
+428079d3-1854-45a0-869a-132b029f40f0.jsonl
+# session IDs recorded in the transcript file (count per ID)
+  39 428079d3-1854-45a0-869a-132b029f40f0
+# GET /sessions entry for this session
+$ curl -s http://127.0.0.1:47811/api/sessions
+[{"sessionId":"428079d3-1854-45a0-869a-132b029f40f0","displayTitle":"PINEAPPLE reply","fromScript":false,"archived":false,"entrypoint":"sdk-cli"}]
+
+
+# 22:51:52 A2 again after restarting the server (same app folder): nothing live for this session
+$ curl -s http://127.0.0.1:47811/api/sessions/428079d3-1854-45a0-869a-132b029f40f0
+{"status":"done","liveId":null,"fromScript":false,"totalTurns":4}
+
+$ curl -s -X POST http://127.0.0.1:47811/api/sessions/428079d3-1854-45a0-869a-132b029f40f0/send -H 'content-type: application/json' -d '{"text":"Reply with exactly KIWI and nothing else. Use no tools."}'
+{"sessionId":"428079d3-1854-45a0-869a-132b029f40f0","liveId":"00ec36be-5804-4ffb-ba65-41e52c360110","resumed":true}
+
+# 22:51:57 status=idle
+$ curl -s http://127.0.0.1:47811/api/sessions/428079d3-1854-45a0-869a-132b029f40f0
+{"status":"idle","liveId":"00ec36be-5804-4ffb-ba65-41e52c360110","pending":[],"totalTurns":6,"turns":[{"role":"user","text":"Reply with exactly the word PINEAPPLE and nothing else. Use no tools."},{"role":"assistant","text":"PINEAPPLE"},{"role":"user","text":"Now reply with exactly the word MANGO and nothing else. Use no tools."},{"role":"assistant","text":"MANGO"},{"role":"user","text":"Reply with exactly KIWI and nothing else. Use no tools."},{"role":"assistant","text":"KIWI"}]}
+
+# 22:51:57 session IDs in the transcript file (count per ID):
+  49 428079d3-1854-45a0-869a-132b029f40f0
+
+# 22:52:37 GET /sessions: every entry carries fromScript and archived; counts across all sessions on this computer
+$ curl -s http://127.0.0.1:47811/api/sessions
+{"total":279,"withBothFlags":279,"fromScriptTrue":201,"fromScriptByEntrypoint":[{"entrypoint":"claude-desktop","n":15,"fromScript":0},{"entrypoint":"cli","n":57,"fromScript":0},{"entrypoint":"sdk-cli","n":204,"fromScript":198},{"entrypoint":"sdk-ts","n":3,"fromScript":3}]}
+
+# 22:52:37 the sessions started in this check through POST /sessions/new (all entrypoint sdk-cli):
+$ curl -s http://127.0.0.1:47811/api/sessions
+[{"sessionId":"2d2c7a18-5a0b-4423-ad5a-505b5c4f8553","displayTitle":"cc-002-s1-check.txt file creation","entrypoint":"sdk-cli","fromScript":false,"archived":false},{"sessionId":"428079d3-1854-45a0-869a-132b029f40f0","displayTitle":"PINEAPPLE reply","entrypoint":"sdk-cli","fromScript":false,"archived":false},{"sessionId":"14d9c5d6-75fe-47e9-84f5-c8eadf989c1b","displayTitle":"Foreground sleep command","entrypoint":"sdk-cli","fromScript":false,"archived":false}]
+
+# 22:52:37 archived list (?archived=1) entries are marked archived:
+$ curl -s http://127.0.0.1:47811/api/sessions?archived=1
+{"n":0,"allArchived":true,"sample":{"sessionId":null,"displayTitle":null,"archived":null,"archivedAt":null}}
+
+
+# 22:52:37 old /live endpoints still work
+$ curl -s -X POST http://127.0.0.1:47811/api/live -H 'content-type: application/json' -d '{"project":"~/projects/claude-test","prompt":"Reply with exactly OLDLIVE. Use no tools.","permissionMode":"default"}'
+{"id":"1632b14e-6ab3-4104-84ab-cf75ee9b0793","sessionId":"673f27a0-bc32-42a7-b560-257936868f8e","status":"working"}
+
+$ curl -s http://127.0.0.1:47811/api/live/1632b14e-6ab3-4104-84ab-cf75ee9b0793
+{"id":"1632b14e-6ab3-4104-84ab-cf75ee9b0793","sessionId":"673f27a0-bc32-42a7-b560-257936868f8e","status":"idle","events":[{"kind":"user","text":"Reply with exactly OLDLIVE. Use no tools."},{"kind":"text","text":"OLDLIVE"},{"kind":"result","text":""}]}
+
+$ curl -s -X POST http://127.0.0.1:47811/api/live/1632b14e-6ab3-4104-84ab-cf75ee9b0793/send -H 'content-type: application/json' -d '{"text":"Reply with exactly OLDLIVE2. Use no tools."}'
+{"ok":true}
+
+$ curl -s http://127.0.0.1:47811/api/live/1632b14e-6ab3-4104-84ab-cf75ee9b0793
+{"status":"idle","events":[{"kind":"user","text":"Reply with exactly OLDLIVE. Use no tools."},{"kind":"text","text":"OLDLIVE"},{"kind":"user","text":"Reply with exactly OLDLIVE2. Use no tools."},{"kind":"text","text":"OLDLIVE2"}]}
+
+$ curl -s http://127.0.0.1:47811/api/live
+[{"id":"1632b14e-6ab3-4104-84ab-cf75ee9b0793","sessionId":"673f27a0-bc32-42a7-b560-257936868f8e","status":"idle"}]
+
+$ curl -s -X DELETE http://127.0.0.1:47811/api/live/1632b14e-6ab3-4104-84ab-cf75ee9b0793 -H 'content-type: application/json' -d '{}'
+{"ok":true}
+
+# 22:52:44 resume through the old endpoint (POST /live with resume)
+$ curl -s -X POST http://127.0.0.1:47811/api/live -H 'content-type: application/json' -d '{"resume":"673f27a0-bc32-42a7-b560-257936868f8e","prompt":"Reply with exactly OLDRESUME. Use no tools."}'
+{"id":"bfeec455-30eb-43d3-a787-3cd865684d41","sessionId":"673f27a0-bc32-42a7-b560-257936868f8e","status":"working"}
+
+$ curl -s http://127.0.0.1:47811/api/live/bfeec455-30eb-43d3-a787-3cd865684d41
+{"sessionId":"673f27a0-bc32-42a7-b560-257936868f8e","status":"idle","events":[{"kind":"user","text":"Reply with exactly OLDRESUME. Use no tools."},{"kind":"text","text":"OLDRESUME"}]}
+
+$ curl -s -X DELETE http://127.0.0.1:47811/api/live/bfeec455-30eb-43d3-a787-3cd865684d41 -H 'content-type: application/json' -d '{}'
+{"ok":true}
+
