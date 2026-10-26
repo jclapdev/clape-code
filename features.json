@@ -95,9 +95,18 @@
         "A7",
         "A8"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": [
+        "specs/screenshots/002-S4-a7-sessions-default.png",
+        "specs/screenshots/002-S4-a7-show-script-runs.png",
+        "specs/screenshots/002-S4-row-opens-conversation.png",
+        "specs/screenshots/002-S4-a8-project-filter.png",
+        "specs/screenshots/002-S4-a8-every-project.png",
+        "specs/screenshots/002-S4-a8-show-archived.png",
+        "specs/screenshots/002-S4-390-light.png",
+        "specs/screenshots/002-S4-390-dark.png"
+      ]
     },
     {
       "id": "002-S5",
