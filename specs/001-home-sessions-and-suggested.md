@@ -24,7 +24,7 @@ Job 2 in BRIEF.md: see what Claude is waiting on and answer it. Job 4: create a 
 - Threshold 3, at most 5 suggestions, most typed first. Claude's own call.
 - The server sends only the prompt text and its count, never project paths or session ids. Claude's own call, following CLAUDE.md "Pick the fields a view needs instead."
 - The suggested skill name is the prompt in lower case with spaces as hyphens ("read-your-instructions"); the instructions box holds the prompt as typed. A prompt is dropped once a skill with that name exists in any scope. Claude's own call.
-- A usage limit resets within hours, so a run stopped by one more than a day ago needs nothing from him (`isStaleLimit`, `server/src/api/sessions.ts:149`). It stays a normal session row so Continue is still one click.
+- A run stopped by a usage limit asks him nothing: he can only continue it once the limit resets, which for the five-hour limit is within hours and for the weekly limit can be days (https://support.claude.com/en/articles/9797557-usage-limit-best-practices: "Check when your plan's weekly usage limit resets"). So a run stopped more than a day ago (`isStaleLimit`, `server/src/api/sessions.ts:150`) is a normal session row with Continue, and its line no longer claims the limit "has since reset". Claude's own call.
 - The sentence under Home's heading goes. BRIEF.md "What it will not do": "Put a sentence under a heading to explain it. Headings name the thing (S9)."
 
 ## Acceptance checks
