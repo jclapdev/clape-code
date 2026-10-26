@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { BookOpen, ChevronRight, FolderGit2, Home, LayoutGrid, Menu, MessagesSquare, Monitor, Moon, Plus, Settings2, SlidersHorizontal, Sun, type LucideIcon } from "lucide-react";
+import { BookOpen, ChevronRight, FolderGit2, History, Home, LayoutGrid, Menu, MessagesSquare, Monitor, Moon, Plus, Settings2, SlidersHorizontal, Sun, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { FEATURES } from "@/lib/features";
@@ -42,11 +42,12 @@ const itemClass = (on: boolean) =>
     on && "bg-accent font-semibold text-accent-foreground hover:bg-accent hover:text-accent-foreground",
   );
 
-function NavLink({ to, label, icon: Icon, attn, onPick, sub }: { to: string; label: string; icon?: LucideIcon; attn?: number; onPick?: () => void; sub?: boolean }) {
+function NavLink({ to, search, label, icon: Icon, dot, attn, onPick, sub, title }: { to: string; search?: Record<string, unknown>; label: string; icon?: LucideIcon; dot?: string; attn?: number; onPick?: () => void; sub?: boolean; title?: string }) {
   const on = isOn(usePath(), to);
   return (
-    <Link to={to} onClick={onPick} aria-current={on ? "page" : undefined} className={cn(itemClass(on), sub && "h-8 text-[13.5px]")}>
+    <Link to={to} search={search} onClick={onPick} title={title} aria-current={on ? "page" : undefined} className={cn(itemClass(on), sub && "h-8 text-[13.5px]")}>
       {Icon && <Icon className="size-4 flex-none" aria-hidden />}
+      {dot && <span className={cn("mx-1 size-2 flex-none rounded-full", dot)} aria-hidden />}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {attn ? (
         <span className="rounded-full bg-attn-dot px-1.5 text-[11px] font-semibold text-white" aria-label={`${attn} need you`}>
@@ -91,6 +92,77 @@ function useNeeds() {
   return (overview.data?.needsYou?.length ?? 0) + useWaiting();
 }
 
+interface MenuItem {
+  sessionId: string | null;
+  jobId: string | null;
+  title: string;
+  project: string | null;
+}
+interface MenuData {
+  last: MenuItem | null;
+  needsYou: MenuItem[];
+  needsYouMore: number;
+  running: MenuItem[];
+  runningMore: number;
+}
+
+/** The conversation you last sent a message in, the ones that need you and the ones Claude is working in. */
+const useMenu = () => useQuery({ queryKey: ["menu"], queryFn: () => api.get<MenuData>("/menu") }).data;
+const linkOf = (i: MenuItem) => (i.sessionId ? `/sessions/${i.sessionId}` : `/jobs/${i.jobId}`);
+const about = (i: MenuItem) => [i.title, i.project?.split("/").pop()].filter(Boolean).join(" · ");
+const KINDS = [
+  { key: "needsYou", more: "needsYouMore", label: "Needs you", dot: "bg-attn-dot", search: { needs: true } },
+  { key: "running", more: "runningMore", label: "Working", dot: "bg-primary", search: {} },
+] as const;
+
+function Conversations({ onPick }: { onPick?: () => void }) {
+  const m = useMenu();
+  if (!m) return null;
+  return (
+    <>
+      {m.last && <NavLink to={linkOf(m.last)} label="Continue last conversation" icon={History} title={about(m.last)} onPick={onPick} />}
+      {KINDS.map(
+        (k) =>
+          m[k.key].length > 0 && (
+            <section key={k.key} aria-label={k.label} className="mt-1 flex flex-col gap-0.5 pl-2">
+              <h2 className="px-2.5 pt-1 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">{k.label}</h2>
+              {m[k.key].map((i) => (
+                <NavLink key={linkOf(i)} to={linkOf(i)} label={i.title} dot={k.dot} title={about(i)} onPick={onPick} sub />
+              ))}
+              {m[k.more] > 0 && <NavLink to="/sessions" search={k.search} label={`${m[k.more]} more`} onPick={onPick} sub />}
+            </section>
+          ),
+      )}
+    </>
+  );
+}
+
+/** The rail's version: Continue, then a few short lines per conversation that needs you or is running. */
+function RailConversations() {
+  const m = useMenu();
+  const path = usePath();
+  if (!m) return null;
+  return (
+    <>
+      {m.last && <RailLink to={linkOf(m.last)} label="Continue" icon={History} title={`Continue last conversation: ${about(m.last)}`} />}
+      {KINDS.map((k) =>
+        m[k.key].map((i) => (
+          <Link
+            key={linkOf(i)}
+            to={linkOf(i)}
+            title={`${k.label}: ${about(i)}`}
+            aria-current={isOn(path, linkOf(i)) ? "page" : undefined}
+            className={cn("flex w-full flex-none items-start gap-1 rounded-md px-1.5 py-1.5 text-[11px] leading-tight text-ink-2 no-underline hover:bg-sunken hover:text-ink", isOn(path, linkOf(i)) && "bg-accent text-accent-foreground")}
+          >
+            <span className={cn("mt-1 size-1.5 flex-none rounded-full", k.dot)} aria-label={k.label} />
+            <span className="line-clamp-3 min-w-0 break-words">{i.title}</span>
+          </Link>
+        )),
+      )}
+    </>
+  );
+}
+
 function Brand({ onPick }: { onPick?: () => void }) {
   return (
     <Link to="/" onClick={onPick} className="flex min-w-0 items-center gap-2 text-ink no-underline">
@@ -122,6 +194,7 @@ function FullMenu({ onPick, connected }: { onPick?: () => void; connected: boole
       <nav aria-label="Main" className="flex flex-col gap-0.5">
         <NavLink to="/" label="Home" icon={Home} attn={needs || undefined} onPick={onPick} />
         <NavLink to="/sessions" label="Sessions" icon={MessagesSquare} onPick={onPick} />
+        <Conversations onPick={onPick} />
         <Group id="projects" label="Projects" to="/projects" onPick={onPick}>
           {projects.map((p) => (
             <NavLink key={p.id} to={`/projects/${encodeURIComponent(p.id)}`} label={p.name} onPick={onPick} sub />
@@ -147,11 +220,11 @@ function FullMenu({ onPick, connected }: { onPick?: () => void; connected: boole
   );
 }
 
-function RailLink({ to, label, icon: Icon, attn }: { to: string; label: string; icon: LucideIcon; attn?: number }) {
+function RailLink({ to, label, icon: Icon, attn, title }: { to: string; label: string; icon: LucideIcon; attn?: number; title?: string }) {
   const path = usePath();
   const on = isOn(path, to) || (to === "/customize" && FEATURES.some((f) => isOn(path, `/${f.id}`)));
   return (
-    <Link to={to} aria-current={on ? "page" : undefined} className={cn("relative flex w-full flex-none flex-col items-center gap-1 rounded-md px-1 py-2 text-[11.5px] leading-tight text-ink-2 no-underline hover:bg-sunken hover:text-ink", on && "bg-accent font-semibold text-accent-foreground hover:bg-accent hover:text-accent-foreground")}>
+    <Link to={to} title={title} aria-current={on ? "page" : undefined} className={cn("relative flex w-full flex-none flex-col items-center gap-1 rounded-md px-1 py-2 text-[11.5px] leading-tight text-ink-2 no-underline hover:bg-sunken hover:text-ink", on && "bg-accent font-semibold text-accent-foreground hover:bg-accent hover:text-accent-foreground")}>
       <Icon className="size-5" aria-hidden />
       <span className="text-center">{label}</span>
       {attn ? <span className="absolute right-2 top-1.5 size-2 rounded-full bg-attn-dot" aria-label={`${attn} need you`} /> : null}
@@ -169,6 +242,7 @@ function Rail({ connected }: { connected: boolean }) {
       </Link>
       <RailLink to="/" label="Home" icon={Home} attn={needs || undefined} />
       <RailLink to="/sessions" label="Sessions" icon={MessagesSquare} />
+      <RailConversations />
       <RailLink to="/projects" label="Projects" icon={FolderGit2} />
       <RailLink to="/customize" label="Customize" icon={LayoutGrid} />
       <RailLink to="/settings" label="Settings" icon={Settings2} />

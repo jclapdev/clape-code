@@ -3,13 +3,13 @@ import { useEffect, useState } from "react";
 
 // Which query keys depend on which server area.
 const DEPENDS: Record<string, string[][]> = {
-  sessions: [["sessions"], ["session"], ["overview"], ["projects"], ["project"]],
-  jobs: [["jobs"], ["job"], ["overview"]],
+  sessions: [["sessions"], ["session"], ["overview"], ["projects"], ["project"], ["menu"]],
+  jobs: [["jobs"], ["job"], ["overview"], ["menu"]],
   projects: [["projects"], ["project"], ["overview"], ["file"], ["suggested"]],
   library: [["library"], ["file"], ["project"], ["map"], ["suggested"]],
   settings: [["settings"], ["library"], ["file"], ["map"]],
   memory: [["library"], ["memory"], ["file"]],
-  live: [["live"], ["overview"]],
+  live: [["live"], ["overview"], ["menu"]],
   archive: [["archive"], ["library"]],
 };
 

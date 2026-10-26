@@ -299,7 +299,8 @@ export function isStaleLimit(j: { detail: string | null; updatedAt: string | nul
   return /limit/i.test(j.detail ?? "") && !!j.updatedAt && now - Date.parse(j.updatedAt) > 24 * 3600_000;
 }
 
-sessions.get("/overview", async (c) => {
+/** Live requests waiting for an answer, and background sessions blocked on you. */
+async function needsYouNow() {
   const jobs = await listJobs(false);
   const live = listLive();
   const named = (j: (typeof jobs)[number]) => j.name ?? `Session in ${j.cwd ? j.cwd.split(/[\\/]/).filter(Boolean).pop() : "an unknown folder"}`;
@@ -308,10 +309,73 @@ sessions.get("/overview", async (c) => {
     ...live.filter((l) => l.pending.length).map((l) => ({ type: "live" as const, id: l.id, sessionId: l.sessionId, cwd: l.cwd, request: l.pending[0], at: l.pending[0].at })),
     ...blocked.filter((j) => !isStaleLimit(j)).map((j) => ({ type: "job" as const, id: j.id, name: named(j), cwd: j.cwd, detail: j.detail, sessionId: j.sessionId, at: j.updatedAt })),
   ];
+  return { needsYou, live, jobs };
+}
+
+sessions.get("/overview", async (c) => {
+  const { needsYou, live } = await needsYouNow();
   return c.json({
     needsYou,
     live: live.filter((l) => l.status !== "stopped").length,
     waiting: waitingCount(),
+  });
+});
+
+/** At most this many conversations in each of the menu's lists; the rest are on Sessions. */
+const MENU_MAX = 5;
+
+interface MenuItem {
+  sessionId: string | null;
+  jobId: string | null;
+  title: string;
+  project: string | null;
+}
+
+/**
+ * The main menu's conversations: the one you last sent a message in, the ones that need you and the ones Claude is
+ * working in. Runs from scripts and archived conversations are left out, as on Sessions. Only ID, title and project.
+ */
+sessions.get("/menu", async (c) => {
+  const [ctx, { needsYou, jobs }] = await Promise.all([context(), needsYouNow()]);
+  const list = listSessions().filter((s) => s.prompts > 0 && !ctx.archived[s.sessionId] && !isFromScript(s.entrypoint, s.sessionId, ctx.started));
+  const byId = new Map(list.map((s) => [s.sessionId, s]));
+  const jobName = new Map(jobs.flatMap((j) => (j.sessionId && j.name ? [[j.sessionId, j.name] as const] : [])));
+  const projectOf = (cwd: string | null) => ctx.projectOf(cwd ? untildify(cwd) : null);
+  const item = (s: IndexedSession): MenuItem => ({ sessionId: s.sessionId, jobId: null, title: jobName.get(s.sessionId) ?? s.title ?? untitled(s.firstPrompt), project: ctx.projectOf(s.cwd) });
+  const last = list.reduce<IndexedSession | null>((a, s) => ((s.lastPromptAt ?? "") > (a?.lastPromptAt ?? "") ? s : a), null);
+
+  const seen = new Set<string>();
+  const needs: MenuItem[] = [];
+  const running: MenuItem[] = [];
+  for (const n of needsYou) {
+    const key = n.sessionId ?? `job:${n.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const s = n.sessionId ? byId.get(n.sessionId) : undefined;
+    if (s) needs.push(item(s));
+    else if (n.type === "job") needs.push({ sessionId: n.sessionId, jobId: n.id, title: n.name, project: projectOf(n.cwd) });
+    else if (n.sessionId) needs.push({ sessionId: n.sessionId, jobId: null, title: "New conversation", project: projectOf(n.cwd) });
+  }
+  // Newest activity first.
+  for (const s of list) {
+    const a = ctx.activity.get(s.sessionId);
+    if (!a || seen.has(s.sessionId)) continue;
+    seen.add(s.sessionId);
+    (a === "waiting" ? needs : running).push(item(s));
+  }
+  // A conversation started here that Claude Code hasn't written a transcript for yet.
+  for (const [sid, a] of ctx.activity) {
+    const fresh = seen.has(sid) || sessionById(sid) ? null : liveBySessionId(sid);
+    if (!fresh) continue;
+    seen.add(sid);
+    (a === "waiting" ? needs : running).unshift({ sessionId: sid, jobId: null, title: "New conversation", project: projectOf(fresh.view().cwd) });
+  }
+  return c.json({
+    last: last ? item(last) : null,
+    needsYou: needs.slice(0, MENU_MAX),
+    needsYouMore: Math.max(0, needs.length - MENU_MAX),
+    running: running.slice(0, MENU_MAX),
+    runningMore: Math.max(0, running.length - MENU_MAX),
   });
 });
 

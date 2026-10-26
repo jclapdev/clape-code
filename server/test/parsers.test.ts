@@ -241,6 +241,9 @@ describe("transcript", () => {
       ["assistant", "DONE TWO"],
     ]);
     expect(summarize(lines, "s").entrypoint).toBe("sdk-cli");
+    // The last message you sent is the mid-turn one, not Claude's later reply.
+    expect(summarize(lines, "s")).toMatchObject({ lastPromptAt: "2026-10-26T02:37:20Z", lastAt: "2026-10-26T02:37:30Z" });
+    expect(summarize(lines.split("\n").slice(0, 2).join("\n"), "s").lastPromptAt).toBe("2026-10-26T02:37:10Z");
   });
 
   test("the stand-in reply Claude Code writes after a stop isn't shown as Claude's", () => {

@@ -6,7 +6,7 @@ import { readLines } from "../fs/lines";
 import { Summarizer, type SessionSummary } from "../parsers/transcript";
 
 // A rebuildable cache. Files on disk are the truth; deleting index.sqlite only costs a re-scan.
-const SCHEMA_VERSION = 6; // 3: search text includes Claude's replies; 4: plan files per session; 5: entrypoint; 6: summary titles
+const SCHEMA_VERSION = 7; // 3: search text includes Claude's replies; 4: plan files per session; 5: entrypoint; 6: summary titles; 7: lastPromptAt
 
 let db: Database | null = null;
 

@@ -68,7 +68,7 @@ beforeAll(async () => {
 afterAll(() => rm(root, { recursive: true, force: true }));
 
 describe("secrets never leave the server", () => {
-  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d", "/api/suggested"];
+  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d", "/api/suggested", "/api/menu"];
   for (const ep of endpoints) {
     test(ep, async () => {
       const res = await request(ep);
@@ -723,6 +723,43 @@ describe("a conversation is addressed by its session ID", () => {
       await until(async () => (await get(`/api/sessions/${sessionId}`)).status === "idle");
       await post(`/api/sessions/${sessionId}/stop`);
     });
+  });
+
+  test("A9: the menu continues the conversation you last sent a message in and lists those that need you or are running", async () => {
+    // Typed into on 19 Oct, but Claude's reply came on 21 Oct, after the last message typed in TERMINAL (20 Oct).
+    const CHATTY = "7a1b2c3d-0000-4000-8000-000000000002";
+    const line = (o: object) => JSON.stringify({ entrypoint: "cli", sessionId: CHATTY, cwd: join(root, "projects", "demo"), ...o });
+    await writeFile(
+      join(root, ".claude", "projects", "-demo", `${CHATTY}.jsonl`),
+      [line({ type: "user", timestamp: "2026-10-19T10:00:00Z", message: { role: "user", content: "a long job" } }), line({ type: "assistant", timestamp: "2026-10-21T10:00:00Z", message: { id: "m1", model: "m", role: "assistant", content: [{ type: "text", text: "done" }] } })].join("\n") + "\n",
+    );
+    const { indexSessions } = await import("../src/db/index");
+    await indexSessions();
+    const menu = await get("/api/menu");
+    // The fixture session is a `claude -p` run, so it is never the one to continue.
+    expect(menu.last).toEqual({ sessionId: TERMINAL, jobId: null, title: "hello from the terminal", project: "~/projects/demo" });
+    expect(Object.keys(menu.last).sort()).toEqual(["jobId", "project", "sessionId", "title"]);
+    // A background session blocked on you is listed by its name.
+    expect(menu.needsYou).toContainEqual({ sessionId: null, jobId: "new-limit", title: "new-limit", project: null });
+    expect(menu.needsYou.some((n: any) => n.jobId === "old-limit")).toBe(false);
+    // An archived conversation isn't offered.
+    await post("/api/sessions/archive", { ids: [TERMINAL], archived: true });
+    expect((await get("/api/menu")).last.sessionId).toBe(CHATTY);
+    await post("/api/sessions/archive", { ids: [TERMINAL], archived: false });
+
+    const asks = (await (await post("/api/sessions/new", { project: "~/projects/demo", prompt: "make a file" })).json()).sessionId;
+    const works = (await (await post("/api/sessions/new", { project: "~/projects/demo", prompt: "slow" })).json()).sessionId;
+    await until(async () => {
+      const m = await get("/api/menu");
+      return m.needsYou.some((n: any) => n.sessionId === asks) && m.running.some((n: any) => n.sessionId === works);
+    });
+    const m = await get("/api/menu");
+    expect(m.running.find((n: any) => n.sessionId === works)).toEqual({ sessionId: works, jobId: null, title: "New conversation", project: "~/projects/demo" });
+    expect(m.running.some((n: any) => n.sessionId === asks)).toBe(false);
+    release();
+    await post(`/api/sessions/${asks}/stop`);
+    await post(`/api/sessions/${works}/stop`);
+    await until(async () => !(await get("/api/menu")).running.some((n: any) => n.sessionId === works));
   });
 
   test("the overview names the conversation a waiting request belongs to", async () => {

@@ -19,6 +19,8 @@ export interface SessionSummary {
   firstPrompt: string | null;
   firstAt: string | null;
   lastAt: string | null;
+  /** When a person last sent a message: a prompt, or one sent while Claude was working. */
+  lastPromptAt: string | null;
   model: string | null;
   version: string | null;
   prompts: number;
@@ -83,6 +85,7 @@ export class Summarizer {
       firstPrompt: null,
       firstAt: null,
       lastAt: null,
+      lastPromptAt: null,
       model: null,
       version: null,
       prompts: 0,
@@ -123,6 +126,8 @@ export class Summarizer {
       if (!s.firstAt) s.firstAt = d.timestamp;
       s.lastAt = d.timestamp;
     }
+    // A message sent while Claude works is recorded only as a queued prompt (see TurnBuilder).
+    if (d.type === "attachment" && d.attachment?.type === "queued_command" && d.attachment.commandMode === "prompt" && typeof d.timestamp === "string") s.lastPromptAt = d.timestamp;
     switch (d.type) {
       case "ai-title":
         this.aiTitle = d.aiTitle ?? this.aiTitle;
@@ -146,6 +151,7 @@ export class Summarizer {
         const p = promptTextOf(d);
         if (p) {
           s.prompts++;
+          if (typeof d.timestamp === "string") s.lastPromptAt = d.timestamp;
           if (!s.firstPrompt) s.firstPrompt = p.slice(0, 500);
           this.addText(p);
         }
