@@ -30,10 +30,10 @@ const LISTS = [
   { value: "deny", label: "Never allowed" },
 ];
 
-const SPEC: Record<AddWhat, { title: string; intro: string; guide: string; section: string }> = {
-  permission: { title: "New permission rule", intro: "Decide which actions Claude may take without asking, must always ask about, or may never take.", guide: "settings", section: "settings" },
-  hook: { title: "New hook", intro: "A hook is a command Claude Code runs on its own at a set moment, every time, such as formatting a file after Claude edits it.", guide: "hooks", section: "hooks" },
-  mcp: { title: "Add an MCP server", intro: "An MCP server connects Claude to an outside tool or service, such as GitHub, a database or Notion.", guide: "mcp", section: "mcp" },
+const SPEC: Record<AddWhat, { title: string; guide: string; section: string }> = {
+  permission: { title: "New permission rule", guide: "settings", section: "settings" },
+  hook: { title: "New hook", guide: "hooks", section: "hooks" },
+  mcp: { title: "Add an MCP server", guide: "mcp", section: "mcp" },
 };
 
 function Field({ label, hint, htmlFor, children }: { label: string; hint?: string; htmlFor?: string; children: ReactNode }) {
@@ -94,10 +94,7 @@ export function AddSettingPage() {
             if (ready) save.mutate();
           }}
         >
-          <div>
-            <h1 className="text-[24px] font-semibold">{spec.title}</h1>
-            <p className="mt-1 text-ink-2">{spec.intro}</p>
-          </div>
+          <h1 className="text-[24px] font-semibold">{spec.title}</h1>
           <Field label="Where it applies" htmlFor="scope">
             <SimpleSelect id="scope" label="Where it applies" value={scope} onChange={setScope} options={scopes} />
           </Field>

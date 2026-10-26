@@ -18,7 +18,7 @@ import { errorResponse } from "./errors";
 import { WriteError } from "./fs/safeWrite";
 import { startWatching } from "./fs/watch";
 import { stopAll } from "./live/sessions";
-import { bump } from "./metrics";
+import { bump, metricFor } from "./metrics";
 import { globalLibrary, projectLibrary } from "./scan/library";
 import { listProjects } from "./scan/projects";
 
@@ -28,13 +28,8 @@ app.use("*", guard((c) => getConnInfo(c).remote.address));
 app.use("/api/*", async (c, next) => {
   await next();
   if (c.res.status < 300) {
-    const p = new URL(c.req.url).pathname;
-    if (c.req.method === "PUT" && p === "/api/file") void bump("edits.saved");
-    else if (/^\/api\/projects\/.+\/(backlog|changelog)/.test(p)) void bump("edits.saved");
-    else if (/^\/api\/live\/[^/]+\/respond$/.test(p)) void bump("live.answered");
-    else if (c.req.method === "POST" && p === "/api/live") void bump("live.started");
-    else if (/^\/api\/(library\/archive|sessions\/archive)$/.test(p)) void bump("items.archived");
-    else if (/^\/api\/(library|sessions)\/delete$/.test(p)) void bump("items.deleted");
+    const key = metricFor(c.req.method, new URL(c.req.url).pathname);
+    if (key) void bump(key);
   }
 });
 app.onError((err, c) => {

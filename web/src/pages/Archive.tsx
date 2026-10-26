@@ -40,10 +40,7 @@ export function ArchivePage() {
     onError: (e: Error) => toast.error(e.message),
   });
   return (
-    <Page
-      title="Archived items"
-      sub="Items you deleted from the app. Claude Code doesn't load them; restore puts each back where it came from."
-    >
+    <Page title="Archived items">
       {q.isLoading && <Loading />}
       <ErrorNote error={q.error} />
       {q.data && !q.data.length && <EmptyState title="No archived items">Things archived earlier show up here so you can put them back.</EmptyState>}

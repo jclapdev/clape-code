@@ -768,3 +768,19 @@ describe("a conversation is addressed by its session ID", () => {
     await post(`/api/sessions/${sessionId}/stop`);
   });
 });
+
+describe("usage statistics", () => {
+  test("count the requests the app makes today", async () => {
+    const { metricFor } = await import("../src/metrics");
+    expect(metricFor("PUT", "/api/file")).toBe("edits.saved");
+    expect(metricFor("POST", "/api/projects/~%2Fprojects%2Fdemo/backlog")).toBe("edits.saved");
+    expect(metricFor("POST", "/api/sessions/new")).toBe("live.started");
+    expect(metricFor("POST", "/api/sessions/abc/respond")).toBe("live.answered");
+    expect(metricFor("POST", "/api/live/abc/respond")).toBe("live.answered");
+    expect(metricFor("POST", "/api/library/archive")).toBe("items.archived");
+    expect(metricFor("POST", "/api/sessions/archive")).toBe("items.archived");
+    expect(metricFor("POST", "/api/sessions/delete")).toBe("items.deleted");
+    expect(metricFor("POST", "/api/sessions/abc/send")).toBeNull();
+    expect(metricFor("GET", "/api/sessions/new")).toBeNull();
+  });
+});

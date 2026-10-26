@@ -70,7 +70,7 @@ export function NewProjectPage() {
   };
 
   return (
-    <Page title="New project" sub="A folder for the project, ready for Claude: git, a starter CLAUDE.md and an empty board.">
+    <Page title="New project">
       <form onSubmit={submit} className="flex max-w-[640px] flex-col gap-5">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="np-name" className="text-[14px] font-medium">

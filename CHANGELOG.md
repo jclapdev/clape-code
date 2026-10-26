@@ -63,9 +63,12 @@ Notable changes to Control Center, newest first.
 - The command palette and its hidden keyboard shortcuts.
 - The separate Sessions, Live, Jobs, Library, Settings and Map menu entries. Old links land on the pages that replaced them: /jobs and /live open Sessions, /map opens Customize, and an old Library link to one kind of item, such as agents, opens that kind's page.
 - The File locations page (/map).
+- The explaining sentence under the headings of Customize and each of its lists, Settings, Archived items, Guides, New project and the New item forms.
+- App preferences no longer lists shortcuts and features that are gone (⌘K, `[`, `]`, the other single-key shortcuts, dragging dividers, saving feedback from the search box) or the feedback file; it lists ⌘S (Ctrl S on Windows and Linux), which saves the open file.
 
 ### Fixed
 
+- Usage statistics in App preferences count sessions started and questions answered from a conversation page again.
 - Stopping a new conversation within about a second of its first message, then sending, no longer fails with "No conversation found" and loses the message: the send waits for the transcript Claude Code is still writing.
 - After a stop, the conversation no longer shows "No response requested." as Claude's reply.
 - The Control Center window keeps working when you turn home network mode on or off from it, instead of going unresponsive until the app is reopened. If the window's local address can't be opened, it says so instead of staying blank.

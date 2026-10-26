@@ -63,4 +63,20 @@ describe("wording", () => {
   test("titles don't use words only Claude Code insiders know", () => {
     expect(all.filter((t) => INSIDER.test(t.text))).toEqual([]);
   });
+
+  test("no page puts a sentence under its heading to explain it", () => {
+    // A heading's sub line may show data (a path, an account), never a written sentence; feature and form intros are gone too.
+    const hits = files(WEB).flatMap((f) => {
+      const src = readFileSync(f, "utf8");
+      return [...src.matchAll(/\bsub="([^"]*)"|\bintro: "([^"]*)"|\{(?:f|spec)\.intro\}/g)].map((m) => `${relative(WEB, f)}: ${m[0]}`);
+    });
+    expect(hits).toEqual([]);
+  });
+
+  test("App preferences only lists shortcuts and features that exist", () => {
+    const src = readFileSync(join(WEB, "pages", "Preferences.tsx"), "utf8");
+    for (const gone of ['"K"', '["["]', '["]"]', '"g", "h"', "Drag a divider", "Save as feedback", "search box", "Pane sizes", "FeedbackFile"]) expect(src).not.toContain(gone);
+    // The one shortcut it lists, Save, is bound in the editor.
+    expect(readFileSync(join(WEB, "components", "Editor.tsx"), "utf8")).toContain('key: "Mod-s"');
+  });
 });

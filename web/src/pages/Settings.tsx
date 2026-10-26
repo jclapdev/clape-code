@@ -726,7 +726,7 @@ export function SettingsPage() {
   const projectOptions = (projects.data ?? []).filter((p) => p.group === "root" && !p.empty);
 
   return (
-    <Page title="Settings" sub="How Claude Code behaves: what it may do, which model it uses, its sandbox, shortcuts and colors.">
+    <Page title="Settings">
       <div className="flex gap-8">
         <div className="flex min-w-0 max-w-[900px] flex-1 flex-col">
           <Section id="account" title="Account">

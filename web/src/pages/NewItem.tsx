@@ -18,7 +18,6 @@ export type NewKind = "skill" | "command" | "agent" | "rule" | "output-style" | 
 
 interface KindSpec {
   title: string;
-  intro: string;
   guides: { slug: string; label: string }[];
   name?: string;
   description?: { label: string; hint: string; required: boolean };
@@ -30,7 +29,6 @@ interface KindSpec {
 export const KINDS: Record<NewKind, KindSpec> = {
   skill: {
     title: "New skill",
-    intro: "A skill teaches Claude a task or gives it know-how. Claude uses it when your request matches the description, or when you type /name.",
     guides: [
       { slug: "skill-best-practices", label: "Writing a good skill" },
       { slug: "skill-descriptions", label: "Writing the description" },
@@ -43,7 +41,6 @@ export const KINDS: Record<NewKind, KindSpec> = {
   },
   command: {
     title: "New command",
-    intro: "A command is a prompt you run by typing /name. Claude Code now saves commands as skills that only run when you type them.",
     guides: [{ slug: "skills", label: "How skills and commands work" }],
     name: "Lowercase letters, numbers and hyphens. You'll run it as /name.",
     description: { label: "What it does", hint: "Shown next to the command when you type /.", required: true },
@@ -52,7 +49,6 @@ export const KINDS: Record<NewKind, KindSpec> = {
   },
   agent: {
     title: "New agent",
-    intro: "An agent is a helper with its own instructions, tools and model. Claude hands it work that matches its description and gets a summary back.",
     guides: [{ slug: "agents", label: "Agents (subagents)" }],
     name: "Lowercase letters, numbers and hyphens, such as code-reviewer.",
     description: { label: "When Claude should hand work to it", hint: 'Claude reads this to decide when to delegate. Add "Use proactively" if it should step in on its own.', required: true },
@@ -61,7 +57,6 @@ export const KINDS: Record<NewKind, KindSpec> = {
   },
   rule: {
     title: "New rule",
-    intro: "A rule is an instruction Claude follows when it works on certain files, such as everything under src/api.",
     guides: [{ slug: "memory", label: "Instructions and rules" }],
     name: "A short file name, such as api-design.",
     body: { label: "The rule", hint: "What Claude should do when working on those files." },
@@ -69,7 +64,6 @@ export const KINDS: Record<NewKind, KindSpec> = {
   },
   "output-style": {
     title: "New output style",
-    intro: "An output style changes how Claude writes every reply in a session, such as shorter answers or a different role. Pick it with /output-style.",
     guides: [{ slug: "output-styles", label: "Output styles" }],
     name: "A short name, such as terse.",
     description: { label: "What it changes", hint: "Shown in the style picker.", required: false },
@@ -78,7 +72,6 @@ export const KINDS: Record<NewKind, KindSpec> = {
   },
   memory: {
     title: "New memory note",
-    intro: "A note Claude reads at the start of every session in this project, listed in the project's memory index.",
     guides: [{ slug: "memory", label: "Instructions and memory" }],
     name: "A short file name, such as testing-setup.",
     description: { label: "One line about it", hint: "Shown in the memory index Claude reads.", required: false },
@@ -88,7 +81,6 @@ export const KINDS: Record<NewKind, KindSpec> = {
   },
   instructions: {
     title: "New instructions",
-    intro: "Instructions Claude reads at the start of every session: commands it can't guess, code style, and how you like to work.",
     guides: [
       { slug: "memory", label: "Writing CLAUDE.md" },
       { slug: "best-practices", label: "Best practices" },
@@ -190,10 +182,7 @@ export function NewItemPage() {
             if (ready) create.mutate();
           }}
         >
-          <div>
-            <h1 className="text-[24px] font-semibold">{spec.title}</h1>
-            <p className="mt-1 text-ink-2">{spec.intro}</p>
-          </div>
+          <h1 className="text-[24px] font-semibold">{spec.title}</h1>
           <Field label="Where it applies" htmlFor="scope">
             <SimpleSelect id="scope" label="Where it applies" value={scope} onChange={setScope} options={scopes} placeholder="Pick a project" />
           </Field>

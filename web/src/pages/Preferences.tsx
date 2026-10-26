@@ -15,7 +15,6 @@ interface Config {
   projectRoots: string[];
   port: number;
   lan: { enabled: boolean; hasPassword: boolean };
-  feedbackFile: string;
   platform: string;
 }
 
@@ -28,15 +27,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-const SHORTCUTS: [string[], string][] = [
-  [["⌘", "K"], "Search and actions"],
-  [["["], "Hide or show the menu"],
-  [["]"], "Hide or show the list pane"],
-  [["/"], "Filter the current list"],
-  [["e"], "Edit the open file"],
-  [["g", "h"], "Go to Home (also g p, g s, g l, g j, g i, g t, g m, g a)"],
-  [["⌘", "S"], "Save the open file"],
-];
+const SHORTCUTS: [(mac: boolean) => string[], string][] = [[(mac) => [mac ? "⌘" : "Ctrl", "S"], "Save the open file"]];
 
 const METRIC_LABEL: Record<string, string> = {
   "edits.saved": "Edits saved",
@@ -47,45 +38,8 @@ const METRIC_LABEL: Record<string, string> = {
   "items.deleted": "Delete actions",
 };
 
-function FeedbackFileField() {
-  const cfg = useQuery({ queryKey: ["config"], queryFn: () => api.get<Config>("/config") });
-  const [path, setPath] = useState("");
-  const qc = useQueryClient();
-  useEffect(() => {
-    if (cfg.data) setPath(cfg.data.feedbackFile);
-  }, [cfg.data]);
-  const save = useMutation({
-    mutationFn: () => api.post("/config", { feedbackFile: path }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["config"] });
-      qc.invalidateQueries({ queryKey: ["metrics"] });
-      toast.success("Feedback file saved.");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  return (
-    <form
-      className="flex flex-col gap-1.5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        save.mutate();
-      }}
-    >
-      <label htmlFor="ff" className="text-[13px] text-ink-2">
-        Feedback is added to
-      </label>
-      <div className="flex gap-2">
-        <Input id="ff" value={path} onChange={(e) => setPath(e.target.value)} className="font-mono text-[13px]" />
-        <Button type="submit" variant="outline" busy={save.isPending} disabled={!path.trim() || path === cfg.data?.feedbackFile}>
-          Save
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 function UsageCard() {
-  const q = useQuery({ queryKey: ["metrics"], queryFn: () => api.get<{ counts: Record<string, number>; feedback: string }>("/metrics") });
+  const q = useQuery({ queryKey: ["metrics"], queryFn: () => api.get<{ counts: Record<string, number> }>("/metrics") });
   const counts = q.data?.counts ?? {};
   const views = Object.entries(counts)
     .filter(([k]) => k.startsWith("view."))
@@ -94,7 +48,6 @@ function UsageCard() {
     .join(", ");
   return (
     <Card title="Usage statistics">
-      <p className="text-[13px] text-muted-foreground">Counted on this computer only, for reviewing what to build next. Save feedback from the search box (⌘K): type a note and choose “Save as feedback”.</p>
       <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-[13.5px]">
         {Object.entries(METRIC_LABEL).map(([k, label]) => (
           <div key={k} className="contents">
@@ -104,8 +57,6 @@ function UsageCard() {
         ))}
       </dl>
       {views && <p className="text-[13px] text-muted-foreground">Views opened: {views}</p>}
-      <FeedbackFileField />
-      {q.data?.feedback && <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-sunken p-2.5 text-[12.5px]">{q.data.feedback}</pre>}
     </Card>
   );
 }
@@ -155,7 +106,6 @@ export function PreferencesPage() {
               <ToggleGroupItem value="dark">Dark</ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <p className="text-[13px] text-muted-foreground">Pane sizes and collapsed panes are remembered in this browser. Drag a divider to resize; double-click it to reset.</p>
         </Card>
 
         <Card title="Project folders">
@@ -220,7 +170,7 @@ export function PreferencesPage() {
               <li key={what} className="flex items-center justify-between gap-3 text-[13.5px]">
                 <span className="text-ink-2">{what}</span>
                 <span className="flex gap-1">
-                  {keys.map((k) => (
+                  {keys(/Mac|iPhone|iPad/.test(navigator.userAgent)).map((k) => (
                     <Kbd key={k}>{k}</Kbd>
                   ))}
                 </span>

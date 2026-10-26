@@ -1,15 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { getConfig } from "./config";
-import { appDir, untildify } from "./fs/paths";
-import { readWithHash, safeWrite } from "./fs/safeWrite";
+import { appDir } from "./fs/paths";
 
 // Local-only counts for the post-launch review: which views get used, edits saved,
 // conflicts caught, sessions answered from the browser. Nothing leaves this machine.
 const file = () => join(appDir(), "metrics.json");
-
-/** FEEDBACK.md in the repo by default, so the Iterate step can review it there. */
-export const feedbackFile = async () => untildify((await getConfig()).feedbackFile);
 
 let counts: Record<string, number> | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -36,17 +31,16 @@ export async function bump(key: string) {
   }, 1000);
 }
 
+/** Which count a successful API request adds to, if any. */
+export function metricFor(method: string, path: string): string | null {
+  if (method === "PUT" && path === "/api/file") return "edits.saved";
+  if (/^\/api\/projects\/.+\/(backlog|changelog)/.test(path)) return "edits.saved";
+  if (method !== "POST") return null;
+  if (/^\/api\/(live\/[^/]+|sessions\/[^/]+)\/respond$/.test(path)) return "live.answered";
+  if (path === "/api/sessions/new") return "live.started";
+  if (/^\/api\/(library|sessions)\/archive$/.test(path)) return "items.archived";
+  if (/^\/api\/(library|sessions)\/delete$/.test(path)) return "items.deleted";
+  return null;
+}
+
 export const getMetrics = async () => ({ ...(await load()) });
-
-/** Append one dated note. Goes through safeWrite like every other change to a user's file. */
-export async function addFeedback(text: string) {
-  const path = await feedbackFile();
-  const cur = await readWithHash(path);
-  const base = cur?.content ?? "# Feedback\n\nNotes saved from Control Center's search box, oldest first.\n\n";
-  const line = `- ${new Date().toISOString().slice(0, 16).replace("T", " ")} ${text.replace(/\s+/g, " ").trim()}\n`;
-  await safeWrite(path, base.endsWith("\n") ? base + line : base + "\n" + line, cur?.hash ?? null);
-}
-
-export async function readFeedback(): Promise<string> {
-  return readFile(await feedbackFile(), "utf8").catch(() => "");
-}

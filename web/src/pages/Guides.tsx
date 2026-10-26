@@ -48,7 +48,7 @@ export function GuidesPage() {
       </div>
     );
   return (
-    <Page title="Guides" sub="The official guides for Claude Code and for writing skills, shown here so you don't have to leave the app.">
+    <Page title="Guides">
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
         {(list.data ?? []).map((g) => (
           <Link key={g.slug} to="/guides/$slug" params={{ slug: g.slug }} className="rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-line-strong">

@@ -4,11 +4,11 @@ import { streamSSE } from "hono/streaming";
 import { allowLoginAttempt, COOKIE, issueToken, verifyToken } from "../auth";
 import { getConfig, publicConfig, saveConfig } from "../config";
 import { subscribe, type AppEvent } from "../events";
-import { canRead, canWrite } from "../fs/policy";
+import { canRead } from "../fs/policy";
 import { untildify } from "../fs/paths";
 import { WriteError } from "../fs/safeWrite";
 import { waitingCount } from "../live/sessions";
-import { addFeedback, bump, getMetrics, readFeedback } from "../metrics";
+import { bump, getMetrics } from "../metrics";
 import type { Env } from "./env";
 
 export const system = new Hono<Env>();
@@ -45,18 +45,12 @@ system.post("/auth/logout", (c) => {
 system.get("/config", async (c) => c.json({ ...publicConfig(await getConfig()), platform: process.platform }));
 
 system.post("/config", async (c) => {
-  const { projectRoots, feedbackFile } = await c.req.json();
+  const { projectRoots } = await c.req.json();
   const cfg = await getConfig();
   const next = { ...cfg };
   if (projectRoots !== undefined) {
     if (!Array.isArray(projectRoots) || !projectRoots.every((r) => typeof r === "string" && r.trim())) throw new WriteError(400, "Project folders must be a list of paths.");
     next.projectRoots = projectRoots.map((r: string) => r.trim());
-  }
-  if (feedbackFile !== undefined) {
-    const f = String(feedbackFile).trim();
-    if (!f.toLowerCase().endsWith(".md")) throw new WriteError(400, "The feedback file must be a .md file.");
-    if (!canWrite(untildify(f))) throw new WriteError(400, "The feedback file must be inside one of your projects so the app may write it.");
-    next.feedbackFile = f;
   }
   await saveConfig(next);
   return c.json(publicConfig(await getConfig()));
@@ -84,13 +78,7 @@ system.post("/metrics/view", async (c) => {
   if (typeof view === "string" && /^[a-z]{1,20}$/.test(view)) await bump(`view.${view}`);
   return c.json({ ok: true });
 });
-system.get("/metrics", async (c) => c.json({ counts: await getMetrics(), feedback: await readFeedback() }));
-system.post("/feedback", async (c) => {
-  const { text } = await c.req.json();
-  if (!String(text ?? "").trim()) throw new WriteError(400, "Write something first.");
-  await addFeedback(String(text).slice(0, 2000));
-  return c.json({ ok: true });
-});
+system.get("/metrics", async (c) => c.json({ counts: await getMetrics() }));
 
 /** Open a file or folder in the editor or file manager on the computer running the app. */
 system.post("/open", async (c) => {

@@ -321,17 +321,11 @@ function ListHead({ f, count, total, q, setQ, project, setProject, projects }: {
         <h1 className="text-[24px] font-semibold tracking-[-0.01em]">{f.label}</h1>
         {f.id === "plugins" ? <PluginLinks /> : <NewLink f={f} project={project} />}
       </div>
-      <p className="leading-relaxed text-ink-2">
-        {f.intro}
-        {f.guide && (
-          <>
-            {" "}
-            <Link to="/guides/$slug" params={{ slug: f.guide }}>
-              Read the guide
-            </Link>
-          </>
-        )}
-      </p>
+      {f.guide && (
+        <Link to="/guides/$slug" params={{ slug: f.guide }} className="self-start text-[13.5px]">
+          Read the guide
+        </Link>
+      )}
       <div className="flex flex-wrap gap-2">
         <div className="relative min-w-[180px] flex-1">
           <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -447,7 +441,7 @@ export function CustomizePage() {
   if (cat.error) return <ErrorNote error={cat.error} />;
   const items = cat.data!.items;
   return (
-    <Page title="Customize" sub="Everything that changes how Claude Code works, in every project and from every plugin. Pick one to see, change or add to it.">
+    <Page title="Customize">
       <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
         {FEATURES.map((f) => {
           const n = countFor(f.id, items, live.data);
@@ -459,7 +453,6 @@ export function CustomizePage() {
                   <span className="flex-1 font-medium">{f.label}</span>
                   <span className="text-[13px] text-muted-foreground">{n}</span>
                 </span>
-                <span className="text-[13.5px] leading-relaxed text-ink-2">{f.intro}</span>
               </Link>
             </li>
           );

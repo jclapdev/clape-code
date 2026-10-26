@@ -68,7 +68,7 @@ Starting and answering sessions uses the Claude Code installed on the computer, 
 | Map | Every file and folder Claude Code uses, what it is, and whether you can edit it. |
 | Archive | Items you archived, with Restore. |
 
-Press <kbd>⌘K</kbd> (<kbd>Ctrl K</kbd> on Windows and Linux) to search everything. <kbd>[</kbd> and <kbd>]</kbd> hide the menu and the list pane; drag the dividers to resize. Preferences has the theme (match system, light, dark) and the full shortcut list.
+The search box at the top of the menu searches everything. <kbd>⌘S</kbd> (<kbd>Ctrl S</kbd> on Windows and Linux) saves the open file. Preferences has the theme (match system, light, dark).
 
 ## How it keeps your files safe
 
@@ -78,7 +78,7 @@ Press <kbd>⌘K</kbd> (<kbd>Ctrl K</kbd> on Windows and Linux) to search everyth
 - Archive moves an item into the app's `archive` folder so Claude Code stops loading it; Restore puts it back. Delete moves it to the system trash.
 - Archived sessions are only hidden from the list, so `claude --resume` still works.
 
-App data lives in `~/.config/control-center` (macOS and Linux) or `%APPDATA%\control-center` (Windows): `config.json`, `backups/`, `archive/`, `index.sqlite` (a cache you can delete) and `metrics.json`. Notes saved as feedback from the search box go to `FEEDBACK.md` in this repository; Preferences sets a different file.
+App data lives in `~/.config/control-center` (macOS and Linux) or `%APPDATA%\control-center` (Windows): `config.json`, `backups/`, `archive/`, `index.sqlite` (a cache you can delete) and `metrics.json`.
 
 ## Home network mode
 
