@@ -399,7 +399,7 @@ export function NewButton({ kind, scope, label }: { kind: NewKind; scope: string
 }
 
 /** A button that opens a form or a pre-filled session. */
-export function ActionLink({ to, search, label, primary }: { to: "/add" | "/live"; search: Record<string, string>; label: string; primary?: boolean }) {
+export function ActionLink({ to, search, label, primary }: { to: "/add" | "/sessions/new"; search: Record<string, string>; label: string; primary?: boolean }) {
   return (
     <Button asChild size="sm" variant={primary ? "default" : "outline"} className="no-underline">
       <Link to={to} search={search}>
@@ -581,7 +581,7 @@ function ProjectDetailView({ id }: { id: string }) {
               Open folder
             </Button>
             <Button asChild className="no-underline">
-              <Link to="/live" search={{ new: "1", project: p.id }}>
+              <Link to="/sessions/new" search={{ project: p.id }}>
                 New session
               </Link>
             </Button>

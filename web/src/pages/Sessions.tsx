@@ -79,7 +79,7 @@ function SessionsList({ search }: { search: SessionsSearch }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-[24px] font-semibold tracking-[-0.01em]">Sessions</h1>
         <Button asChild className="no-underline">
-          <Link to="/live" search={{ new: "1", ...(project && project !== OUTSIDE ? { project } : {}) } as never}>
+          <Link to="/sessions/new" search={project && project !== OUTSIDE ? { project } : {}}>
             <Plus aria-hidden /> New session
           </Link>
         </Button>

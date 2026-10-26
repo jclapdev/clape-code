@@ -14,7 +14,7 @@ export interface Feature {
   intro: string;
   kinds: Kind[];
   /** What the New button makes, and its label. */
-  create?: { label: string; to: "/new" | "/add" | "/live"; search: Record<string, string> };
+  create?: { label: string; to: "/new" | "/add" | "/sessions/new"; search: Record<string, string> };
   guide?: string; // slug on the Guides page
 }
 
@@ -95,7 +95,7 @@ export const FEATURES: Feature[] = [
     icon: ClipboardList,
     intro: "The step-by-step plans Claude writes in plan mode before it changes anything, for you to read and approve.",
     kinds: ["plan"],
-    create: { label: "New plan", to: "/live", search: { new: "1", mode: "plan" } },
+    create: { label: "New plan", to: "/sessions/new", search: { mode: "plan" } },
   },
   {
     id: "scheduled",

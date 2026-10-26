@@ -71,7 +71,7 @@ export function HomePage() {
       title="Control Center"
       actions={
         <Button asChild size="lg" className="no-underline">
-          <Link to="/live" search={{ new: "1" } as never}>
+          <Link to="/sessions/new" search={{}}>
             New session
           </Link>
         </Button>

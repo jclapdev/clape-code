@@ -48,7 +48,7 @@ export function NewProjectPage() {
             <p className="text-[13.5px] text-ink-2">Starts a session in the new folder with /init, which has Claude look at the project and fill in CLAUDE.md. Best once there are some files in it.</p>
             <div className="flex flex-wrap gap-2 pt-1">
               <Button asChild className="no-underline">
-                <Link to="/live" search={{ new: "1", project: p.id, prompt: "/init" }}>
+                <Link to="/sessions/new" search={{ project: p.id, prompt: "/init" }}>
                   Have Claude set it up
                 </Link>
               </Button>

@@ -110,7 +110,7 @@ function NewLink({ f, project }: { f: Feature; project: string }) {
   if (!f.create) return null;
   const search: Record<string, string> = { ...f.create.search };
   if (project) {
-    if (f.create.to === "/live") {
+    if (f.create.to === "/sessions/new") {
       if (project !== "global") search.project = project;
     } else search.scope = project;
   }
@@ -145,7 +145,7 @@ function RunLink({ r }: { r: Row }) {
   if (!r.command) return null;
   return (
     <Button asChild variant="outline" size="sm" className="no-underline">
-      <Link to="/live" search={{ new: "1", prompt: r.command, ...(r.projectId ? { project: r.projectId } : {}) }}>
+      <Link to="/sessions/new" search={{ prompt: r.command, ...(r.projectId ? { project: r.projectId } : {}) }}>
         <Play aria-hidden /> Run in a new session
       </Link>
     </Button>

@@ -1,13 +1,16 @@
 // One page per conversation, at /sessions/<session id>: the whole transcript, approvals and questions where Claude
 // stopped, and the reply box at the bottom. Sending resumes the conversation under the same ID when Claude isn't running.
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { type InfiniteData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { Archive, ArchiveRestore, Copy, MoreHorizontal, Square, Trash2, Users } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { copyCommand, resumeCommand } from "@/lib/resume";
-import type { PendingRequest, Session, SlashCommand, Turn } from "@/lib/types";
+import { accountLabel } from "@/lib/format";
+import { firstPage, pickProject, type NewSessionSearch } from "@/lib/newSession";
+import type { PendingRequest, Project, Session, SlashCommand, Turn } from "@/lib/types";
+import { useAccount } from "@/components/Account";
 import { DetailHeader } from "@/components/Panes";
 import { MessageBox } from "@/components/MessageBox";
 import { SimpleSelect } from "@/components/SimpleSelect";
@@ -225,6 +228,26 @@ function Switch({ label, on, onChange }: { label: string; on: boolean; onChange:
 
 const textOf = (t: Turn) => ((t.blocks[0] as { text?: string } | undefined)?.text ?? "").trim();
 
+const SELECT = "h-8 min-w-[130px] max-w-full text-[13px]";
+
+/** The reply box at the bottom of the page, with its settings in the row under it. */
+function Composer({ box, onSubmit, children }: { box: Omit<ComponentProps<typeof MessageBox>, "onSubmit">; onSubmit: () => void; children: ReactNode }) {
+  return (
+    <form
+      className="flex-none border-t border-line bg-panel px-3 pb-3 pt-2.5 md:px-6"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+    >
+      <div className="mx-auto flex max-w-[880px] flex-col gap-2 md:pl-6">
+        <MessageBox {...box} onSubmit={onSubmit} />
+        <div className="flex flex-wrap gap-2 md:pl-12">{children}</div>
+      </div>
+    </form>
+  );
+}
+
 function Conversation({ sid }: { sid: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -233,7 +256,11 @@ function Conversation({ sid }: { sid: string }) {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [text, setText] = useState("");
   const [localMode, setLocalMode] = useState<string | null>(null);
-  const [model, setModel] = useState("");
+  // A conversation started a moment ago on the New session page keeps the model picked there.
+  const [model, setModel] = useState(() => {
+    const m = qc.getQueryData<InfiniteData<Page>>(["session", sid])?.pages[0]?.model ?? "";
+    return MODELS.some((x) => x.value === m) ? m : "";
+  });
   // Messages sent from this page that the transcript doesn't show yet: the text and how many times it was there before.
   const [sent, setSent] = useState<{ text: string; before: number; at: string }[]>([]);
   const scroller = useRef<HTMLDivElement>(null);
@@ -390,54 +417,42 @@ function Conversation({ sid }: { sid: string }) {
           )}
         </div>
       </div>
-      <form
-        className="flex-none border-t border-line bg-panel px-3 pb-3 pt-2.5 md:px-6"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
+      <Composer
+        onSubmit={submit}
+        box={{
+          value: text,
+          onChange: setText,
+          commands: s.commands.length ? s.commands : (fallbackCmds.data ?? []),
+          placeholder: active ? "Send a message while Claude works" : "Reply to Claude, or type / for a command",
+          busy: send.isPending,
+          extra: open && status !== "idle" && (
+            <Button size="lg" type="button" variant="outline" onClick={() => call.mutate({ path: "stop" })} busy={call.isPending && call.variables?.path === "stop"}>
+              <Square className="size-3.5 fill-current" aria-hidden /> Stop
+            </Button>
+          ),
         }}
       >
-        <div className="mx-auto flex max-w-[880px] flex-col gap-2 md:pl-6">
-          <MessageBox
-            value={text}
-            onChange={setText}
-            onSubmit={submit}
-            commands={s.commands.length ? s.commands : (fallbackCmds.data ?? [])}
-            placeholder={active ? "Send a message while Claude works" : "Reply to Claude, or type / for a command"}
-            busy={send.isPending}
-            extra={
-              open &&
-              status !== "idle" && (
-                <Button size="lg" type="button" variant="outline" onClick={() => call.mutate({ path: "stop" })} busy={call.isPending && call.variables?.path === "stop"}>
-                  <Square className="size-3.5 fill-current" aria-hidden /> Stop
-                </Button>
-              )
-            }
-          />
-          <div className="flex flex-wrap gap-2 md:pl-12">
-            <SimpleSelect
-              label="Model"
-              value={model}
-              onChange={(m) => {
-                setModel(m);
-                if (open) call.mutate({ path: "model", body: { model: m } });
-              }}
-              options={MODELS}
-              className="h-8 min-w-[130px] text-[13px]"
-            />
-            <SimpleSelect
-              label="Permission mode"
-              value={mode}
-              onChange={(m) => {
-                setLocalMode(m);
-                if (open) call.mutate({ path: "mode", body: { mode: m } });
-              }}
-              options={MODES}
-              className="h-8 min-w-[160px] text-[13px]"
-            />
-          </div>
-        </div>
-      </form>
+        <SimpleSelect
+          label="Model"
+          value={model}
+          onChange={(m) => {
+            setModel(m);
+            if (open) call.mutate({ path: "model", body: { model: m } });
+          }}
+          options={MODELS}
+          className={SELECT}
+        />
+        <SimpleSelect
+          label="Permission mode"
+          value={mode}
+          onChange={(m) => {
+            setLocalMode(m);
+            if (open) call.mutate({ path: "mode", body: { mode: m } });
+          }}
+          options={MODES}
+          className={SELECT}
+        />
+      </Composer>
       <SubagentDialog sid={sid} agent={agent} onClose={() => setAgent(null)} />
     </div>
   );
@@ -450,6 +465,75 @@ export function ConversationPage() {
       <BackBar />
       <div className="min-h-0 flex-1">
         <Conversation key={sid} sid={sid} />
+      </div>
+    </div>
+  );
+}
+
+/** A new conversation: the same page with nothing in it yet. The first message starts it, and the address becomes its own. */
+function NewConversation({ search }: { search: NewSessionSearch }) {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const projects = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
+  const [proj, setProj] = useState(search.project ?? "");
+  const [model, setModel] = useState("");
+  const [mode, setMode] = useState(search.mode ?? "default");
+  const [text, setText] = useState(search.prompt ?? "");
+  const account = useAccount(proj || undefined);
+  const cmds = useQuery({ queryKey: ["live-commands", proj], queryFn: () => api.get<SlashCommand[]>(`/live-commands?project=${encodeURIComponent(proj)}`) });
+  useEffect(() => {
+    if (projects.data) setProj((cur) => cur || pickProject(projects.data, search.project));
+  }, [projects.data, search.project]);
+
+  const start = useMutation({
+    mutationFn: (prompt: string) => api.post<{ sessionId: string; liveId: string | null }>("/sessions/new", { project: proj, model, permissionMode: mode, prompt }),
+    onSuccess: (r, prompt) => {
+      if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
+      // The conversation page opens with the message already in it, then fills in from the server.
+      const page = firstPage({ sessionId: r.sessionId, liveId: r.liveId, project: proj, prompt, model, permissionMode: mode, at: new Date().toISOString() });
+      qc.setQueryData<InfiniteData<Page>>(["session", r.sessionId], { pages: [page as unknown as Page], pageParams: [0] });
+      qc.invalidateQueries({ queryKey: ["live"] });
+      qc.invalidateQueries({ queryKey: ["overview"] });
+      void navigate({ to: "/sessions/$sid", params: { sid: r.sessionId }, replace: true });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const submit = () => {
+    if (!text.trim()) return;
+    if (!proj) return void toast.error("Pick a project to run in.");
+    start.mutate(text);
+  };
+  const options = (projects.data ?? []).filter((p) => !p.empty || p.id === proj).map((p) => ({ value: p.id, label: p.name }));
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <DetailHeader title="New session" sub={proj && account.data && !account.data.problem ? <span className="break-all">{accountLabel(account.data)}</span> : undefined} />
+      <div className="min-h-0 flex-1" />
+      <Composer
+        onSubmit={submit}
+        box={{
+          value: text,
+          onChange: setText,
+          commands: cmds.data ?? [],
+          placeholder: "What should Claude do? Type / for commands and skills.",
+          busy: start.isPending,
+        }}
+      >
+        <SimpleSelect label="Project" placeholder="Choose a project" value={proj} onChange={setProj} options={options} className={SELECT} />
+        <SimpleSelect label="Model" value={model} onChange={setModel} options={MODELS} className={SELECT} />
+        <SimpleSelect label="Permission mode" value={mode} onChange={setMode} options={MODES} className={SELECT} />
+      </Composer>
+    </div>
+  );
+}
+
+export function NewSessionPage() {
+  const search = useSearch({ strict: false }) as NewSessionSearch;
+  return (
+    <div className="flex h-full flex-col">
+      <BackBar />
+      <div className="min-h-0 flex-1">
+        <NewConversation key={JSON.stringify(search)} search={search} />
       </div>
     </div>
   );

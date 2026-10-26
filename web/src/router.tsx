@@ -4,7 +4,7 @@ import { ArchivePage } from "./pages/Archive";
 import { FilePage } from "./pages/File";
 import { HomePage } from "./pages/Home";
 import { JobsPage } from "./pages/Jobs";
-import { ConversationPage } from "./pages/Conversation";
+import { ConversationPage, NewSessionPage } from "./pages/Conversation";
 import { LivePage } from "./pages/Live";
 import { PreferencesPage } from "./pages/Preferences";
 import { ProjectsPage } from "./pages/Projects";
@@ -16,6 +16,7 @@ import { AddSettingPage, type AddWhat } from "./pages/AddSetting";
 import { CustomizePage, FeaturePage, type FeatureSearch } from "./pages/Feature";
 import { NewProjectPage } from "./pages/NewProject";
 import { FEATURES } from "./lib/features";
+import { newSessionSearch } from "./lib/newSession";
 
 const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
 
@@ -36,17 +37,16 @@ const sessionsSearch = (s: Record<string, unknown>): SessionsSearch => ({ projec
 const sessions = createRoute({ getParentRoute: () => root, path: "/sessions", component: SessionsPage, validateSearch: sessionsSearch });
 const session = createRoute({ getParentRoute: () => root, path: "/sessions/$sid", component: ConversationPage });
 
-const liveSearch = (s: Record<string, unknown>): { new?: string; project?: string; resume?: string; prompt?: string; mode?: string } => ({ new: str(String(s.new ?? "")), project: str(s.project), resume: str(s.resume), prompt: str(s.prompt), mode: str(s.mode) });
-// Plain /live was the old list of live sessions; with a form to fill in it's the New session form.
-// ?resume=<session id> was the resume form; a conversation now has one page.
+const newSession = createRoute({ getParentRoute: () => root, path: "/sessions/new", component: NewSessionPage, validateSearch: newSessionSearch });
+
+// Old addresses: /live was the New session form, and ?resume=<session id> its resume form.
 const live = createRoute({
   getParentRoute: () => root,
   path: "/live",
-  component: LivePage,
-  validateSearch: liveSearch,
-  beforeLoad: ({ search }) => {
-    if (search.resume) throw redirect({ to: "/sessions/$sid", params: { sid: search.resume }, replace: true });
-    if (!Object.values(search).some(Boolean)) throw redirect({ to: "/sessions", search: {} });
+  validateSearch: (s: Record<string, unknown>) => ({ ...newSessionSearch(s), resume: str(s.resume) }),
+  beforeLoad: ({ search: { resume, ...rest } }) => {
+    if (resume) throw redirect({ to: "/sessions/$sid", params: { sid: resume }, replace: true });
+    throw redirect({ to: "/sessions/new", search: rest, replace: true });
   },
 });
 // An old live-session link opens that session's conversation page.
@@ -111,7 +111,7 @@ const customize = createRoute({ getParentRoute: () => root, path: "/customize", 
 const featureSearch = (s: Record<string, unknown>): FeatureSearch => ({ item: str(s.item), project: str(s.project), q: str(s.q), panel: s.panel === "find" || s.panel === "new" ? s.panel : undefined });
 const features = FEATURES.map((f) => createRoute({ getParentRoute: () => root, path: `/${f.id}`, component: FeaturePage, validateSearch: featureSearch }));
 
-const routeTree = root.addChildren([customize, ...features, newProject, addSetting, setup, guidesRoute, guide, newItem, home, projects, project, sessions, session, live, liveOne, jobs, job, library, settings, map, archive, file, preferences]);
+const routeTree = root.addChildren([customize, ...features, newProject, addSetting, setup, guidesRoute, guide, newItem, home, projects, project, sessions, newSession, session, live, liveOne, jobs, job, library, settings, map, archive, file, preferences]);
 
 export const router = createRouter({ routeTree, defaultPreload: false });
 
