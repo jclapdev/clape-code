@@ -1,5 +1,6 @@
-import chokidar, { type FSWatcher } from "chokidar";
-import { relative, sep } from "node:path";
+import chokidar from "chokidar";
+import { watch } from "node:fs";
+import { join, relative, sep } from "node:path";
 import { emit, type Area } from "../events";
 import { claudeDir, isInside } from "./paths";
 
@@ -19,7 +20,8 @@ function areaOf(abs: string): Area | null {
   return null;
 }
 
-let watcher: FSWatcher | null = null;
+type Closable = { close(): unknown };
+let watchers: Closable[] = [];
 const pending = new Map<Area, Set<string>>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let onFlush: (areas: Map<Area, Set<string>>) => void = () => {};
@@ -40,27 +42,43 @@ function queue(abs: string) {
   }, 400);
 }
 
+function ignored(p: string, cd: string) {
+  if (isInside(p, cd)) {
+    const rel = relative(cd, p).split(sep).join("/");
+    return NOISY.test(rel) || /\.key$/.test(rel);
+  }
+  return HEAVY_DIR.test(p.split(sep).join("/"));
+}
+
+/**
+ * One recursive OS watcher per folder (FSEvents on macOS): chokidar's one watcher per file took 22 s and
+ * stalled the server for seconds at a time with ~3,000 paths. Where recursive watching isn't supported,
+ * that folder falls back to chokidar.
+ */
+function watchFolder(dir: string, cd: string): Closable {
+  try {
+    const w = watch(dir, { recursive: true }, (_ev, name) => {
+      const p = name ? join(dir, name.toString()) : dir; // no name: something in the folder itself changed
+      if (!ignored(p, cd)) queue(p);
+    });
+    w.on("error", () => {}); // a folder that disappears or can't be read shouldn't stop the app
+    return w;
+  } catch {
+    const w = chokidar.watch(dir, { ignoreInitial: true, depth: 6, ignored: (p: string) => ignored(p, cd) });
+    w.on("all", (_ev, p) => queue(p));
+    w.on("error", () => {});
+    return w;
+  }
+}
+
 export function startWatching(projectDirs: string[], flush: (areas: Map<Area, Set<string>>) => void) {
   onFlush = flush;
   const cd = claudeDir();
-  watcher?.close();
-  watcher = chokidar.watch([cd, ...projectDirs], {
-    ignoreInitial: true,
-    depth: 6,
-    ignored: (p: string) => {
-      if (isInside(p, cd)) {
-        const rel = relative(cd, p).split(sep).join("/");
-        return NOISY.test(rel) || /\.key$/.test(rel);
-      }
-      return HEAVY_DIR.test(p.split(sep).join("/"));
-    },
-  });
-  watcher.on("all", (_ev, p) => queue(p));
-  watcher.on("error", () => {}); // permission errors on odd folders shouldn't stop the app
-  return watcher;
+  for (const w of watchers) void w.close();
+  watchers = [cd, ...projectDirs].map((dir) => watchFolder(dir, cd));
 }
 
 export async function stopWatching() {
-  await watcher?.close();
-  watcher = null;
+  await Promise.all(watchers.map((w) => w.close()));
+  watchers = [];
 }

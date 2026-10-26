@@ -70,6 +70,7 @@ Notable changes to Control Center, newest first.
 - The browser console no longer shows "Encountered a script tag while rendering React component" on every page.
 - Cancelling "Delete this session?" no longer leaves the session page.
 - Home no longer says background sessions need you when they only stopped at a usage limit that has since reset.
+- The Control Center window shows its pages right after launch instead of staying blank for about 20 seconds while the app set up a watcher on every file in your projects.
 
 ## [0.1.0] - 2026-10-17
 
