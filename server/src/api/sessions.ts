@@ -146,7 +146,7 @@ sessions.get("/jobs/:id", async (c) => {
 
 // ---- Overview ----
 
-/** A background session stopped by a usage limit more than a day ago; limits reset within hours. */
+/** A background session stopped by a usage limit more than a day ago: it asks nothing, so it is an ordinary session. */
 export function isStaleLimit(j: { detail: string | null; updatedAt: string | null }, now = Date.now()) {
   return /limit/i.test(j.detail ?? "") && !!j.updatedAt && now - Date.parse(j.updatedAt) > 24 * 3600_000;
 }
@@ -160,11 +160,8 @@ sessions.get("/overview", async (c) => {
     ...live.filter((l) => l.pending.length).map((l) => ({ type: "live" as const, id: l.id, cwd: l.cwd, request: l.pending[0], at: l.pending[0].at })),
     ...blocked.filter((j) => !isStaleLimit(j)).map((j) => ({ type: "job" as const, id: j.id, name: named(j), cwd: j.cwd, detail: j.detail, sessionId: j.sessionId, at: j.updatedAt })),
   ];
-  // Stopped by a usage limit that has long since reset: nothing to answer, just something to continue.
-  const paused = blocked.filter((j) => isStaleLimit(j)).map((j) => ({ id: j.id, name: named(j), cwd: j.cwd, sessionId: j.sessionId, at: j.updatedAt }));
   return c.json({
     needsYou,
-    paused,
     live: live.filter((l) => l.status !== "stopped").length,
     waiting: waitingCount(),
   });

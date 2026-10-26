@@ -7,7 +7,7 @@ import { ErrorNote, Loading } from "@/components/ui";
 
 function SessionList() {
   const { requests, entries, isLoading, error } = useSessionEntries();
-  const first = entries.filter((e) => e.status === "needs" || e.status === "paused").sort((a, b) => (a.status === b.status ? 0 : a.status === "needs" ? -1 : 1));
+  const first = entries.filter((e) => e.status === "needs");
   const recent = entries.filter((e) => !first.includes(e)).slice(0, 6);
   const empty = !requests.length && !first.length && !recent.length;
 
@@ -43,7 +43,6 @@ export function HomePage() {
   return (
     <Page
       title="Control Center"
-      sub="See and change everything that shapes how Claude Code works: its instructions, skills, agents, hooks and connections, across all your projects. Track each project's tasks, and run sessions from here."
       actions={
         <Button asChild size="lg" className="no-underline">
           <Link to="/live" search={{ new: "1" } as never}>

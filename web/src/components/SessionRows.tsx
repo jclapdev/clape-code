@@ -13,7 +13,6 @@ export interface Overview {
     | { type: "live"; id: string; cwd: string; request: PendingRequest; at: string }
     | { type: "job"; id: string; name: string | null; cwd: string | null; detail: string | null; sessionId: string | null; at: string | null }
   )[];
-  paused: { id: string; name: string; cwd: string | null; sessionId: string | null; at: string | null }[];
 }
 
 type LiveRequest = Extract<Overview["needsYou"][number], { type: "live" }>;
@@ -30,7 +29,7 @@ export interface SessionEntry {
   at: string | null;
   session: Session | null;
   job: { id: string; detail: string | null } | null;
-  status: "needs" | "paused" | "running" | null;
+  status: "needs" | "running" | null;
 }
 
 export const useOverview = () => useQuery({ queryKey: ["overview"], queryFn: () => api.get<Overview>("/overview") });
@@ -42,11 +41,10 @@ export function useSessionEntries() {
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: () => api.get<{ jobs: Job[] }>("/jobs") });
   const o = overview.data;
   const needsJobs = new Set(o?.needsYou.flatMap((n) => (n.type === "job" ? [n.id] : [])) ?? []);
-  const pausedJobs = new Set(o?.paused.map((p) => p.id) ?? []);
   const bySession = new Map((jobs.data?.jobs ?? []).flatMap((j) => (j.sessionId ? [[j.sessionId, j] as const] : [])));
   const listed = new Set((sessions.data ?? []).map((s) => s.sessionId));
   const statusOf = (job: Job | undefined, running: boolean): SessionEntry["status"] =>
-    job && needsJobs.has(job.id) ? "needs" : job && pausedJobs.has(job.id) ? "paused" : running ? "running" : null;
+    job && needsJobs.has(job.id) ? "needs" : running ? "running" : null;
 
   const entries: SessionEntry[] = [
     ...(sessions.data ?? []).map((s) => {
@@ -122,7 +120,6 @@ export function LiveRequestRow({ item }: { item: LiveRequest }) {
 
 const TAGS = {
   needs: <Tag tone="attn">Needs you</Tag>,
-  paused: <Tag tone="accent">Paused</Tag>,
   running: <Tag tone="ok">Running</Tag>,
 };
 
@@ -135,9 +132,7 @@ export function SessionRow({ e, search }: { e: SessionEntry; search?: Record<str
   const about =
     e.status === "needs"
       ? join(folder(e.project ?? e.cwd), e.job?.detail || "Stopped and waiting for an answer before it can go on.")
-      : e.status === "paused"
-        ? join(folder(e.project ?? e.cwd), "Stopped by a usage limit that has since reset", when(e.at))
-        : join(folder(e.project ?? e.cwd), e.job && "Background", when(e.at), accountLabel(e.session?.account));
+      : join(folder(e.project ?? e.cwd), e.job && "Background", when(e.at), accountLabel(e.session?.account));
   return (
     <Row tag={e.status ? TAGS[e.status] : undefined} title={e.title} about={about}>
       {e.status === "needs" && sid && (
@@ -148,7 +143,7 @@ export function SessionRow({ e, search }: { e: SessionEntry; search?: Record<str
         </Button>
       )}
       {e.status !== "needs" && e.status !== "running" && sid && (
-        <Button asChild size="sm" variant={e.status === "paused" ? "default" : "outline"} className="no-underline">
+        <Button asChild size="sm" variant="outline" className="no-underline">
           <Link to="/live" search={{ resume: sid } as never}>
             Continue
           </Link>

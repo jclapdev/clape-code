@@ -38,6 +38,7 @@ Notable changes to Control Center, newest first.
 
 ### Changed
 
+- A background session stopped by a usage limit more than a day ago shows as an ordinary session on Home and Sessions, in date order with Open and Continue, instead of a "Paused" row at the top that said the limit had since reset.
 - Deleting a skill, agent, command, rule, output style, plan or memory note from a project page moves it to Archived items instead of the computer's trash.
 - Opening a file to edit right after reading it no longer shows an empty editor.
 - Home's "All sessions" link opens the Sessions page, and a project page's "Show all N sessions" opens it filtered to that project.
@@ -51,6 +52,7 @@ Notable changes to Control Center, newest first.
 
 ### Removed
 
+- The sentence under Home's heading.
 - The Setup page. Its skills, agents and other lists are on the Customize pages, its settings on Settings; /setup opens Settings and /library opens Customize.
 - The command palette and its hidden keyboard shortcuts.
 - The separate Sessions, Live, Jobs, Library, Settings and Map menu entries. Old links land on the pages that replaced them: /jobs and /live open Sessions, /map opens Customize, and an old Library link to one kind of item, such as agents, opens that kind's page.

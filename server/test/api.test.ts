@@ -35,6 +35,14 @@ beforeAll(async () => {
   await copyFile(join(import.meta.dir, "fixtures", "transcript.jsonl"), join(claude, "projects", "-demo", "0f8d3c8e-0000-4000-8000-000000000000.jsonl"));
   await copyFile(join(import.meta.dir, "fixtures", "BACKLOG.md"), join(root, "projects", "demo", "BACKLOG.md"));
 
+  // Two background sessions stopped by a usage limit: one on 12 Oct, long past, and one just now.
+  const job = async (id: string, updatedAt: string) => {
+    await mkdir(join(claude, "jobs", id), { recursive: true });
+    await writeFile(join(claude, "jobs", id, "state.json"), JSON.stringify({ name: id, state: "blocked", detail: "You've hit your session limit · resets 1:30pm", updatedAt }));
+  };
+  await job("old-limit", "2026-10-12T10:00:00Z");
+  await job("new-limit", new Date().toISOString());
+
   // A session started from the app saved its account; the stray field must never reach the browser.
   await mkdir(join(root, "app"), { recursive: true });
   await writeFile(join(root, "app", "session-accounts.json"), JSON.stringify({ "e2644826-95f0-4880-8af9-8169d229cf1d": { provider: "firstParty", providerName: "Anthropic", email: "me@example.com", organization: "Acme", plan: "Claude Pro", tokenSource: "token-source-secret" } }));
@@ -403,5 +411,13 @@ describe("Settings page writes", () => {
     expect(r.status).toBe(400);
     expect(((await r.json()) as { error: string }).error).toContain("Fix it as text first");
     expect(await readFile(local(), "utf8")).toBe("{ broken");
+  });
+});
+
+describe("overview", () => {
+  test("a usage limit from days ago is an ordinary session, not one that needs you or is paused", async () => {
+    const o = await (await request("/api/overview")).json();
+    expect(o.paused).toBeUndefined();
+    expect(o.needsYou.map((n: any) => n.id)).toEqual(["new-limit"]);
   });
 });
