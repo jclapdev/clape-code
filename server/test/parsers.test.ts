@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { addItem, editItemText, parseBacklog, toggleItem } from "../src/parsers/backlog";
+import { parseBacklog } from "../src/parsers/backlog";
 import { addEntry, parseChangelog } from "../src/parsers/changelog";
 import { effective } from "../src/parsers/settings";
 import { summarize, toTurns } from "../src/parsers/transcript";
@@ -30,35 +30,6 @@ describe("backlog", () => {
     expect(b.sections[1].intro).toBe("Some intro text.");
     expect(b.sections[0].items[0]).toEqual({ line: 6, done: true, n: 1, text: "Split each topic into short lessons." });
     expect(b.numbered && b.checkboxes).toBe(true);
-  });
-
-  test("toggle changes only that line", () => {
-    const out = toggleItem(BACKLOG, 7);
-    const a = BACKLOG.split("\n");
-    const b = out.split("\n");
-    expect(b[7]).toBe("- [x] 2. Replace the four tabs.");
-    expect(b.filter((l, i) => l !== a[i]).length).toBe(1);
-    expect(toggleItem(out, 7)).toBe(BACKLOG);
-  });
-
-  test("edit keeps the checkbox and number", () => {
-    expect(editItemText(BACKLOG, 7, "Replace tabs").split("\n")[7]).toBe("- [ ] 2. Replace tabs");
-  });
-
-  test("add continues numbering across sections", () => {
-    const out = addItem(BACKLOG, 4, "New thing");
-    expect(out.split("\n")[8]).toBe("- [ ] 4. New thing");
-  });
-
-  test("plain bullet backlog stays plain", () => {
-    const plain = "# Backlog\n\n- First idea\n";
-    expect(parseBacklog(plain).sections[0].items[0].done).toBeNull();
-    expect(addItem(plain, -1, "Second")).toBe("# Backlog\n\n- First idea\n- Second\n");
-  });
-
-  test("keeps Windows line endings", () => {
-    const crlf = BACKLOG.replace(/\n/g, "\r\n");
-    expect(toggleItem(crlf, 7)).toContain("\r\n- [x] 2. Replace the four tabs.\r\n");
   });
 });
 
@@ -268,6 +239,7 @@ describe("transcript", () => {
 // ---- Board (BACKLOG.md tables as Open / In spec / Done) ----
 
 import { attachSteps, cells, parseBacklogBoard } from "../src/parsers/backlogBoard";
+import { appendFeedback } from "../src/parsers/feedback";
 import { addImport, importedPaths, removeImport } from "../src/parsers/imports";
 
 const BOARD_BACKLOG = `# Backlog
@@ -340,6 +312,74 @@ describe("board", () => {
     const cols = parseBacklogBoard(own);
     expect(cols.reduce((n, c) => n + c.cards.length, 0)).toBe(rows);
     expect(cols[1].cards.length).toBeGreaterThan(0);
+  });
+});
+
+describe("feedback", () => {
+  const ON = new Date(2026, 9, 26);
+  const row = (n: number, note: string) => `| ${n} | 2026-10-26 | "${note}" | pending | | Feedback in Control Center | open |`;
+  const TEMPLATE = "# Backlog\n\nVerdicts: `build`.\nStatus: `open`.\n\n| # | Date | Idea (his words) | Verdict | Reason | Source | Status |\n|---|---|---|---|---|---|---|\n| 1 | YYYY-MM-DD | <idea> | build | Serves job 2. | <URL> | in spec 001 |\n";
+
+  test("adds a Feedback table at the end, numbered after the highest # in any table, and keeps every other byte", () => {
+    const { text, n } = appendFeedback(BOARD_BACKLOG, "make it blue", ON);
+    expect(n).toBe(6);
+    expect(text.startsWith(BOARD_BACKLOG)).toBe(true);
+    expect(text.slice(BOARD_BACKLOG.length)).toBe(`\n## Feedback\n\n| # | Date | Idea (his words) | Verdict | Reason | Source | Status |\n|---|---|---|---|---|---|---|\n${row(6, "make it blue")}\n`);
+    expect(parseBacklogBoard(text)[0].cards.at(-1)).toMatchObject({ n: 6, idea: '"make it blue"', verdict: "pending", status: "open" });
+  });
+
+  test("a second note goes at the end of the existing Feedback table", () => {
+    const once = appendFeedback(BOARD_BACKLOG, "first", ON).text;
+    const { text, n } = appendFeedback(once + "\n\n", "second", ON);
+    expect(n).toBe(7);
+    expect(text).toBe(once.replace(row(6, "first") + "\n", `${row(6, "first")}\n${row(7, "second")}\n`) + "\n\n");
+  });
+
+  test("a Feedback heading with no table gets one under it, before the next heading", () => {
+    const src = "# Backlog\n\n## Feedback\n\n## Later\n\n| # | Idea | Status |\n|---|---|---|\n| 9 | x | done |\n";
+    const { text, n } = appendFeedback(src, "hi", ON);
+    expect(n).toBe(10);
+    expect(text).toBe(`# Backlog\n\n## Feedback\n\n| # | Date | Idea (his words) | Verdict | Reason | Source | Status |\n|---|---|---|---|---|---|---|\n${row(10, "hi")}\n\n## Later\n\n| # | Idea | Status |\n|---|---|---|\n| 9 | x | done |\n`);
+  });
+
+  test("Windows line endings stay, and new lines use them", () => {
+    const crlf = BOARD_BACKLOG.replace(/\n/g, "\r\n");
+    const { text } = appendFeedback(crlf, "x", ON);
+    expect(text.startsWith(crlf)).toBe(true);
+    expect(text.slice(crlf.length)).toBe(`\r\n## Feedback\r\n\r\n| # | Date | Idea (his words) | Verdict | Reason | Source | Status |\r\n|---|---|---|---|---|---|---|\r\n${row(6, "x")}\r\n`);
+    const twice = appendFeedback(text, "y", ON).text;
+    expect(twice).toBe(text + `${row(7, "y")}\r\n`);
+  });
+
+  test("a file without a final newline keeps none", () => {
+    const src = BOARD_BACKLOG.trimEnd();
+    const { text } = appendFeedback(src, "x", ON);
+    expect(text.startsWith(src + "\n")).toBe(true);
+    expect(text.endsWith(row(6, "x"))).toBe(true);
+    const twice = appendFeedback(text, "y", ON).text;
+    expect(twice).toBe(`${text}\n${row(7, "y")}`);
+  });
+
+  test("a | in the note is escaped and line breaks become spaces", () => {
+    const { text } = appendFeedback(BOARD_BACKLOG, "  a | b\r\n\nc\rd  ", ON);
+    expect(text.trimEnd().split("\n").at(-1)).toBe(row(6, "a \\| b c d"));
+    const card = parseBacklogBoard(text)[0].cards.at(-1)!;
+    expect(card).toMatchObject({ n: 6, idea: '"a | b c d"', status: "open" });
+  });
+
+  test("a missing file starts from the template's lines above its table, without the example row", () => {
+    const { text, n } = appendFeedback(null, "first idea", ON, TEMPLATE);
+    expect(n).toBe(1);
+    expect(text).toBe(`# Backlog\n\nVerdicts: \`build\`.\nStatus: \`open\`.\n\n## Feedback\n\n| # | Date | Idea (his words) | Verdict | Reason | Source | Status |\n|---|---|---|---|---|---|---|\n${row(1, "first idea")}\n`);
+    expect(appendFeedback(null, "x", ON, null).text).toStartWith("# Backlog\n\n## Feedback\n");
+  });
+
+  test("Control Center's own BACKLOG.md keeps every byte", async () => {
+    const own = await Bun.file(join(import.meta.dir, "..", "..", "BACKLOG.md")).text();
+    const max = Math.max(...own.split("\n").map((l) => /^\| (\d+) \|/.exec(l)?.[1]).filter(Boolean).map(Number));
+    const { text, n } = appendFeedback(own, "x", ON);
+    expect(n).toBe(max + 1);
+    expect(text.replace(`${row(n, "x")}\n`, "").replace(/\n## Feedback\n\n\| # \|.*\n\|---.*\n$/, "")).toBe(own);
   });
 });
 

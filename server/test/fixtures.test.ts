@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { addItem, parseBacklog, toggleItem } from "../src/parsers/backlog";
+import { parseBacklog } from "../src/parsers/backlog";
 import { addEntry, parseChangelog } from "../src/parsers/changelog";
 import { effective } from "../src/parsers/settings";
 import { summarize, toTurns } from "../src/parsers/transcript";
@@ -38,13 +38,6 @@ describe("real BACKLOG.md format", () => {
     expect(b.sections[0].name).toBe("Structure");
     const ns = b.sections.flatMap((s) => s.items.map((i) => i.n));
     expect(ns).toEqual([...ns].sort((a, b) => a! - b!));
-  });
-  test("toggle twice restores every byte; add continues the numbering", () => {
-    const first = parseBacklog(text).sections[0].items[0];
-    expect(toggleItem(toggleItem(text, first.line), first.line)).toBe(text);
-    const last = parseBacklog(text).sections.at(-1)!;
-    const max = Math.max(...parseBacklog(text).sections.flatMap((s) => s.items.map((i) => i.n ?? 0)));
-    expect(addItem(text, last.line, "New")).toContain(`- [ ] ${max + 1}. New`);
   });
 });
 

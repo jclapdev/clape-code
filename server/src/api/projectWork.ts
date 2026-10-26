@@ -5,10 +5,11 @@ import { mkdir, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, sep } from "node:path";
 import { getConfig } from "../config";
 import { emit } from "../events";
-import { isInside, tildify, untildify } from "../fs/paths";
+import { claudeDir, isInside, tildify, untildify } from "../fs/paths";
 import { readWithHash, safeWrite, WriteError } from "../fs/safeWrite";
-import { canRead } from "../fs/policy";
+import { canRead, classify } from "../fs/policy";
 import { attachSteps, parseBacklogBoard } from "../parsers/backlogBoard";
+import { appendFeedback } from "../parsers/feedback";
 import { addImport, importedPaths, removeImport } from "../parsers/imports";
 import { listProjects, projectDir } from "../scan/projects";
 import type { Env } from "./env";
@@ -44,6 +45,34 @@ export async function boardOf(dir: string) {
 }
 
 projectWork.get("/projects/:id/board", async (c) => c.json(await boardOf(await requireProject(c.req.param("id")))));
+
+// ---- Feedback ----
+
+/** Longest note Feedback takes. */
+const MAX_NOTE = 10_000;
+
+/**
+ * Adds a note as a new pending, open line in the project's BACKLOG.md, or in ~/.claude/BACKLOG.md when no project is given.
+ * A missing file starts from the feature skill's template, without its example row.
+ */
+projectWork.post("/feedback", async (c) => {
+  const { project, note } = await c.req.json();
+  if (typeof note !== "string" || !note.trim()) throw new WriteError(400, "Type a note first.");
+  if (note.length > MAX_NOTE) throw new WriteError(400, "This note is too long to save.");
+  let abs = join(claudeDir(), "BACKLOG.md");
+  if (project) {
+    const dir = typeof project === "string" ? await projectDir(project) : null;
+    if (!dir) throw new WriteError(404, "Unknown project.");
+    abs = join(dir, "BACKLOG.md");
+  }
+  if (classify(abs) !== "edit") throw new WriteError(403, "The app can't change this file.");
+  const cur = await readWithHash(abs);
+  const template = cur ? null : await readAllowed(join(claudeDir(), "skills", "feature", "assets", "BACKLOG.md"));
+  const { text, n } = appendFeedback(cur?.content ?? null, note, new Date(), template);
+  await safeWrite(abs, text, cur?.hash ?? null);
+  emit({ area: "projects", path: abs });
+  return c.json({ n, path: tildify(abs) });
+});
 
 // ---- Context files ----
 

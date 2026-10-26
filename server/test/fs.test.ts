@@ -46,6 +46,10 @@ describe("policy", async () => {
     expect(classify(join(claude, "themes", "dusk.json"))).toBe("edit");
     expect(classify(join(claude, "workflows-old", "x.js"))).toBe("app");
   });
+  test("the backlog for all projects is editable", () => {
+    expect(classify(join(claude, "BACKLOG.md"))).toBe("edit");
+    expect(classify(join(claude, "projects", "BACKLOG.md"))).toBe("app");
+  });
   test("agent memory, keyboard shortcuts and .worktreeinclude are editable", () => {
     expect(classify(join(claude, "agent-memory", "code-reviewer", "MEMORY.md"))).toBe("edit");
     expect(classify(join(proj, ".claude", "agent-memory", "tester", "MEMORY.md"))).toBe("edit");

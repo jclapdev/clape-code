@@ -68,7 +68,7 @@ Starting and answering sessions uses the Claude Code installed on the computer, 
 | Map | Every file and folder Claude Code uses, what it is, and whether you can edit it. |
 | Archive | Items you archived, with Restore. |
 
-The search box at the top of the menu searches everything. <kbd>⌘S</kbd> (<kbd>Ctrl S</kbd> on Windows and Linux) saves the open file. Preferences has the theme (match system, light, dark).
+The search box at the top of the menu searches everything. Feedback in the menu adds a note to a project's BACKLOG.md, or to `~/.claude/BACKLOG.md` for all projects, as a new pending, open line. <kbd>⌘S</kbd> (<kbd>Ctrl S</kbd> on Windows and Linux) saves the open file. Preferences has the theme (match system, light, dark).
 
 ## How it keeps your files safe
 

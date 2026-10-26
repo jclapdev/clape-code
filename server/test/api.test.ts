@@ -291,6 +291,41 @@ describe("project board, context files and new projects", () => {
     for (const op of ["start", "add", "edit", "move", "delete"]) expect((await post(`/api/projects/${encodeURIComponent("~/projects/progress-only")}/board/${op}`, {})).status).toBe(404);
   });
 
+  test("Feedback adds a pending, open line to the project's BACKLOG.md and the card shows in Open", async () => {
+    const dir = join(root, "projects", "feedback");
+    await mkdir(dir, { recursive: true });
+    const before = "# Backlog\r\n\r\n## Ideas\r\n\r\n| # | Date | Idea | Verdict | Reason | Source | Status |\r\n|---|---|---|---|---|---|---|\r\n| 7 | 2026-10-20 | old | build | x | y | done |";
+    await writeFile(join(dir, "BACKLOG.md"), before);
+    await request("/api/projects");
+    const id = "~/projects/feedback";
+    const res = await post("/api/feedback", { project: id, note: "a | b\nc" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ n: 8, path: "~/projects/feedback/BACKLOG.md" });
+    const after = await readFile(join(dir, "BACKLOG.md"), "utf8");
+    expect(after.startsWith(before + "\r\n")).toBe(true);
+    expect(after.slice(before.length).split("\r\n").at(-1)).toMatch(/^\| 8 \| \d{4}-\d\d-\d\d \| "a \\\| b c" \| pending \| \| Feedback in Control Center \| open \|$/);
+    const board = (await (await request(`/api/projects/${encodeURIComponent(id)}/board`)).json()) as any;
+    expect(board.columns[0].cards.map((c: any) => [c.n, c.idea])).toEqual([[8, '"a | b c"']]);
+    expect((await post("/api/feedback", { project: id, note: "  " })).status).toBe(400);
+    expect((await post("/api/feedback", { project: "~/projects/nope", note: "x" })).status).toBe(404);
+    for (const op of ["toggle", "edit", "add"]) expect((await post(`/api/projects/${encodeURIComponent(id)}/backlog/${op}`, {})).status).toBe(404);
+  });
+
+  test("Feedback for all projects creates ~/.claude/BACKLOG.md from the feature skill's template, without its example row", async () => {
+    const claude = join(root, ".claude");
+    const assets = join(claude, "skills", "feature", "assets");
+    await mkdir(assets, { recursive: true });
+    await writeFile(join(assets, "BACKLOG.md"), "# Backlog\n\nStatus: `open`.\n\n| # | Date | Idea (his words) | Verdict | Reason | Source | Status |\n|---|---|---|---|---|---|---|\n| 1 | YYYY-MM-DD | <idea> | build | x | y | in spec 001 |\n");
+    await rm(join(claude, "BACKLOG.md"), { force: true });
+    const first = (await (await post("/api/feedback", { project: null, note: "everywhere" })).json()) as any;
+    expect(first).toEqual({ n: 1, path: "~/.claude/BACKLOG.md" });
+    const text = await readFile(join(claude, "BACKLOG.md"), "utf8");
+    expect(text).toStartWith("# Backlog\n\nStatus: `open`.\n\n## Feedback\n\n| # | Date | Idea (his words) |");
+    expect(text).not.toContain("<idea>");
+    expect(((await (await post("/api/feedback", { note: "again" })).json()) as any).n).toBe(2);
+    expect((await readFile(join(claude, "BACKLOG.md"), "utf8")).startsWith(text)).toBe(true);
+  });
+
   test("Add context takes text files, refuses binary and big ones, and the switch edits CLAUDE.md", async () => {
     const send = (name: string, data: string | Uint8Array) => {
       const fd = new FormData();
@@ -775,7 +810,8 @@ describe("usage statistics", () => {
   test("count the requests the app makes today", async () => {
     const { metricFor } = await import("../src/metrics");
     expect(metricFor("PUT", "/api/file")).toBe("edits.saved");
-    expect(metricFor("POST", "/api/projects/~%2Fprojects%2Fdemo/backlog")).toBe("edits.saved");
+    expect(metricFor("POST", "/api/projects/~%2Fprojects%2Fdemo/changelog")).toBe("edits.saved");
+    expect(metricFor("POST", "/api/feedback")).toBe("edits.saved");
     expect(metricFor("POST", "/api/sessions/new")).toBe("live.started");
     expect(metricFor("POST", "/api/sessions/abc/respond")).toBe("live.answered");
     expect(metricFor("POST", "/api/live/abc/respond")).toBe("live.answered");

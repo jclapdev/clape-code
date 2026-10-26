@@ -21,6 +21,7 @@ const SECRET = [
 const EDITABLE = [
   /^settings(\.local)?\.json$/,
   /^CLAUDE\.md$/,
+  /^BACKLOG\.md$/,
   /^keybindings\.json$/,
   /^commands(\/|$)/,
   /^rules(\/|$)/,

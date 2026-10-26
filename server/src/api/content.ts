@@ -7,7 +7,6 @@ import { emit } from "../events";
 import { claudeDir, isInside, tildify, untildify } from "../fs/paths";
 import { canRead, classify } from "../fs/policy";
 import { readWithHash, safeWrite, WriteError } from "../fs/safeWrite";
-import { addItem, editItemText, parseBacklog, toggleItem } from "../parsers/backlog";
 import { addEntry, isKeepAChangelog, parseChangelog } from "../parsers/changelog";
 import { effective, type Source } from "../parsers/settings";
 import { applySettingsChange, redactEnv, removeKeybinding, setKeybinding, type SettingsChange } from "../parsers/settingsEdit";
@@ -52,8 +51,6 @@ content.get("/projects", async (c) => c.json(await listProjects()));
 content.get("/projects/:id", async (c) => {
   const dir = await requireProject(c.req.param("id"));
   const summary = (await listProjects()).find((p) => untildify(p.id) === dir)!;
-  // The board reads BACKLOG.md's tables; the older backlog editor reads its list items.
-  const backlogFile = await readWithHash(join(dir, "BACKLOG.md"));
   const changelogFile = await readWithHash(join(dir, "CHANGELOG.md"));
   const worktrees = (await ls(join(dir, ".claude", "worktrees"))).map((n) => ({ name: n, path: tildify(join(dir, ".claude", "worktrees", n)) }));
   const all = listSessions().filter((s) => s.cwd && isInside(projectPathOf(s.cwd), dir));
@@ -65,7 +62,6 @@ content.get("/projects/:id", async (c) => {
     abs: dir,
     board: await boardOf(dir),
     context: await contextOf(dir),
-    backlog: backlogFile ? { ...parseBacklog(backlogFile.content), hash: backlogFile.hash, path: join(dir, "BACKLOG.md"), file: "BACKLOG.md" } : null,
     changelog: changelogFile ? { ...parseChangelog(changelogFile.content), keep: isKeepAChangelog(changelogFile.content), hash: changelogFile.hash, path: join(dir, "CHANGELOG.md") } : null,
     docs: summary.docs.map((d) => ({ name: d, path: join(dir, d) })),
     library: await projectLibrary(dir),
@@ -123,11 +119,6 @@ async function mcpServersIn(path: string) {
   return { path, servers };
 }
 
-async function handoffOf(id: string) {
-  await requireProject(id);
-  return "BACKLOG.md";
-}
-
 async function editProjectFile(id: string, file: string, hash: string, change: (text: string) => string) {
   const dir = await requireProject(id);
   const abs = join(dir, file);
@@ -145,18 +136,6 @@ async function editProjectFile(id: string, file: string, hash: string, change: (
   return r;
 }
 
-content.post("/projects/:id/backlog/toggle", async (c) => {
-  const { line, hash } = await c.req.json();
-  return c.json(await editProjectFile(c.req.param("id"), await handoffOf(c.req.param("id")), hash, (t) => toggleItem(t, line)));
-});
-content.post("/projects/:id/backlog/edit", async (c) => {
-  const { line, text, hash } = await c.req.json();
-  return c.json(await editProjectFile(c.req.param("id"), await handoffOf(c.req.param("id")), hash, (t) => editItemText(t, line, text)));
-});
-content.post("/projects/:id/backlog/add", async (c) => {
-  const { sectionLine, text, hash } = await c.req.json();
-  return c.json(await editProjectFile(c.req.param("id"), await handoffOf(c.req.param("id")), hash, (t) => addItem(t, sectionLine, text)));
-});
 content.post("/projects/:id/changelog", async (c) => {
   const { text, hash, kind } = await c.req.json();
   return c.json(await editProjectFile(c.req.param("id"), "CHANGELOG.md", hash, (t) => addEntry(t, text, new Date(), kind)));

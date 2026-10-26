@@ -34,7 +34,7 @@ export async function bump(key: string) {
 /** Which count a successful API request adds to, if any. */
 export function metricFor(method: string, path: string): string | null {
   if (method === "PUT" && path === "/api/file") return "edits.saved";
-  if (/^\/api\/projects\/.+\/(backlog|changelog)/.test(path)) return "edits.saved";
+  if (/^\/api\/projects\/.+\/changelog/.test(path) || path === "/api/feedback") return "edits.saved";
   if (method !== "POST") return null;
   if (/^\/api\/(live\/[^/]+|sessions\/[^/]+)\/respond$/.test(path)) return "live.answered";
   if (path === "/api/sessions/new") return "live.started";

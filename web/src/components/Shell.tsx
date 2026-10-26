@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { BookOpen, ChevronRight, FolderGit2, History, Home, LayoutGrid, Menu, MessagesSquare, Monitor, Moon, Plus, Settings2, SlidersHorizontal, Sun, type LucideIcon } from "lucide-react";
+import { BookOpen, ChevronRight, FolderGit2, History, Home, LayoutGrid, Menu, MessageSquarePlus, MessagesSquare, Monitor, Moon, Plus, Settings2, SlidersHorizontal, Sun, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { FEATURES } from "@/lib/features";
@@ -8,6 +8,7 @@ import { setPageTitle, useLiveUpdates, useWaiting } from "@/lib/live";
 import { layoutStorage, useMediaQuery } from "@/lib/prefs";
 import type { Project } from "@/lib/types";
 import { useTheme } from "next-themes";
+import { FeedbackDialog } from "./Feedback";
 import { IconButton } from "./IconButton";
 import { LoginGate } from "./LoginGate";
 import { SearchBox } from "./SearchBox";
@@ -182,7 +183,7 @@ function Status({ connected }: { connected: boolean }) {
 }
 
 /** The full menu: on wide screens beside the page, on phones as a full-screen sheet. The whole column scrolls as one. */
-function FullMenu({ onPick, connected }: { onPick?: () => void; connected: boolean }) {
+function FullMenu({ onPick, onFeedback, connected }: { onPick?: () => void; onFeedback: () => void; connected: boolean }) {
   const projects = useProjects();
   const needs = useNeeds();
   return (
@@ -212,6 +213,10 @@ function FullMenu({ onPick, connected }: { onPick?: () => void; connected: boole
         </div>
       </nav>
       <div className="mt-auto flex flex-col gap-2 pt-4">
+        <button type="button" onClick={onFeedback} className={cn(itemClass(false), "w-full text-left")}>
+          <MessageSquarePlus className="size-4 flex-none" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">Feedback</span>
+        </button>
         <NavLink to="/preferences" label="App preferences" icon={SlidersHorizontal} onPick={onPick} />
         <ThemeSwitch />
         <Status connected={connected} />
@@ -233,7 +238,7 @@ function RailLink({ to, label, icon: Icon, attn, title }: { to: string; label: s
 }
 
 /** Tablets and small laptops: icons with their names underneath, so the page keeps most of the width. */
-function Rail({ connected }: { connected: boolean }) {
+function Rail({ connected, onFeedback }: { connected: boolean; onFeedback: () => void }) {
   const needs = useNeeds();
   return (
     <nav aria-label="Main" className="flex h-full w-[84px] flex-none flex-col items-center gap-1 overflow-y-auto border-r border-line bg-panel px-1.5 py-3">
@@ -248,6 +253,10 @@ function Rail({ connected }: { connected: boolean }) {
       <RailLink to="/settings" label="Settings" icon={Settings2} />
       <RailLink to="/guides" label="Guides" icon={BookOpen} />
       <div className="mt-auto flex flex-col items-center gap-2 pt-3">
+        <button type="button" onClick={onFeedback} className="flex w-full flex-none flex-col items-center gap-1 rounded-md px-1 py-2 text-[11.5px] leading-tight text-ink-2 hover:bg-sunken hover:text-ink">
+          <MessageSquarePlus className="size-5" aria-hidden />
+          <span className="text-center">Feedback</span>
+        </button>
         <RailLink to="/preferences" label="App" icon={SlidersHorizontal} />
         <span className={cn("size-2 rounded-full", connected ? "bg-ok-dot" : "bg-attn-dot")} title={connected ? "Updates as your files change" : "Reconnecting…"} />
       </div>
@@ -262,6 +271,12 @@ export function Shell() {
   const phone = useIsMobile();
   const wide = useMediaQuery("(min-width: 1280px)");
   const [drawer, setDrawer] = useState(false);
+  const [feedback, setFeedback] = useState(false);
+  const openFeedback = () => {
+    setDrawer(false);
+    setFeedback(true);
+  };
+  const feedbackBox = <FeedbackDialog open={feedback} onOpenChange={setFeedback} />;
   const path = usePath();
   const crash = useRouterState({ select: (s) => import.meta.env.DEV && new URLSearchParams(s.location.searchStr).get("crash") === "1" });
   const page = <PageErrorBoundary resetKey={path}>{crash ? <CrashForTesting /> : <Outlet />}</PageErrorBoundary>;
@@ -296,9 +311,10 @@ export function Shell() {
           <Dialog open={drawer} onOpenChange={setDrawer}>
             <DialogContent className="inset-0 top-0 left-0 block h-dvh w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none bg-panel p-0 ring-0 sm:max-w-none">
               <DialogTitle className="sr-only">Menu</DialogTitle>
-              <FullMenu onPick={() => setDrawer(false)} connected={connected} />
+              <FullMenu onPick={() => setDrawer(false)} onFeedback={openFeedback} connected={connected} />
             </DialogContent>
           </Dialog>
+          {feedbackBox}
         </div>
       </LoginGate>
     );
@@ -309,12 +325,13 @@ export function Shell() {
       <div className="flex h-full">
         {wide ? (
           <aside className="h-full w-64 flex-none overflow-y-auto border-r border-line bg-panel">
-            <FullMenu connected={connected} />
+            <FullMenu onFeedback={openFeedback} connected={connected} />
           </aside>
         ) : (
-          <Rail connected={connected} />
+          <Rail connected={connected} onFeedback={openFeedback} />
         )}
         <main className="h-full min-w-0 flex-1">{page}</main>
+        {feedbackBox}
       </div>
     </LoginGate>
   );
