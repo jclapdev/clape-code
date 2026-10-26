@@ -14,9 +14,9 @@
       "spec": "specs/001-home-sessions-and-suggested.md",
       "description": "Suggested section on Home: prompts typed 3+ times from history.jsonl with a Make it a skill button that opens New skill filled in; gone once the skill exists.",
       "checks": ["A4", "A5", "A6", "A7"],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": ["specs/screenshots/001-S2-A4.png", "specs/screenshots/001-S2-A5.png", "specs/screenshots/001-S2-A6.png", "specs/screenshots/001-S2-A7-light.png", "specs/screenshots/001-S2-A7-dark.png"]
     }
   ]
 }
