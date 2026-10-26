@@ -342,7 +342,7 @@ function SessionRows({ p }: { p: ProjectDetail }) {
               <Tag tone="accent">Running now</Tag>
             ) : (
               <Button asChild variant="outline" size="sm" className="no-underline">
-                <Link to="/live" search={{ resume: s.sessionId }}>
+                <Link to="/sessions/$sid" params={{ sid: s.sessionId }}>
                   Continue
                 </Link>
               </Button>

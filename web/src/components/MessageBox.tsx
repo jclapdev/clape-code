@@ -1,5 +1,5 @@
 // The box you type to Claude in. "/" at the start, or the / button, lists the slash commands the session accepts.
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { SlashCommand } from "@/lib/types";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
@@ -16,6 +16,7 @@ export function MessageBox({
   busy,
   disabled,
   enterSends = true,
+  extra,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -27,6 +28,8 @@ export function MessageBox({
   busy?: boolean;
   disabled?: boolean;
   enterSends?: boolean;
+  /** Shown after the send button, such as Stop. */
+  extra?: ReactNode;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [forced, setForced] = useState(false);
@@ -122,6 +125,7 @@ export function MessageBox({
         <Button size="lg" type="button" onClick={onSubmit} busy={busy} disabled={disabled || !value.trim()}>
           {submitLabel}
         </Button>
+        {extra}
       </div>
       <p className="pl-14 text-[12px] text-muted-foreground">
         {enterSends ? "Enter to send · Shift+Enter for a new line" : "⌘Enter to send"} · / for commands{hint ? ` · this command takes: ${hint}` : ""}

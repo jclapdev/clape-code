@@ -1,13 +1,14 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { when } from "@/lib/format";
 import type { Turn, TurnBlock } from "@/lib/types";
 import { Md, cn } from "./ui";
 
 type ToolBlock = Extract<TurnBlock, { kind: "tool" }>;
 
-function ToolGroup({ tools }: { tools: ToolBlock[] }) {
-  const [open, setOpen] = useState(false);
+function ToolGroup({ tools, details }: { tools: ToolBlock[]; details: boolean }) {
+  const [open, setOpen] = useState(details);
+  useEffect(() => setOpen(details), [details]);
   const [detail, setDetail] = useState<string | null>(null);
   const counts = new Map<string, number>();
   for (const t of tools) counts.set(t.name, (counts.get(t.name) ?? 0) + 1);
@@ -44,32 +45,31 @@ function ToolGroup({ tools }: { tools: ToolBlock[] }) {
   );
 }
 
-/** Assistant blocks with consecutive tool calls folded into one collapsed row. */
-function AssistantBlocks({ blocks, showThinking }: { blocks: TurnBlock[]; showThinking: boolean }) {
+/** Assistant blocks with consecutive tool calls folded into one collapsed row; `details` unfolds them and shows thinking. */
+function AssistantBlocks({ blocks, details }: { blocks: TurnBlock[]; details: boolean }) {
   const out: React.ReactNode[] = [];
   let run: ToolBlock[] = [];
   const flush = (k: string) => {
-    if (run.length) out.push(<ToolGroup key={k} tools={run} />);
+    if (run.length) out.push(<ToolGroup key={k} tools={run} details={details} />);
     run = [];
   };
   blocks.forEach((b, i) => {
     if (b.kind === "tool") return void run.push(b);
-    if (b.kind === "thinking" && !showThinking) return;
+    if (b.kind === "thinking" && !details) return;
     flush(`t${i}`);
     if (b.kind === "text") out.push(<Md key={i}>{b.text}</Md>);
-    else if (showThinking) out.push(<div key={i} className="border-l-2 border-line pl-3 text-[13px] italic text-muted-foreground">{b.text}</div>);
+    else out.push(<div key={i} className="border-l-2 border-line pl-3 text-[13px] italic text-muted-foreground">{b.text}</div>);
   });
   flush("end");
   return <div className="flex flex-col gap-3">{out}</div>;
 }
 
-export function Transcript({ turns, mineOnly, showThinking = false }: { turns: Turn[]; mineOnly?: boolean; showThinking?: boolean }) {
-  const shown = mineOnly ? turns.filter((t) => t.role === "user") : turns;
-  if (!shown.length) return <p className="text-muted-foreground">This session has no messages yet.</p>;
+export function Transcript({ turns, details = false }: { turns: Turn[]; details?: boolean }) {
+  if (!turns.length) return <p className="text-muted-foreground">No messages yet.</p>;
   return (
     <ol className="flex flex-col gap-3">
-      {shown.map((t, i) => (
-        <li key={t.uuid ?? i} id={t.role === "user" ? `prompt-${i}` : undefined} data-prompt={t.role === "user" ? "" : undefined}>
+      {turns.map((t, i) => (
+        <li key={t.uuid ?? i}>
           {t.role === "system" ? (
             <div className="py-1 text-center text-xs text-muted-foreground">{(t.blocks[0] as any)?.text}</div>
           ) : (
@@ -78,7 +78,7 @@ export function Transcript({ turns, mineOnly, showThinking = false }: { turns: T
                 <span className={cn("font-semibold", t.role === "user" ? "text-accent-foreground" : "text-ink-2")}>{t.role === "user" ? "You" : "Claude"}</span>
                 <span className="text-muted-foreground">{when(t.at)}</span>
               </div>
-              {t.role === "user" ? <div className="whitespace-pre-wrap text-[14px] leading-relaxed">{(t.blocks[0] as any)?.text}</div> : <AssistantBlocks blocks={t.blocks} showThinking={showThinking} />}
+              {t.role === "user" ? <div className="whitespace-pre-wrap text-[14px] leading-relaxed">{(t.blocks[0] as any)?.text}</div> : <AssistantBlocks blocks={t.blocks} details={details} />}
             </article>
           )}
         </li>

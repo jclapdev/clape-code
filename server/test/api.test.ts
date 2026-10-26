@@ -479,7 +479,7 @@ describe("a conversation is addressed by its session ID", () => {
   // question on "ask me", and holds a "slow" message until `release` is called.
   const OLD = "e2644826-95f0-4880-8af9-8169d229cf1d";
   const TERMINAL = "7a1b2c3d-0000-4000-8000-000000000001";
-  const queries: { options: any; received: string[]; mode: string; interrupts: number }[] = [];
+  const queries: { options: any; received: string[]; mode: string; model?: string; interrupts: number }[] = [];
   let release: () => void = () => {};
   const post = (path: string, body: unknown = {}) => request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const get = async (path: string) => (await request(path)).json();
@@ -493,7 +493,7 @@ describe("a conversation is addressed by its session ID", () => {
 
   function fakeQuery({ prompt, options }: any) {
     const sid = options.sessionId ?? options.resume;
-    const rec = { options, received: [] as string[], mode: options.permissionMode, interrupts: 0 };
+    const rec: (typeof queries)[number] = { options, received: [], mode: options.permissionMode, interrupts: 0 };
     queries.push(rec);
     const say = (text: string) => ({ type: "assistant", session_id: sid, message: { content: [{ type: "text", text }] } });
     async function* run() {
@@ -517,6 +517,7 @@ describe("a conversation is addressed by its session ID", () => {
     return Object.assign(run(), {
       interrupt: async () => void rec.interrupts++,
       setPermissionMode: async (mode: string) => void (rec.mode = mode),
+      setModel: async (model?: string) => void (rec.model = model),
       supportedCommands: async () => [],
       accountInfo: async () => Promise.reject(new Error("no account in tests")),
     });
@@ -571,7 +572,7 @@ describe("a conversation is addressed by its session ID", () => {
     // No transcript yet: the page still opens, with the live state.
     await until(async () => (await get(`/api/sessions/${sessionId}`)).status === "idle");
     const one = await get(`/api/sessions/${sessionId}`);
-    expect(one).toMatchObject({ sessionId, turns: [], fromScript: false, permissionMode: "acceptEdits", model: "sonnet" });
+    expect(one).toMatchObject({ sessionId, totalTurns: 1, fromScript: false, permissionMode: "acceptEdits", model: "sonnet" });
     const { startedSessions } = await import("../src/live/started");
     await until(async () => !!(await startedSessions())[sessionId]);
     expect(JSON.parse(await readFile(join(root, "app", "started-sessions.json"), "utf8"))[sessionId]).toBeString();
@@ -643,7 +644,63 @@ describe("a conversation is addressed by its session ID", () => {
     expect((await post(`/api/sessions/${sessionId}/mode`, { mode: "nonsense" })).status).toBe(400);
     expect((await post(`/api/sessions/${sessionId}/mode`, { mode: "acceptEdits" })).status).toBe(200);
     expect((await get(`/api/sessions/${sessionId}`)).permissionMode).toBe("acceptEdits");
+    expect((await post(`/api/sessions/${sessionId}/model`, { model: "a b" })).status).toBe(400);
+    expect((await post(`/api/sessions/${sessionId}/model`, { model: "haiku" })).status).toBe(200);
+    expect(queries.at(-1)!.model).toBe("haiku");
+    expect((await get(`/api/sessions/${sessionId}`)).model).toBe("haiku");
     await post(`/api/sessions/${sessionId}/stop`);
     expect((await post(`/api/sessions/${sessionId}/respond`, { requestId: "x", decision: "allow" })).status).toBe(409);
+  });
+
+  test("a new conversation's first message shows before Claude Code writes the transcript", async () => {
+    const { sessionId } = await (await post("/api/sessions/new", { project: "~/projects/demo", prompt: "slow first words" })).json();
+    const one = await get(`/api/sessions/${sessionId}`);
+    expect(one.turns.map((t: any) => [t.role, t.blocks[0].text])).toEqual([["user", "slow first words"]]);
+    await post(`/api/sessions/${sessionId}/stop`);
+    release();
+  });
+
+  describe("sending right after stopping a new conversation", () => {
+    beforeAll(async () => (await import("../src/live/sessions")).setTranscriptWaitForTests(600));
+    afterAll(async () => (await import("../src/live/sessions")).setTranscriptWaitForTests(null));
+
+    test("waits for the transcript the stopped Claude is still writing, then resumes it", async () => {
+      const { sessionId } = await (await post("/api/sessions/new", { project: "~/projects/demo", prompt: "slow poem" })).json();
+      await post(`/api/sessions/${sessionId}/stop`);
+      const before = queries.length;
+      const sent = await (await post(`/api/sessions/${sessionId}/send`, { text: "AGAIN" })).json();
+      expect(sent).toMatchObject({ sessionId, resumed: true });
+      expect(queries.length).toBe(before); // nothing resumed yet: there's no transcript to resume
+      await Bun.sleep(100);
+      await writeFile(join(root, ".claude", "projects", "-demo", `${sessionId}.jsonl`), JSON.stringify({ type: "user", sessionId, cwd: join(root, "projects", "demo"), message: { role: "user", content: "slow poem" } }) + "\n");
+      await until(() => queries.length === before + 1);
+      const q = queries.at(-1)!;
+      expect(q.options.resume).toBe(sessionId);
+      await until(() => q.received.length === 1);
+      expect(q.received).toEqual(["AGAIN"]);
+      await post(`/api/sessions/${sessionId}/stop`);
+      release();
+    });
+
+    test("starts afresh under the same ID when the stopped Claude never wrote one", async () => {
+      const { sessionId } = await (await post("/api/sessions/new", { project: "~/projects/demo", prompt: "slow poem" })).json();
+      await post(`/api/sessions/${sessionId}/stop`);
+      const before = queries.length;
+      await post(`/api/sessions/${sessionId}/send`, { text: "AGAIN" });
+      await until(() => queries.length === before + 1);
+      const q = queries.at(-1)!;
+      expect(q.options.resume).toBeUndefined();
+      expect(q.options.sessionId).toBe(sessionId);
+      await until(() => q.received.length === 1);
+      expect(q.received).toEqual(["AGAIN"]);
+      await until(async () => (await get(`/api/sessions/${sessionId}`)).status === "idle");
+      await post(`/api/sessions/${sessionId}/stop`);
+    });
+  });
+
+  test("the overview names the conversation a waiting request belongs to", async () => {
+    const { sessionId } = await (await post("/api/sessions/new", { project: "~/projects/demo", prompt: "make a file" })).json();
+    await until(async () => (await get("/api/overview")).needsYou.some((n: any) => n.sessionId === sessionId));
+    await post(`/api/sessions/${sessionId}/stop`);
   });
 });

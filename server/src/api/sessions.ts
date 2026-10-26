@@ -101,6 +101,8 @@ sessions.get("/sessions/:sid", async (c) => {
     const l = liveBySessionId(sid)?.view();
     if (!l) throw new WriteError(404, "No such session.");
     const first = l.events.find((e) => e.kind === "user");
+    // The messages sent so far, until Claude Code records them.
+    const turns = l.events.flatMap((e, i) => (e.kind === "user" ? [{ uuid: `live-${i}`, role: "user", at: e.at, blocks: [{ kind: "text", text: e.text }] }] : []));
     return c.json({
       sessionId: sid,
       cwd: l.cwd,
@@ -109,8 +111,8 @@ sessions.get("/sessions/:sid", async (c) => {
       archived: !!ctx.archived[sid],
       fromScript: false,
       account: l.account,
-      turns: [],
-      totalTurns: 0,
+      turns,
+      totalTurns: turns.length,
       offset: 0,
       subagentList: [],
       ...liveState(sid, null, ctx.running),
@@ -175,7 +177,7 @@ sessions.post("/sessions/:sid/send", async (c) => {
   const s = await findSession(sid);
   const cwd = s?.cwd ?? l?.cwd ?? null;
   if (!cwd) throw new WriteError(404, "Can't find that session's folder.");
-  const v = startSession({ cwd, prompt: text, model: body.model || l?.model || null, permissionMode: modeOf(body.permissionMode) ?? l?.permissionMode ?? "default", resume: sid });
+  const v = startSession({ cwd, prompt: text, model: body.model || l?.model || null, permissionMode: modeOf(body.permissionMode) ?? l?.permissionMode ?? "default", resume: sid, transcriptPending: !s });
   return c.json({ sessionId: v.sessionId, liveId: v.id, resumed: true });
 });
 
@@ -204,6 +206,13 @@ sessions.post("/sessions/:sid/mode", async (c) => {
   const mode = modeOf((await c.req.json()).mode);
   if (!mode) throw new WriteError(400, "That isn't a permission mode.");
   await l.setMode(mode);
+  return c.json({ ok: true });
+});
+sessions.post("/sessions/:sid/model", async (c) => {
+  const l = running(sidOf(c));
+  const model = String((await c.req.json()).model ?? "");
+  if (model && !/^[\w.[\]-]+$/.test(model)) throw new WriteError(400, "That isn't a model name.");
+  await l.setModel(model || null);
   return c.json({ ok: true });
 });
 /** Ends Claude's process for this conversation. The transcript stays; sending again resumes it. */
@@ -276,7 +285,7 @@ sessions.get("/overview", async (c) => {
   const named = (j: (typeof jobs)[number]) => j.name ?? `Session in ${j.cwd ? j.cwd.split(/[\\/]/).filter(Boolean).pop() : "an unknown folder"}`;
   const blocked = jobs.filter((j) => j.state === "blocked");
   const needsYou = [
-    ...live.filter((l) => l.pending.length).map((l) => ({ type: "live" as const, id: l.id, cwd: l.cwd, request: l.pending[0], at: l.pending[0].at })),
+    ...live.filter((l) => l.pending.length).map((l) => ({ type: "live" as const, id: l.id, sessionId: l.sessionId, cwd: l.cwd, request: l.pending[0], at: l.pending[0].at })),
     ...blocked.filter((j) => !isStaleLimit(j)).map((j) => ({ type: "job" as const, id: j.id, name: named(j), cwd: j.cwd, detail: j.detail, sessionId: j.sessionId, at: j.updatedAt })),
   ];
   return c.json({

@@ -39,6 +39,7 @@ Notable changes to Control Center, newest first.
 
 ### Changed
 
+- Every conversation has one page, at /sessions/<session id>: the whole conversation with tool calls folded into one line, Claude's approvals and questions as cards where it stopped, and a reply box at the bottom with the model and permission mode under it. Pressing Enter sends, whether Claude is working, finished, or the session was started in a terminal; Stop sits next to the box. "Show details" unfolds tool calls and thinking. "Copy command for the terminal", subagent runs, Archive and Delete are in the page's menu. The header names the conversation, its project and whether Claude is working, waiting for you or done. Old /live/<id>, /live?resume=<id> and /jobs/<id> links open this page.
 - A background session stopped by a usage limit more than a day ago shows as an ordinary session on Home and Sessions, in date order with Open and Continue, instead of a "Paused" row at the top that said the limit had since reset.
 - Deleting a skill, agent, command, rule, output style, plan or memory note from a project page moves it to Archived items instead of the computer's trash.
 - Opening a file to edit right after reading it no longer shows an empty editor.
@@ -53,6 +54,7 @@ Notable changes to Control Center, newest first.
 
 ### Removed
 
+- The separate live session view and the "Resume a session" form, with the transcript page's "Only my messages" and "N prompts ↑↓" controls and its "Continue this session" button.
 - The sentence under Home's heading.
 - The Setup page. Its skills, agents and other lists are on the Customize pages, its settings on Settings; /setup opens Settings and /library opens Customize.
 - The command palette and its hidden keyboard shortcuts.
@@ -61,6 +63,8 @@ Notable changes to Control Center, newest first.
 
 ### Fixed
 
+- Stopping a new conversation within about a second of its first message, then sending, no longer fails with "No conversation found" and loses the message: the send waits for the transcript Claude Code is still writing.
+- After a stop, the conversation no longer shows "No response requested." as Claude's reply.
 - The Control Center window keeps working when you turn home network mode on or off from it, instead of going unresponsive until the app is reopened. If the window's local address can't be opened, it says so instead of staying blank.
 - Guides show lists, tables and bold lines inside the docs' tabs as formatted text instead of raw code, and a code block inside a list item no longer swallows the text after it.
 - The "How to write a good one" guide on the New forms folds under the form below 1280 px wide, so phones and tablets can read it too, and sits beside the form from 1280 px.

@@ -1,7 +1,8 @@
 import { query, type PermissionMode, type PermissionResult, type Query, type SDKMessage, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { emit } from "../events";
-import { appDir, tildify } from "../fs/paths";
+import { appDir, claudeDir, tildify } from "../fs/paths";
 import { toolSummary } from "../parsers/transcript";
 import { pickSessionAccount, saveSessionAccount, type SessionAccount } from "../account/sessions";
 import { claudeEnv, findClaude } from "./claude";
@@ -92,6 +93,40 @@ export function setQueryForTests(q: typeof query | null) {
   runQuery = q ?? query;
 }
 
+// How long a resume waits for a transcript that a just-stopped Claude may still be writing.
+let transcriptWaitMs = 8000;
+export function setTranscriptWaitForTests(ms: number | null) {
+  transcriptWaitMs = ms ?? 8000;
+}
+
+/** The transcript file Claude Code writes for a session, in any project folder, or null. */
+async function transcriptFile(sessionId: string): Promise<string | null> {
+  const root = join(claudeDir(), "projects");
+  for (const d of await readdir(root).catch(() => [] as string[])) {
+    const f = join(root, d, `${sessionId}.jsonl`);
+    if (await stat(f).then((s) => s.isFile(), () => false)) return f;
+  }
+  return null;
+}
+
+/**
+ * Waits until the session's transcript exists and has stopped growing. Stopping a new conversation within about a
+ * second of its first message leaves Claude Code writing the transcript after the stop; resuming before it exists
+ * fails with "No conversation found". False when no transcript appears in time.
+ */
+async function settledTranscript(sessionId: string, waitMs: number): Promise<boolean> {
+  const end = Date.now() + waitMs;
+  let last = -1;
+  for (;;) {
+    const f = await transcriptFile(sessionId);
+    const size = f ? await stat(f).then((s) => s.size, () => -1) : -1;
+    if (size >= 0 && size === last) return true;
+    last = size;
+    if (Date.now() >= end) return size >= 0;
+    await Bun.sleep(200);
+  }
+}
+
 function claudeExecutable(): string | undefined {
   if (!embedded()) return undefined; // running from source: the SDK uses its own bundled copy
   const p = findClaude();
@@ -107,7 +142,7 @@ class LiveSession {
   events: LiveEvent[] = [];
   waiters = new Map<string, Waiter>();
   input = new AsyncQueue<SDKUserMessage>();
-  q: Query;
+  q: Query | null = null;
   abort = new AbortController();
   toolIndex = new Map<string, Extract<LiveEvent, { kind: "tool" }>>();
   // Slash commands this session accepts, from Claude Code itself. Terminal-only ones (exit, statusline…) are left out.
@@ -120,16 +155,33 @@ class LiveSession {
     public model: string | null,
     public permissionMode: PermissionMode,
     resume: string | null,
+    transcriptPending = false,
   ) {
     // A new session gets its ID up front, so its address is known before Claude answers. Resuming keeps the ID.
     this.sessionId = resume ?? crypto.randomUUID();
     void recordStarted(this.sessionId).catch(() => {});
+    if (!resume || !transcriptPending) this.launch(resume);
+    else
+      // Messages sent meanwhile wait in `input`. With no transcript at all, Claude never recorded the conversation, so
+      // it starts afresh under the same ID.
+      void settledTranscript(resume, transcriptWaitMs).then((found) => {
+        if (this.status === "stopped") return;
+        try {
+          this.launch(found ? resume : null);
+        } catch (e: any) {
+          this.events.push({ kind: "error", at: now(), text: e?.message ?? String(e) });
+          this.setStatus("error");
+        }
+      });
+  }
+
+  private launch(resume: string | null) {
     this.q = runQuery({
       prompt: this.input,
       options: {
-        cwd,
-        model: model ?? undefined,
-        permissionMode,
+        cwd: this.cwd,
+        model: this.model ?? undefined,
+        permissionMode: this.permissionMode,
         ...(resume ? { resume } : { sessionId: this.sessionId }),
         abortController: this.abort,
         settingSources: ["user", "project", "local"],
@@ -171,6 +223,8 @@ class LiveSession {
   }
 
   private setStatus(s: LiveStatus) {
+    // Once stopped, messages still arriving from the ending process don't bring it back.
+    if (this.status === "stopped") return;
     this.status = s;
     this.changed();
   }
@@ -226,12 +280,18 @@ class LiveSession {
   }
 
   async interrupt() {
-    await this.q.interrupt();
+    await this.q?.interrupt();
   }
 
   async setMode(mode: PermissionMode) {
-    await this.q.setPermissionMode(mode);
+    await this.q?.setPermissionMode(mode);
     this.permissionMode = mode;
+    this.changed();
+  }
+
+  async setModel(model: string | null) {
+    await this.q?.setModel(model ?? undefined);
+    this.model = model;
     this.changed();
   }
 
@@ -256,12 +316,12 @@ class LiveSession {
     if (m.type === "system" && (m as any).subtype === "init") {
       this.model = (m as any).model ?? this.model;
       this.terminalOnly = new Set((m as any).terminal_slash_commands ?? []);
-      this.q.supportedCommands().then(
+      this.q!.supportedCommands().then(
         (c) => this.setCommands(c),
         () => {},
       );
       // The account this session runs on, kept by session id so its transcript can show it after it ends.
-      this.q.accountInfo().then(
+      this.q!.accountInfo().then(
         (info) => {
           this.account = pickSessionAccount(info);
           if (this.sessionId) void saveSessionAccount(this.sessionId, info).catch(() => {});
@@ -307,8 +367,8 @@ class LiveSession {
 
   private async pump() {
     try {
-      for await (const m of this.q) this.handle(m);
-      if (this.status !== "stopped") this.setStatus("stopped");
+      for await (const m of this.q!) this.handle(m);
+      this.setStatus("stopped");
     } catch (e: any) {
       if (this.status === "stopped") return;
       this.events.push({ kind: "error", at: now(), text: e?.message ?? String(e) });
@@ -319,10 +379,11 @@ class LiveSession {
 
 const sessions = new Map<string, LiveSession>();
 
-export function startSession(o: { cwd: string; prompt: string; model?: string | null; permissionMode?: PermissionMode; resume?: string | null }) {
+/** `transcriptPending`: resuming a conversation whose transcript isn't on disk yet. */
+export function startSession(o: { cwd: string; prompt: string; model?: string | null; permissionMode?: PermissionMode; resume?: string | null; transcriptPending?: boolean }) {
   // One live session per conversation: a finished one is replaced by its resumption.
   if (o.resume) for (const old of [...sessions.values()]) if (old.sessionId === o.resume) removeSession(old.id);
-  const s = new LiveSession(o.cwd, o.model ?? null, o.permissionMode ?? "default", o.resume ?? null);
+  const s = new LiveSession(o.cwd, o.model ?? null, o.permissionMode ?? "default", o.resume ?? null, !!o.transcriptPending);
   sessions.set(s.id, s);
   s.send(o.prompt);
   return s.view();

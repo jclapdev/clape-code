@@ -10,7 +10,7 @@ import { Tag } from "@/components/ui";
 
 export interface Overview {
   needsYou: (
-    | { type: "live"; id: string; cwd: string; request: PendingRequest; at: string }
+    | { type: "live"; id: string; sessionId: string; cwd: string; request: PendingRequest; at: string }
     | { type: "job"; id: string; name: string | null; cwd: string | null; detail: string | null; sessionId: string | null; at: string | null }
   )[];
 }
@@ -110,7 +110,7 @@ export function LiveRequestRow({ item }: { item: LiveRequest }) {
         </>
       )}
       <Button asChild size="sm" variant="outline" className="no-underline">
-        <Link to="/live/$id" params={{ id: item.id }}>
+        <Link to="/sessions/$sid" params={{ sid: item.sessionId }}>
           {isQ ? "Answer" : "Open"}
         </Link>
       </Button>
@@ -137,15 +137,8 @@ export function SessionRow({ e, search }: { e: SessionEntry; search?: Record<str
     <Row tag={e.status ? TAGS[e.status] : undefined} title={e.title} about={about}>
       {e.status === "needs" && sid && (
         <Button asChild size="sm" className="no-underline">
-          <Link to="/live" search={{ new: "1", resume: sid } as never}>
+          <Link to="/sessions/$sid" params={{ sid }}>
             Answer
-          </Link>
-        </Button>
-      )}
-      {e.status !== "needs" && e.status !== "running" && sid && (
-        <Button asChild size="sm" variant="outline" className="no-underline">
-          <Link to="/live" search={{ resume: sid } as never}>
-            Continue
           </Link>
         </Button>
       )}
@@ -155,7 +148,7 @@ export function SessionRow({ e, search }: { e: SessionEntry; search?: Record<str
             Open
           </Link>
         ) : (
-          <Link to="/sessions/$sid" params={{ sid: sid! }} search={(search ?? {}) as never}>
+          <Link to="/sessions/$sid" params={{ sid: sid! }}>
             Open
           </Link>
         )}

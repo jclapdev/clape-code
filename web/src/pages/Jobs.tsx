@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Link, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { when } from "@/lib/format";
-import { copyCommand, resumeCommand } from "@/lib/resume";
 import type { Job } from "@/lib/types";
 import { DetailHeader } from "@/components/Panes";
 import { ErrorNote, Loading, Tag } from "@/components/ui";
@@ -11,12 +10,17 @@ import { BackBar } from "./Sessions";
 
 const LABEL: Record<string, string> = { working: "Working", blocked: "Waiting for you", done: "Done" };
 
+/** A background session with a session ID opens as its conversation; one without shows its recorded timeline. */
 function JobDetail({ id }: { id: string }) {
   const q = useQuery({ queryKey: ["job", id], queryFn: () => api.get<Job>(`/jobs/${id}`) });
-  if (q.isLoading) return <Loading />;
+  const navigate = useNavigate();
+  const sid = q.data?.sessionId;
+  useEffect(() => {
+    if (sid) void navigate({ to: "/sessions/$sid", params: { sid }, replace: true });
+  }, [sid, navigate]);
+  if (q.isLoading || sid) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const j = q.data!;
-  const cmd = j.sessionId ? resumeCommand(j.cwd, j.sessionId) : null;
   return (
     <div>
       <DetailHeader
@@ -27,29 +31,6 @@ function JobDetail({ id }: { id: string }) {
             <span className="font-mono">{j.cwd}</span>
             <span>started {when(j.createdAt)}</span>
           </span>
-        }
-        actions={
-          <>
-            {cmd && (
-              <Button variant="outline" onClick={() => copyCommand(cmd)}>
-                Copy resume command
-              </Button>
-            )}
-            {j.sessionId && (
-              <Button asChild variant="outline" className="no-underline">
-                <Link to="/sessions/$sid" params={{ sid: j.sessionId }} search={{}}>
-                  Open transcript
-                </Link>
-              </Button>
-            )}
-            {j.state === "blocked" && j.sessionId && (
-              <Button asChild className="no-underline">
-                <Link to="/live" search={{ new: "1", resume: j.sessionId }}>
-                  Answer here
-                </Link>
-              </Button>
-            )}
-          </>
         }
       >
         {j.detail && <p className="text-ink-2">{j.detail}</p>}

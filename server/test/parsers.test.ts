@@ -223,6 +223,23 @@ describe("transcript", () => {
     ]);
     expect(summarize(lines, "s").entrypoint).toBe("sdk-cli");
   });
+
+  test("the stand-in reply Claude Code writes after a stop isn't shown as Claude's", () => {
+    // Shape from a real transcript after a stop (claude-test, 236af84a-....jsonl line 27).
+    const synthetic = (text: string) => ({ type: "assistant", uuid: "a" + text.length, timestamp: "2026-10-26T02:53:57Z", message: { id: "x" + text.length, model: "<synthetic>", role: "assistant", content: [{ type: "text", text }] } });
+    const lines = [
+      { type: "user", uuid: "u1", timestamp: "2026-10-26T02:53:38Z", message: { role: "user", content: "Write a poem" } },
+      synthetic("No response requested."),
+      { type: "user", uuid: "u2", timestamp: "2026-10-26T02:53:57Z", message: { role: "user", content: "Reply with THIRD" } },
+      { type: "assistant", uuid: "a3", timestamp: "2026-10-26T02:54:00Z", message: { id: "m3", model: "m", role: "assistant", content: [{ type: "text", text: "THIRD" }] } },
+      synthetic("API Error: overloaded"),
+    ].map((l) => JSON.stringify(l)).join("\n");
+    expect(toTurns(lines).map((x) => [x.role, x.blocks.map((b: any) => b.text).join("|")])).toEqual([
+      ["user", "Write a poem"],
+      ["user", "Reply with THIRD"],
+      ["assistant", "THIRD|API Error: overloaded"],
+    ]);
+  });
 });
 
 // ---- Board (PROGRESS.md as Next / In progress / Done) ----

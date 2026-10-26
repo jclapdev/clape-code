@@ -4,6 +4,7 @@ import { ArchivePage } from "./pages/Archive";
 import { FilePage } from "./pages/File";
 import { HomePage } from "./pages/Home";
 import { JobsPage } from "./pages/Jobs";
+import { ConversationPage } from "./pages/Conversation";
 import { LivePage } from "./pages/Live";
 import { PreferencesPage } from "./pages/Preferences";
 import { ProjectsPage } from "./pages/Projects";
@@ -33,22 +34,25 @@ const project = createRoute({
 
 const sessionsSearch = (s: Record<string, unknown>): SessionsSearch => ({ project: str(s.project), needs: s.needs === true || s.needs === "true" || s.needs === "1" || s.needs === 1 ? true : undefined, q: str(s.q) });
 const sessions = createRoute({ getParentRoute: () => root, path: "/sessions", component: SessionsPage, validateSearch: sessionsSearch });
-const session = createRoute({ getParentRoute: () => root, path: "/sessions/$sid", component: SessionsPage, validateSearch: sessionsSearch });
+const session = createRoute({ getParentRoute: () => root, path: "/sessions/$sid", component: ConversationPage });
 
 const liveSearch = (s: Record<string, unknown>): { new?: string; project?: string; resume?: string; prompt?: string; mode?: string } => ({ new: str(String(s.new ?? "")), project: str(s.project), resume: str(s.resume), prompt: str(s.prompt), mode: str(s.mode) });
-// Plain /live was the old list of live sessions; with a form to fill in or a session to resume it's the New session form.
+// Plain /live was the old list of live sessions; with a form to fill in it's the New session form.
+// ?resume=<session id> was the resume form; a conversation now has one page.
 const live = createRoute({
   getParentRoute: () => root,
   path: "/live",
   component: LivePage,
   validateSearch: liveSearch,
   beforeLoad: ({ search }) => {
+    if (search.resume) throw redirect({ to: "/sessions/$sid", params: { sid: search.resume }, replace: true });
     if (!Object.values(search).some(Boolean)) throw redirect({ to: "/sessions", search: {} });
   },
 });
-const liveOne = createRoute({ getParentRoute: () => root, path: "/live/$id", component: LivePage, validateSearch: liveSearch });
+// An old live-session link opens that session's conversation page.
+const liveOne = createRoute({ getParentRoute: () => root, path: "/live/$id", component: LivePage });
 
-// Background sessions are listed with the rest on Sessions; each one still opens at /jobs/<id>.
+// Background sessions are listed with the rest on Sessions; /jobs/<id> opens the conversation when it has a session ID.
 const jobs = createRoute({ getParentRoute: () => root, path: "/jobs", beforeLoad: () => { throw redirect({ to: "/sessions", search: {} }); } });
 const job = createRoute({ getParentRoute: () => root, path: "/jobs/$id", component: JobsPage });
 

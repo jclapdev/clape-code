@@ -226,6 +226,8 @@ export class TurnBuilder {
     if (d.type === "assistant" && d.message) {
       const m = d.message;
       if (m.model === "<synthetic>" && !Array.isArray(m.content)) return;
+      // Claude Code's stand-in reply after a stop or interrupt; Claude never said it.
+      if (m.model === "<synthetic>" && m.content.every((b: any) => b.type === "text" && b.text?.trim() === "No response requested.")) return;
       // Consecutive assistant lines form one turn until a person speaks.
       if (!this.current || this.current.role !== "assistant") {
         this.current = { uuid: d.uuid, role: "assistant", at: d.timestamp ?? null, model: m.model, blocks: [] };
