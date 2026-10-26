@@ -1,3 +1,22 @@
 {
-  "steps": []
+  "steps": [
+    {
+      "id": "001-S1",
+      "spec": "specs/001-home-sessions-and-suggested.md",
+      "description": "Runs stopped by a usage limit over a day ago are ordinary sessions, not Paused, on Home and Sessions; remove the sentence under Home's heading.",
+      "checks": ["A1", "A2", "A3"],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "001-S2",
+      "spec": "specs/001-home-sessions-and-suggested.md",
+      "description": "Suggested section on Home: prompts typed 3+ times from history.jsonl with a Make it a skill button that opens New skill filled in; gone once the skill exists.",
+      "checks": ["A4", "A5", "A6", "A7"],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    }
+  ]
 }
