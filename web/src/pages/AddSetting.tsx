@@ -1,8 +1,9 @@
 // Add a permission rule, a hook or an MCP server without editing JSON, with the official guide beside the form.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { api } from "@/lib/api";
+import { draftKey, useDraftForm } from "@/lib/draft";
 import type { Project } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,17 +56,14 @@ export function AddSettingPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
-  const [scope, setScope] = useState(search.scope ?? "global");
-  const [local, setLocal] = useState("shared");
-  const [list, setList] = useState("allow");
-  const [rule, setRule] = useState("");
-  const [event, setEvent] = useState("PostToolUse");
-  const [matcher, setMatcher] = useState("");
-  const [command, setCommand] = useState("");
-  const [name, setName] = useState("");
-  const [transport, setTransport] = useState("http");
-  const [target, setTarget] = useState("");
-  const [env, setEnv] = useState("");
+  // What's typed is kept per form until it's saved; a scope in the address wins over the draft.
+  const [form, field, clearForm] = useDraftForm(
+    draftKey("add", what),
+    { scope: "global", local: "shared", list: "allow", rule: "", event: "PostToolUse", matcher: "", command: "", name: "", transport: "http", target: "", env: "" },
+    search.scope ? { scope: search.scope } : undefined,
+  );
+  const { scope, local, list, rule, event, matcher, command, name, transport, target, env } = form;
+  const [setScope, setLocal, setList, setRule, setEvent, setMatcher, setCommand, setName, setTransport, setTarget, setEnv] = [field("scope"), field("local"), field("list"), field("rule"), field("event"), field("matcher"), field("command"), field("name"), field("transport"), field("target"), field("env")];
 
   const save = useMutation({
     mutationFn: () =>
@@ -73,6 +71,7 @@ export function AddSettingPage() {
         ? api.post("/mcp/add", { scope, name, transport, target, env })
         : api.post("/settings/add", { scope, local: local === "local", what, list, rule, event, matcher, command }),
     onSuccess: () => {
+      clearForm();
       void qc.invalidateQueries();
       // The project page no longer lists rules, hooks or servers, so a project's opens Settings or the Customize page filtered to it.
       const project = scope === "global" ? undefined : scope;

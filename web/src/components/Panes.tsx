@@ -19,11 +19,18 @@ export function DetailHeader({ title, sub, actions, children }: { title: ReactNo
   );
 }
 
+// Every top-level page scrolls in PAGE_SCROLL and puts its content in PAGE_COLUMN, so content starts at the same
+// left edge and has the same width on every page. The scrollbar's gutter is always kept, so a page that scrolls
+// isn't narrower than one that doesn't.
+// relative: hidden form controls, such as a select's native copy, are placed inside it instead of stretching the whole window.
+export const PAGE_SCROLL = "relative h-full overflow-auto [scrollbar-gutter:stable]";
+export const PAGE_COLUMN = "mx-auto w-full max-w-[1180px] px-4 md:px-8";
+
 /** A page with no list pane. */
 export function Page({ title, sub, actions, children }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; children: ReactNode }) {
   return (
-    <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-[1180px] px-4 py-6 md:px-8">
+    <div className={PAGE_SCROLL}>
+      <div className={`${PAGE_COLUMN} py-6`}>
         <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-[24px] font-semibold tracking-[-0.01em]">{title}</h1>

@@ -14,6 +14,11 @@ export const layoutStorage = {
       localStorage.setItem(k, v);
     } catch {}
   },
+  removeItem: (k: string) => {
+    try {
+      localStorage.removeItem(k);
+    } catch {}
+  },
 };
 
 export function useMediaQuery(q: string): boolean {

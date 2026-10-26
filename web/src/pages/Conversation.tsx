@@ -22,6 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { BackBar, useSessionActions } from "./Sessions";
+import { draftKey, useDraft } from "@/lib/draft";
 
 export const MODES = [
   { value: "default", label: "Ask before changes" },
@@ -243,7 +244,7 @@ function Conversation({ sid }: { sid: string }) {
   const { archive, askDelete } = useSessionActions();
   const [details, setDetails] = useState(false);
   const [agent, setAgent] = useState<Agent | null>(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useDraft(draftKey("reply", sid), "");
   const [localMode, setLocalMode] = useState<string | null>(null);
   // A conversation started a moment ago on the New session page keeps the model picked there.
   const [model, setModel] = useState(() => {
@@ -467,7 +468,8 @@ function NewConversation({ search }: { search: NewSessionSearch }) {
   const [proj, setProj] = useState(search.project ?? "");
   const [model, setModel] = useState("");
   const [mode, setMode] = useState(search.mode ?? "default");
-  const [text, setText] = useState(search.prompt ?? "");
+  // A prompt in the address, such as /init, replaces the draft.
+  const [text, setText, clearText] = useDraft(draftKey("new-session"), "", search.prompt);
   const account = useAccount(proj || undefined);
   const cmds = useQuery({ queryKey: ["live-commands", proj], queryFn: () => api.get<SlashCommand[]>(`/live-commands?project=${encodeURIComponent(proj)}`) });
   useEffect(() => {
@@ -477,6 +479,7 @@ function NewConversation({ search }: { search: NewSessionSearch }) {
   const start = useMutation({
     mutationFn: (prompt: string) => api.post<{ sessionId: string; liveId: string | null }>("/sessions/new", { project: proj, model, permissionMode: mode, prompt }),
     onSuccess: (r, prompt) => {
+      clearText();
       if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
       // The conversation page opens with the message already in it, then fills in from the server.
       const page = firstPage({ sessionId: r.sessionId, liveId: r.liveId, project: proj, prompt, model, permissionMode: mode, at: new Date().toISOString() });

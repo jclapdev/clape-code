@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 
-const size = (n: number) => (n < 1024 ? `${n} bytes` : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+const size = (n: number) => (n < 1024 ? (n === 1 ? "1 byte" : `${n} bytes`) : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
 /** Copies files into docs/ one at a time and says what happened to each. */
 export function useContextUpload(p: ProjectDetail) {

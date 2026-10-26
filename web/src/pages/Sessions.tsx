@@ -6,6 +6,7 @@ import { ChevronLeft, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { plural } from "@/lib/format";
+import { PAGE_SCROLL } from "@/components/Panes";
 import { ErrorNote, Loading, Switch, useConfirm } from "@/components/ui";
 import { Input } from "@/components/ui/input";
 import { SessionRow, folder, useSessionEntries } from "@/components/SessionRows";
@@ -18,7 +19,7 @@ export function useSessionActions() {
     onSuccess: (_r, v) => {
       qc.invalidateQueries({ queryKey: ["sessions"] });
       qc.invalidateQueries({ queryKey: ["session"] });
-      toast.success(v.archived ? `Archived ${v.ids.length === 1 ? "the session" : `${v.ids.length} sessions`}. They can still be resumed.` : "Moved back to your sessions.");
+      toast.success(v.archived ? v.ids.length === 1 ? "Archived the session. It can still be resumed." : `Archived ${v.ids.length} sessions. They can still be resumed.` : "Moved back to your sessions.");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -122,7 +123,7 @@ function SessionsList({ search }: { search: SessionsSearch }) {
 export function SessionsPage() {
   const search = useSearch({ strict: false }) as SessionsSearch;
   return (
-    <section aria-label="Sessions" className="h-full overflow-auto">
+    <section aria-label="Sessions" className={PAGE_SCROLL}>
       <div className="mx-auto max-w-[1180px] md:px-2">
         <SessionsList search={search} />
       </div>

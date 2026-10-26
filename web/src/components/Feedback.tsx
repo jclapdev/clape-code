@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { readDraft, useDraft } from "@/lib/draft";
 import { layoutStorage } from "@/lib/prefs";
 import type { Project } from "@/lib/types";
 import { SimpleSelect } from "./SimpleSelect";
@@ -10,7 +11,7 @@ import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Textarea } from "./ui/textarea";
 
-// The note survives closing the box and changing page; storage can be unavailable, so layoutStorage guards each access.
+// The note survives closing the box and changing page (useDraft); storage can be unavailable, so layoutStorage guards each access.
 const DRAFT = "cc-feedback-draft";
 const LAST = "cc-feedback-project";
 const ALL = "";
@@ -28,7 +29,7 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const qc = useQueryClient();
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") }).data ?? [];
   const fallback = useDefaultProject(projects);
-  const [note, setNote] = useState(() => layoutStorage.getItem(DRAFT) ?? "");
+  const [note, setNote, clearNote] = useDraft(DRAFT, "");
   const [project, setProject] = useState(fallback);
   const [added, setAdded] = useState<number | null>(null);
 
@@ -36,7 +37,7 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     if (!open) return;
     setProject(fallback);
     setAdded(null);
-    setNote(layoutStorage.getItem(DRAFT) ?? "");
+    setNote(readDraft(DRAFT, ""));
     // Only when the box opens: picking another project while it's open stays picked.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -44,13 +45,12 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const write = (v: string) => {
     setNote(v);
     setAdded(null);
-    layoutStorage.setItem(DRAFT, v);
   };
 
   const save = useMutation({
     mutationFn: () => api.post<{ n: number; path: string }>("/feedback", { project: project || null, note }),
     onSuccess: (r) => {
-      write("");
+      clearNote();
       setAdded(r.n);
       if (project) layoutStorage.setItem(LAST, project);
       qc.invalidateQueries({ queryKey: ["project"] });

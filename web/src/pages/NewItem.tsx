@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { draftKey, useDraftForm } from "@/lib/draft";
 import type { Project } from "@/lib/types";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { Button } from "@/components/ui/button";
@@ -117,15 +118,15 @@ export function NewItemPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
-  const [scope, setScope] = useState(search.scope ?? (spec.projectOnly ? "" : "global"));
-  const [name, setName] = useState(search.name ?? "");
-  const [description, setDescription] = useState("");
-  const [body, setBody] = useState(search.body ?? "");
-  const [manualOnly, setManualOnly] = useState(false);
-  const [tools, setTools] = useState<string[]>([]);
-  const [model, setModel] = useState("inherit");
-  const [paths, setPaths] = useState("");
-  const [keepCoding, setKeepCoding] = useState(true);
+  // What's typed is kept per kind until it's created; a scope, name or text in the address wins over the draft.
+  const pinned = Object.fromEntries(Object.entries({ scope: search.scope, name: search.name, body: search.body }).filter(([, v]) => v !== undefined));
+  const [form, field, clearForm] = useDraftForm(
+    draftKey("new", kind),
+    { scope: spec.projectOnly ? "" : "global", name: "", description: "", body: "", manualOnly: false, tools: [] as string[], model: "inherit", paths: "", keepCoding: true },
+    pinned,
+  );
+  const { scope, name, description, body, manualOnly, tools, model, paths, keepCoding } = form;
+  const [setScope, setName, setDescription, setBody, setManualOnly, setTools, setModel, setPaths, setKeepCoding] = [field("scope"), field("name"), field("description"), field("body"), field("manualOnly"), field("tools"), field("model"), field("paths"), field("keepCoding")];
   const [guide, setGuide] = useState(spec.guides[0]!.slug);
 
   const create = useMutation({
@@ -143,6 +144,7 @@ export function NewItemPage() {
         keepCoding,
       }),
     onSuccess: () => {
+      clearForm();
       void qc.invalidateQueries();
       // The project page no longer lists items, so a project's new item opens its Customize page filtered to that project.
       const to = `/${spec.section === "rules" ? "instructions" : spec.section}` as "/skills";

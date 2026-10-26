@@ -1,6 +1,6 @@
 # Control Center
 
-A local web app for seeing and managing everything Claude Code keeps on your computer: projects, sessions, background jobs, skills, agents, commands, rules, hooks, plugins, memory, plans and settings. You can edit these files safely, archive or delete the ones you no longer want, and start or answer Claude sessions from the browser.
+An app for seeing and managing everything Claude Code keeps on your computer: projects, sessions, instructions, skills, agents, slash commands, hooks, MCP servers, plugins, plans, memory and settings. You can edit these files safely, archive the ones you no longer want, and start or answer Claude sessions in its window or a browser.
 
 It runs on macOS, Linux and Windows. Your files stay where they are; the app reads them and writes them back.
 
@@ -56,19 +56,20 @@ Starting and answering sessions uses the Claude Code installed on the computer, 
 
 ## What's in it
 
-| View | What it does |
-|---|---|
-| Home | Everything waiting for you: approvals, questions, blocked background jobs. Recent changes across projects. |
-| Projects | Each project's board of its BACKLOG.md (Open, In spec, Done; read-only), changelog (add today's entry), docs, `.claude` configuration and sessions. |
-| Sessions | Your conversations, one row each with its name, project and time since last activity; from a project page only that project's. `claude -p` runs and archived conversations show when you turn them on. Each opens as one page: the whole conversation with tool calls folded away, approvals and Claude's questions as cards you can answer, and a reply box at the bottom that keeps it going. Copy a resume command, archive or delete from the page's menu. |
-| New session | An empty conversation page: pick the project, model and permission mode in the row under the reply box and send the first message. Every New session button opens it with the current project filled in. |
-| Jobs | Background jobs and their timelines. |
-| Library | Skills, agents, commands, rules, output styles, hooks, hook scripts, settings files, CLAUDE.md files, plans, memory notes and plugins, globally or per project. Edit, create, archive or delete one item or many, turn skills and plugins on or off. Skills are checked against the Agent Skills spec when saved. |
-| Settings | The value Claude Code actually uses for each setting, which file it comes from, and what it overrides. |
-| Map | Every file and folder Claude Code uses, what it is, and whether you can edit it. |
-| Archived items | Items you archived, with Restore. It is the last link under Customize in the menu and the last card on the Customize page, and the message after a delete links to it. |
+The menu on the left has these pages:
 
-The search box at the top of the menu searches everything. Feedback in the menu adds a note to a project's BACKLOG.md, or to `~/.claude/BACKLOG.md` for all projects, as a new pending, open line. <kbd>⌘S</kbd> (<kbd>Ctrl S</kbd> on Windows and Linux) saves the open file. Preferences has the theme (match system, light, dark).
+- **Home**: what's waiting for you (approvals, questions), then your recent sessions and suggestions for skills.
+- **Sessions**: every conversation, newest first, with its project and when it was last active. Background and `claude -p` runs are here too; turn on "Show runs from scripts" or "Show archived" to see them.
+- **A conversation**: opens as one page with tool calls folded away. Approvals and Claude's questions are cards you answer in place, and the reply box at the bottom keeps it going.
+- **New session**: an empty conversation. Pick the project, model and permission mode under the box and send the first message.
+- **Projects**: one card per project. A project's page has its board (BACKLOG.md as Open, In spec and Done), "Build your setup", recent sessions, context files, changelog, docs and `.worktreeinclude`.
+- **Customize**: one page each for instructions, skills, slash commands, agents, hooks, MCP servers, plugins, plans, scheduled tasks, output styles, memory and workflows. Each lists every item from every project and plugin. Open one to read, edit, archive or delete it; New makes one with the guide beside the form.
+- **Archived items**: what you archived, with Restore. It is the last link under Customize.
+- **Settings**: your Claude account, permission rules, model, environment variables, status line, sandbox, keyboard shortcuts and themes, and which file's value is in effect.
+- **Guides**: Claude Code's official guides, shown in the app, and links to the features that live in the cloud or your organization's admin console.
+- **App preferences**: the theme (match system, light or dark), project folders and home network mode.
+
+The search box at the top of the menu searches everything. **Feedback** in the menu adds a note to a project's BACKLOG.md, or to `~/.claude/BACKLOG.md` for all projects. <kbd>⌘S</kbd> (<kbd>Ctrl S</kbd> on Windows and Linux) saves the open file. Text you type in a reply box, the New session box or a New form is kept if you leave the page, until you send or save it.
 
 ## How it keeps your files safe
 

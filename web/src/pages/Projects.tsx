@@ -6,14 +6,14 @@ import { Link, useParams } from "@tanstack/react-router";
 import { ArrowRight, ChevronDown, Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { api, enc } from "@/lib/api";
-import { when } from "@/lib/format";
+import { plural, when } from "@/lib/format";
 import type { Catalog, LibraryItem, Project, ProjectDetail } from "@/lib/types";
 import { featureById, type Feature, type FeatureId } from "@/lib/features";
 import { ProjectBoard } from "./ProjectBoard";
 import { ContextDropZone, ContextSection } from "./ProjectContext";
 import { openOnComputer } from "@/components/FileEditor";
 import { ItemActions } from "@/components/ItemActions";
-import { DetailHeader } from "@/components/Panes";
+import { DetailHeader, PAGE_COLUMN, PAGE_SCROLL } from "@/components/Panes";
 import { Readable } from "@/components/Readable";
 import type { NewKind } from "./NewItem";
 import { ErrorNote, Loading, Md, Tag, cn } from "@/components/ui";
@@ -25,9 +25,9 @@ function ProjectOverview() {
   if (q.error) return <ErrorNote error={q.error} />;
   const mine = (q.data ?? []).filter((p) => p.group === "root");
   return (
-    <div className="mx-auto max-w-[1100px] px-6 py-8">
-      <h1 className="text-[24px] font-semibold">Projects</h1>
-      <div className="mt-6 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+    <div className={`${PAGE_COLUMN} py-6`}>
+      <h1 className="text-[24px] font-semibold tracking-[-0.01em]">Projects</h1>
+      <div className="mt-6 grid auto-rows-fr gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
         {mine.map((p) => (
           <Link key={p.id} to="/projects/$id" params={{ id: p.id }} search={{}} className="flex flex-col gap-1 rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-line-strong">
             <span className="font-medium">{p.name}</span>
@@ -292,7 +292,7 @@ function BuildCards({ p }: { p: ProjectDetail }) {
   const count = (f: Feature) => (cat.isLoading ? "…" : mine.filter((i) => f.kinds.includes(i.kind)).length || "none");
   return (
     <div className="flex flex-col gap-3">
-      <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))]">
+      <ul className="grid auto-rows-fr gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))]">
         {BUILD.map(({ id, line }) => {
           const f = featureById(id)!;
           const Icon = f.icon;
@@ -377,7 +377,7 @@ function ProjectDetailView({ id }: { id: string }) {
         sub={
           <span className="break-all">
             {p.path}
-            {p.git?.branch ? ` · branch ${p.git.branch}${p.git.dirty ? `, ${p.git.dirty} changed files` : ""}` : ""}
+            {p.git?.branch ? ` · branch ${p.git.branch}${p.git.dirty ? `, ${plural(p.git.dirty, "changed file")}` : ""}` : ""}
           </span>
         }
         actions={
@@ -423,5 +423,5 @@ function ProjectDetailView({ id }: { id: string }) {
 export function ProjectsPage() {
   const params = useParams({ strict: false }) as { id?: string };
   const id = params.id ? decodeURIComponent(params.id) : null;
-  return <div className="h-full overflow-auto">{id ? <ProjectDetailView key={id} id={id} /> : <ProjectOverview />}</div>;
+  return <div className={PAGE_SCROLL}>{id ? <ProjectDetailView key={id} id={id} /> : <ProjectOverview />}</div>;
 }

@@ -6,6 +6,9 @@ Notable changes to Control Center, newest first.
 
 ### Added
 
+- Text you type is kept when you leave the page: a conversation's reply box, the New session box, and the New skill, command, agent, rule, output style, memory note, instructions, hook, permission rule, MCP server and project forms. It's still there when you come back, and goes once you send or save it.
+- Guides has "In the cloud and your organization", with links to the official pages for cloud scheduled tasks (routines), Code Review on GitHub, Claude Code in Slack, gateways, organization-managed settings and the Agent SDK.
+- On Memory, notes kept in a project's `.claude/agent-memory-local/` are tagged "Only you", beside "Agent: <name>".
 - Archived items is in the menu, as the last link under Customize, and is the last card on the Customize page. The message after moving something to Archived items has an "Open Archived items" button.
 - Home has a Suggested section under Sessions when you've typed the same prompt 3 or more times (capitals and trailing spaces ignored; slash commands and one-word prompts left out). Each shows how often you typed it and "Make it a skill", which opens New skill with the name and instructions filled in. A suggestion goes once a skill of that name exists.
 - Settings opens with an Account section: how Claude Code signs in (Claude account, API key, Amazon Bedrock and so on), with the email, organization and plan. Pick a project under "Change settings for" to see the account Claude Code uses in that project.
@@ -41,6 +44,8 @@ Notable changes to Control Center, newest first.
 
 ### Changed
 
+- Every page's content starts at the same left edge and has the same width, including Projects and pages that scroll.
+- Cards on Projects, a project's "Build your setup", Customize and Guides are all the same height.
 - Every conversation has one page, at /sessions/<session id>: the whole conversation with tool calls folded into one line, Claude's approvals and questions as cards where it stopped, and a reply box at the bottom with the model and permission mode under it. Pressing Enter sends, whether Claude is working, finished, or the session was started in a terminal; Stop sits next to the box. "Show details" unfolds tool calls and thinking. "Copy command for the terminal", subagent runs, Archive and Delete are in the page's menu. The header names the conversation, its project and whether Claude is working, waiting for you or done. Old /live/<id>, /live?resume=<id> and /jobs/<id> links open this page.
 - New session opens an empty conversation page at /sessions/new with the project, model and permission mode in the row under the reply box. The first message starts Claude on the same page, and the address becomes the conversation's own. Every New session button (Home, Sessions, a project page) opens it with the current project filled in, or the project you used last; /live opens it too.
 - Sessions shows every conversation as the same row: its name (the one you set, Claude's title, or the first line of the first prompt, never starting with "user:"), the project and how long ago it was last active, with "Working" or "Waiting for you" only while that's true. Click a row to open the conversation. Runs from scripts (`claude -p`) stay hidden until you turn on "Show runs from scripts", and "Show archived" adds archived conversations marked Archived. Opened from a project page ("All sessions"), it lists only that project, with an "Every project" switch. The sentence under the heading and the project picker are gone. Home leaves out runs from scripts too.
@@ -71,6 +76,9 @@ Notable changes to Control Center, newest first.
 
 ### Fixed
 
+- A project with one changed file says "1 changed file", not "1 changed files"; archiving one session says "It can still be resumed".
+- A plugin's Files list no longer shows `.orphaned_at`, the marker Claude Code leaves in an old version's folder.
+- Settings no longer lets the whole window scroll past the end of the page.
 - The Projects list's "N open in the backlog" counts the Open lines of a BACKLOG.md made of tables, the same as the board's Open column.
 - Tables in Guides, and in the guide beside a New form, no longer break words into single letters on a phone; a wide table scrolls sideways inside itself.
 - A plugin's Files list leaves out Claude Code's `.in_use` lock files.

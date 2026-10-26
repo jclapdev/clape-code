@@ -113,11 +113,12 @@ describe(".worktreeinclude", () => {
 });
 
 describe("plugin files", () => {
-  test("leaves out Claude Code's .in_use lock files", async () => {
+  test("leaves out Claude Code's .in_use lock files and .orphaned_at marker", async () => {
     const pl = join(root, "plugin");
     await mkdir(join(pl, ".in_use", "1234"), { recursive: true });
     await mkdir(join(pl, ".claude-plugin"), { recursive: true });
     await writeFile(join(pl, ".in_use", "1234", "lock"), "");
+    await writeFile(join(pl, ".orphaned_at"), "1792540077994");
     await writeFile(join(pl, ".claude-plugin", "plugin.json"), "{}");
     await writeFile(join(pl, "README.md"), "");
     expect(await pluginFiles(pl)).toEqual([".claude-plugin/plugin.json", "README.md"]);

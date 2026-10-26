@@ -1,8 +1,9 @@
 // New project: a folder in one of the project folders, with git and a starter CLAUDE.md.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import type { FormEvent } from "react";
 import { api } from "@/lib/api";
+import { draftKey, useDraftForm } from "@/lib/draft";
 import { Page } from "@/components/Panes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,14 +20,17 @@ export function NewProjectPage() {
   const qc = useQueryClient();
   const cfg = useQuery({ queryKey: ["config"], queryFn: () => api.get<{ projectRoots: string[] }>("/config") });
   const root = (cfg.data?.projectRoots[0] ?? "~/projects").replace(/[\\/]+$/, "");
-  const [name, setName] = useState("");
-  const [folder, setFolder] = useState<string | null>(null); // null until edited: follows the name
+  // Kept as a draft until the project is made. folder is null until edited: it follows the name.
+  const [form, field, clearForm] = useDraftForm(draftKey("new-project"), { name: "", folder: null as string | null });
+  const { name, folder } = form;
+  const [setName, setFolder] = [field("name"), field("folder")];
   const shownFolder = folder ?? `${root}/${name}`;
   const nameOk = NAME.test(name);
 
   const create = useMutation({
     mutationFn: () => api.post<Created>("/projects-new", { name, folder: shownFolder }),
     onSuccess: () => {
+      clearForm();
       qc.invalidateQueries({ queryKey: ["projects"] });
       qc.invalidateQueries({ queryKey: ["catalog"] });
     },

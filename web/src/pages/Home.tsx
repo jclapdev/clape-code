@@ -55,7 +55,7 @@ function Suggested() {
       </h2>
       <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
         {data.map((s) => (
-          <Row key={s.prompt} title={<span title={s.prompt}>{s.prompt}</span>} about={`Typed ${s.count} times`}>
+          <Row key={s.prompt} title={<span title={s.prompt}>{s.prompt}</span>} about={`Typed ${s.count === 1 ? "once" : `${s.count} times`}`}>
             <Button asChild size="sm" variant="outline" className="no-underline">
               <Link to="/new" search={{ kind: "skill", name: s.name, body: s.prompt } as never}>
                 Make it a skill

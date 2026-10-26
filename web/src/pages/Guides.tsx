@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
 import { Page } from "@/components/Panes";
 import { ErrorNote, Loading, Md } from "@/components/ui";
@@ -31,6 +31,19 @@ export function GuideText({ slug }: { slug: string }) {
   );
 }
 
+// Claude Code features that live in the cloud or an organization's admin console. Control Center doesn't show
+// or change them (BRIEF.md, What it will not do), so Guides links to their official pages.
+const CLOUD = [
+  { title: "Cloud scheduled tasks (routines)", about: "Prompts that run in the cloud on a schedule, on API calls or on GitHub events.", url: "https://code.claude.com/docs/en/routines" },
+  { title: "Code Review on GitHub", about: "Claude reviews each pull request and comments inline. Team and Enterprise plans.", url: "https://code.claude.com/docs/en/code-review" },
+  { title: "Claude Code in Slack", about: "Hand Claude a coding task by mentioning @Claude in a Slack channel.", url: "https://code.claude.com/docs/en/slack" },
+  { title: "Gateways", about: "Route Claude Code through your organization's gateway for shared credentials and usage tracking.", url: "https://code.claude.com/docs/en/gateways" },
+  { title: "Organization-managed settings", about: "Settings an organization's owners set for everyone from the claude.ai admin console.", url: "https://code.claude.com/docs/en/server-managed-settings" },
+  { title: "Agent SDK", about: "Build your own agents in Python or TypeScript with Claude Code as a library.", url: "https://code.claude.com/docs/en/agent-sdk/overview" },
+];
+
+const CARD = "rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-line-strong";
+
 export function GuidesPage() {
   const { slug } = useParams({ strict: false }) as { slug?: string };
   const list = useQuery({ queryKey: ["guides"], queryFn: () => api.get<GuideInfo[]>("/guides"), enabled: !slug });
@@ -49,14 +62,30 @@ export function GuidesPage() {
     );
   return (
     <Page title="Guides">
-      <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+      <div className="grid auto-rows-fr gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
         {(list.data ?? []).map((g) => (
-          <Link key={g.slug} to="/guides/$slug" params={{ slug: g.slug }} className="rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-line-strong">
+          <Link key={g.slug} to="/guides/$slug" params={{ slug: g.slug }} className={CARD}>
             <span className="block font-medium">{g.title}</span>
             <span className="mt-1 block text-[13px] text-muted-foreground">{g.about}</span>
           </Link>
         ))}
       </div>
+      <section aria-labelledby="cloud-guides" className="mt-10">
+        <h2 id="cloud-guides" className="mb-3 text-[18px] font-semibold">
+          In the cloud and your organization
+        </h2>
+        <div className="grid auto-rows-fr gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+          {CLOUD.map((g) => (
+            <a key={g.url} href={g.url} target="_blank" rel="noreferrer" className={CARD}>
+              <span className="flex items-center gap-1.5 font-medium">
+                {g.title}
+                <ExternalLink aria-label="Opens code.claude.com" className="size-3.5 flex-none text-muted-foreground" />
+              </span>
+              <span className="mt-1 block text-[13px] text-muted-foreground">{g.about}</span>
+            </a>
+          ))}
+        </div>
+      </section>
     </Page>
   );
 }

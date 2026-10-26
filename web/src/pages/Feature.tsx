@@ -13,7 +13,7 @@ import { FileEditor } from "@/components/FileEditor";
 import { ItemActions, isSkillsDirPlugin } from "@/components/ItemActions";
 import { FindPlugins, NewPlugin } from "./PluginPanels";
 import { toast } from "sonner";
-import { Page } from "@/components/Panes";
+import { PAGE_SCROLL, Page } from "@/components/Panes";
 import { Readable } from "@/components/Readable";
 import { SimpleSelect } from "@/components/SimpleSelect";
 import { ErrorNote, Loading, Tag } from "@/components/ui";
@@ -46,6 +46,8 @@ const slashOf = (i: CatalogItem) => (i.kind === "workflow" ? String(i.meta?.comm
 
 /** For a subagent's memory note, the agent that keeps it. */
 const agentLabel = (i: CatalogItem | null) => (i?.kind === "memory" && i.meta?.agent ? `Agent: ${i.meta.agent}` : null);
+/** A note in a project's .claude/agent-memory-local/: kept on this computer and not shared with the project. */
+const onlyYou = (i: CatalogItem | null) => i?.kind === "memory" && i.meta?.scope === "local";
 
 /** Where an item applies, in the words the menu uses. */
 export function whereLabel(i: CatalogItem | null) {
@@ -84,7 +86,7 @@ function matches(r: Row, q: string, project: string) {
   if (project === "global" && r.projectId) return false;
   if (project && project !== "global" && r.projectId !== project) return false;
   if (!q) return true;
-  const hay = `${r.name} ${r.description} ${whereLabel(r.item)} ${agentLabel(r.item) ?? ""}`.toLowerCase();
+  const hay = `${r.name} ${r.description} ${whereLabel(r.item)} ${agentLabel(r.item) ?? ""} ${onlyYou(r.item) ? "only you" : ""}`.toLowerCase();
   return q
     .toLowerCase()
     .split(/\s+/)
@@ -98,6 +100,7 @@ function RowTags({ r, f }: { r: Row; f: Feature }) {
     <>
       <Tag tone={i ? "muted" : "accent"}>{whereLabel(i)}</Tag>
       {agentLabel(i) && <Tag>{agentLabel(i)}</Tag>}
+      {onlyYou(i) && <Tag>Only you</Tag>}
       {i?.kind === "plugin" && <Tag className="max-w-full break-all">{isSkillsDirPlugin(i) ? "Your skills folder" : `From ${String(i.meta?.marketplace ?? i.sourceName)}`}</Tag>}
       {i && f.kinds.length > 1 && KIND_LABEL[i.kind] && f.kinds[0] !== i.kind && <Tag>{KIND_LABEL[i.kind]}</Tag>}
       {i?.state && i.state !== "on" && <Tag>{STATE_LABEL[i.state] ?? i.state}</Tag>}
@@ -423,7 +426,7 @@ export function FeaturePage() {
     );
   }
   return (
-    <section aria-label={f.label} className="h-full overflow-auto">
+    <section aria-label={f.label} className={PAGE_SCROLL}>
       <div className="mx-auto max-w-[1180px] md:px-2">{list}</div>
     </section>
   );
@@ -442,7 +445,7 @@ export function CustomizePage() {
   const items = cat.data!.items;
   return (
     <Page title="Customize">
-      <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+      <ul className="grid auto-rows-fr gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
         {FEATURES.map((f) => {
           const n = countFor(f.id, items, live.data);
           return (
