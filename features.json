@@ -116,9 +116,29 @@
         "A9",
         "A10"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": [
+        "specs/screenshots/002-S5-A10-1024-dark-conversation.png",
+        "specs/screenshots/002-S5-A10-1024-dark-menu.png",
+        "specs/screenshots/002-S5-A10-1024-light-conversation.png",
+        "specs/screenshots/002-S5-A10-1024-light-menu.png",
+        "specs/screenshots/002-S5-A10-1440-dark-conversation.png",
+        "specs/screenshots/002-S5-A10-1440-dark-menu.png",
+        "specs/screenshots/002-S5-A10-390-dark-conversation.png",
+        "specs/screenshots/002-S5-A10-390-dark-menu.png",
+        "specs/screenshots/002-S5-A10-390-light-conversation.png",
+        "specs/screenshots/002-S5-A10-390-light-menu.png",
+        "specs/screenshots/002-S5-A10-768-dark-conversation.png",
+        "specs/screenshots/002-S5-A10-768-dark-menu.png",
+        "specs/screenshots/002-S5-A10-768-light-conversation.png",
+        "specs/screenshots/002-S5-A10-768-light-menu.png",
+        "specs/screenshots/002-S5-A9-continue-from-home-1440-light.png",
+        "specs/screenshots/002-S5-A9-continue-working-1440-light.png",
+        "specs/screenshots/002-S5-A9-menu-home-1440-light.png",
+        "specs/screenshots/002-S5-A9-menu-skills-1440-light.png",
+        "specs/screenshots/002-S5-A9-menu-working-1440-light.png"
+      ]
     }
   ]
 }
