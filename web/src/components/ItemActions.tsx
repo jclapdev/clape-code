@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -67,6 +68,7 @@ export function ItemActions({ i, scope, projectId, onDeleting, onDeleted }: { i:
     onError: (e: Error) => toast.error(e.message),
   });
   const how = deleteHow(i);
+  const navigate = useNavigate();
   const del = useMutation({
     onMutate: () => onDeleting?.(true),
     mutationFn: () => {
@@ -77,7 +79,8 @@ export function ItemActions({ i, scope, projectId, onDeleting, onDeleted }: { i:
     },
     onSuccess: (r) => {
       const said = (r as { message?: string } | undefined)?.message;
-      toast.success(said || (how?.by === "archive" ? `Moved ${i.name} to Archived items.` : `Removed ${i.name}.`));
+      const msg = said || (how?.by === "archive" ? `Moved ${i.name} to Archived items.` : `Removed ${i.name}.`);
+      toast.success(msg, msg.includes("Archived items") ? { action: { label: "Open Archived items", onClick: () => void navigate({ to: "/archive" }) } } : undefined);
       onDeleted?.();
       // The item's own file is gone; re-fetching it while its view closes would only fail.
       const gone = how?.by === "archive";

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { parseBacklog } from "../src/parsers/backlog";
+import { countBacklog, parseBacklog } from "../src/parsers/backlog";
 import { addEntry, parseChangelog } from "../src/parsers/changelog";
 import { effective } from "../src/parsers/settings";
 import { summarize, toTurns } from "../src/parsers/transcript";
@@ -30,6 +30,17 @@ describe("backlog", () => {
     expect(b.sections[1].intro).toBe("Some intro text.");
     expect(b.sections[0].items[0]).toEqual({ line: 6, done: true, n: 1, text: "Split each topic into short lessons." });
     expect(b.numbered && b.checkboxes).toBe(true);
+  });
+
+  test("counts a table BACKLOG.md's rows by status, like the board", () => {
+    const table = "| # | Date | Idea | Verdict | Reason | Source | Status |\n|---|---|---|---|---|---|---|\n| 1 | d | a | build | r | s | open |\n| 2 | d | b | build | r | s | done |\n| 113 | d | c | build | r | s | in spec 003 |\n| 4 | d | e | pending | | s | open |\n";
+    expect(countBacklog(table, "- [ ] ignored\n")).toEqual({ open: 2, done: 1, total: 4 });
+  });
+
+  test("falls back to list items when BACKLOG.md has no table rows", () => {
+    expect(countBacklog(BACKLOG, BACKLOG)).toEqual({ open: 2, done: 1, total: 3 });
+    expect(countBacklog(null, BACKLOG)).toEqual({ open: 2, done: 1, total: 3 });
+    expect(countBacklog(null, null)).toBeNull();
   });
 });
 
@@ -311,7 +322,8 @@ describe("board", () => {
     const rows = own.split("\n").filter((l) => /^\| \d+ \|/.test(l)).length;
     const cols = parseBacklogBoard(own);
     expect(cols.reduce((n, c) => n + c.cards.length, 0)).toBe(rows);
-    expect(cols[1].cards.length).toBeGreaterThan(0);
+    expect(cols[1].cards.length).toBe(own.split("\n").filter((l) => /\| in spec \d+ \|$/.test(l)).length);
+    expect(cols[2].cards.length).toBeGreaterThan(0);
   });
 });
 

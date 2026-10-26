@@ -283,6 +283,8 @@
   margin: 0 0 0.9em;
   display: block;
   overflow-x: auto;
+  /* Break only between words; a table too wide for the pane scrolls inside itself. */
+  overflow-wrap: normal;
 }
 .prose-cc th,
 .prose-cc td {

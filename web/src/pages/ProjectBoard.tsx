@@ -39,7 +39,7 @@ function Card({ c }: { c: BoardCard }) {
   return (
     <li className="min-w-0 rounded-md border border-line bg-surface px-3 py-2 text-[13.5px]">
       <p className="line-clamp-2 break-words" title={c.idea}>
-        <span className="font-semibold tabular-nums text-muted-foreground">#{c.n}</span> {c.idea}
+        <span className="whitespace-nowrap font-semibold tabular-nums text-muted-foreground">#{c.n}</span> {c.idea}
       </p>
       {c.verdict && <p className="mt-1 break-words text-[12.5px] text-muted-foreground">{c.verdict}</p>}
       {c.steps.length > 0 && (

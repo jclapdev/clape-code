@@ -6,6 +6,7 @@ Notable changes to Control Center, newest first.
 
 ### Added
 
+- Archived items is in the menu, as the last link under Customize, and is the last card on the Customize page. The message after moving something to Archived items has an "Open Archived items" button.
 - Home has a Suggested section under Sessions when you've typed the same prompt 3 or more times (capitals and trailing spaces ignored; slash commands and one-word prompts left out). Each shows how often you typed it and "Make it a skill", which opens New skill with the name and instructions filled in. A suggestion goes once a skill of that name exists.
 - Settings opens with an Account section: how Claude Code signs in (Claude account, API key, Amazon Bedrock and so on), with the email, organization and plan. Pick a project under "Change settings for" to see the account Claude Code uses in that project.
 - Sign in with a Claude account from Settings: open the Claude sign-in page, paste the code it shows, and the Account section updates. Claude Code's own message shows when a code is wrong. "Sign out" asks first. Both run Claude Code's `claude auth login` and `claude auth logout`, so the terminal uses the same login.
@@ -70,6 +71,11 @@ Notable changes to Control Center, newest first.
 
 ### Fixed
 
+- The Projects list's "N open in the backlog" counts the Open lines of a BACKLOG.md made of tables, the same as the board's Open column.
+- Tables in Guides, and in the guide beside a New form, no longer break words into single letters on a phone; a wide table scrolls sideways inside itself.
+- A plugin's Files list leaves out Claude Code's `.in_use` lock files.
+- A plugin's Manifest shows the author as one value under Author, not a second "Name".
+- Card numbers on the project board, such as #113, stay on one line.
 - Usage statistics in App preferences count sessions started and questions answered from a conversation page again.
 - Stopping a new conversation within about a second of its first message, then sending, no longer fails with "No conversation found" and loses the message: the send waits for the transcript Claude Code is still writing.
 - After a stop, the conversation no longer shows "No response requested." as Claude's reply.

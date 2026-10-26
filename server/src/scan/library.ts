@@ -163,12 +163,12 @@ async function syncedSkills(overrides: Record<string, string>): Promise<LibraryI
 }
 
 /** A plugin's files, relative to its folder, so its page can show what's in it. */
-async function pluginFiles(root: string, max = 60): Promise<string[]> {
+export async function pluginFiles(root: string, max = 60): Promise<string[]> {
   const out: string[] = [];
   const walk = async (dir: string, rel: string) => {
     for (const f of (await readdir(dir).catch(() => [] as string[])).sort()) {
       if (out.length >= max) return;
-      if (["node_modules", ".git", ".DS_Store", "__pycache__"].includes(f)) continue;
+      if (["node_modules", ".git", ".DS_Store", "__pycache__", ".in_use"].includes(f)) continue; // .in_use: Claude Code's lock files while a plugin is loaded
       const p = join(dir, f);
       if (await isDir(p)) await walk(p, rel ? `${rel}/${f}` : f);
       else out.push(rel ? `${rel}/${f}` : f);

@@ -67,7 +67,13 @@ function Value({ v }: { v: unknown }): ReactNode {
       </ul>
     );
   }
-  if (typeof v === "object") return <Fields obj={v as Record<string, unknown>} />;
+  if (typeof v === "object") {
+    // A person such as a manifest's author ({ name, email, url }) reads as one value under its own label.
+    const o = v as Record<string, unknown>;
+    const vals = Object.values(o);
+    if (typeof o.name === "string" && vals.every((x) => typeof x === "string")) return <span className="break-words">{vals.join(" · ")}</span>;
+    return <Fields obj={o} />;
+  }
   return <span className="break-words">{String(v)}</span>;
 }
 

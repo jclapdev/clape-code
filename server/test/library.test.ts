@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { agentMemoryItems, globalLibrary, listThemes, parseKeybindings, parseWorktreeInclude, projectLibrary, readKeybindings, readWorktreeInclude } from "../src/scan/library";
+import { agentMemoryItems, globalLibrary, listThemes, pluginFiles, parseKeybindings, parseWorktreeInclude, projectLibrary, readKeybindings, readWorktreeInclude } from "../src/scan/library";
 
 let root: string;
 let claude: string;
@@ -109,5 +109,17 @@ describe(".worktreeinclude", () => {
   test("reads a project's file, or reports it missing", async () => {
     expect((await readWorktreeInclude(proj)).patterns).toEqual([".env", ".env.local", "config/secrets.json"]);
     expect(await readWorktreeInclude(join(root, "projects"))).toMatchObject({ exists: false, patterns: [] });
+  });
+});
+
+describe("plugin files", () => {
+  test("leaves out Claude Code's .in_use lock files", async () => {
+    const pl = join(root, "plugin");
+    await mkdir(join(pl, ".in_use", "1234"), { recursive: true });
+    await mkdir(join(pl, ".claude-plugin"), { recursive: true });
+    await writeFile(join(pl, ".in_use", "1234", "lock"), "");
+    await writeFile(join(pl, ".claude-plugin", "plugin.json"), "{}");
+    await writeFile(join(pl, "README.md"), "");
+    expect(await pluginFiles(pl)).toEqual([".claude-plugin/plugin.json", "README.md"]);
   });
 });

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { BookOpen, ChevronRight, FolderGit2, History, Home, LayoutGrid, Menu, MessageSquarePlus, MessagesSquare, Monitor, Moon, Plus, Settings2, SlidersHorizontal, Sun, type LucideIcon } from "lucide-react";
+import { Archive, BookOpen, ChevronRight, FolderGit2, History, Home, LayoutGrid, Menu, MessageSquarePlus, MessagesSquare, Monitor, Moon, Plus, Settings2, SlidersHorizontal, Sun, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { FEATURES } from "@/lib/features";
@@ -206,6 +206,7 @@ function FullMenu({ onPick, onFeedback, connected }: { onPick?: () => void; onFe
           {FEATURES.map((f) => (
             <NavLink key={f.id} to={`/${f.id}`} label={f.label} icon={f.icon} onPick={onPick} sub />
           ))}
+          <NavLink to="/archive" label="Archived items" icon={Archive} onPick={onPick} sub />
         </Group>
         <div className="mt-3 flex flex-col gap-0.5">
           <NavLink to="/settings" label="Settings" icon={Settings2} onPick={onPick} />
@@ -227,7 +228,7 @@ function FullMenu({ onPick, onFeedback, connected }: { onPick?: () => void; onFe
 
 function RailLink({ to, label, icon: Icon, attn, title }: { to: string; label: string; icon: LucideIcon; attn?: number; title?: string }) {
   const path = usePath();
-  const on = isOn(path, to) || (to === "/customize" && FEATURES.some((f) => isOn(path, `/${f.id}`)));
+  const on = isOn(path, to) || (to === "/customize" && (FEATURES.some((f) => isOn(path, `/${f.id}`)) || isOn(path, "/archive")));
   return (
     <Link to={to} title={title} aria-current={on ? "page" : undefined} className={cn("relative flex w-full flex-none flex-col items-center gap-1 rounded-md px-1 py-2 text-[11.5px] leading-tight text-ink-2 no-underline hover:bg-sunken hover:text-ink", on && "bg-accent font-semibold text-accent-foreground hover:bg-accent hover:text-accent-foreground")}>
       <Icon className="size-5" aria-hidden />

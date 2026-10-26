@@ -66,7 +66,7 @@ Starting and answering sessions uses the Claude Code installed on the computer, 
 | Library | Skills, agents, commands, rules, output styles, hooks, hook scripts, settings files, CLAUDE.md files, plans, memory notes and plugins, globally or per project. Edit, create, archive or delete one item or many, turn skills and plugins on or off. Skills are checked against the Agent Skills spec when saved. |
 | Settings | The value Claude Code actually uses for each setting, which file it comes from, and what it overrides. |
 | Map | Every file and folder Claude Code uses, what it is, and whether you can edit it. |
-| Archive | Items you archived, with Restore. |
+| Archived items | Items you archived, with Restore. It is the last link under Customize in the menu and the last card on the Customize page, and the message after a delete links to it. |
 
 The search box at the top of the menu searches everything. Feedback in the menu adds a note to a project's BACKLOG.md, or to `~/.claude/BACKLOG.md` for all projects, as a new pending, open line. <kbd>⌘S</kbd> (<kbd>Ctrl S</kbd> on Windows and Linux) saves the open file. Preferences has the theme (match system, light, dark).
 

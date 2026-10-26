@@ -1,5 +1,7 @@
 // BACKLOG.md: `##` sections holding `- [ ] N. text` items (checkbox and number both optional).
-// Read-only: the project list counts open items with it.
+// Read-only: the project list counts open items with it when BACKLOG.md has no table rows.
+
+import { parseBacklogBoard } from "./backlogBoard";
 
 export interface BacklogItem {
   line: number; // 0-based line index in the file
@@ -68,4 +70,23 @@ export function parseBacklog(text: string): Backlog {
   if (root.items.length) b.sections.unshift(root);
   b.intro = introLines.join("\n").trim();
   return b;
+}
+
+/** Sections whose items count as still to do; Done and Notes don't. */
+export const isOpenSection = (name: string) => !/^(done|notes?)\b/i.test(name.trim());
+
+/** Open and done counts: the rows of a table-style BACKLOG.md as the board reads them, else `- [ ]` list items in the handoff note. */
+export function countBacklog(backlogMd: string | null, handoff: string | null) {
+  if (backlogMd !== null) {
+    const cols = parseBacklogBoard(backlogMd);
+    const count = (key: string) => cols.find((c) => c.key === key)!.cards.length;
+    const total = cols.reduce((a, c) => a + c.cards.length, 0);
+    if (total > 0) return { open: count("open"), done: count("done"), total };
+  }
+  if (handoff === null) return null;
+  const b = parseBacklog(handoff);
+  const items = b.sections.filter((s) => isOpenSection(s.name)).flatMap((s) => s.items);
+  const open = items.filter((i) => i.done === false || i.done === null).length;
+  const done = b.sections.flatMap((s) => s.items).filter((i) => i.done === true).length;
+  return { open, done, total: open + done };
 }

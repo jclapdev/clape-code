@@ -3,7 +3,7 @@
 // link back to the list.
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
-import { ChevronLeft, FolderOpen, PackageSearch, Play, Plus, Search } from "lucide-react";
+import { Archive, ChevronLeft, FolderOpen, PackageSearch, Play, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { FEATURES, featureById, type Feature, type FeatureId } from "@/lib/features";
@@ -457,6 +457,14 @@ export function CustomizePage() {
             </li>
           );
         })}
+        <li>
+          <Link to="/archive" className="flex h-full flex-col gap-2 rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-line-strong">
+            <span className="flex items-center gap-2">
+              <Archive className="size-4 flex-none text-muted-foreground" aria-hidden />
+              <span className="flex-1 font-medium">Archived items</span>
+            </span>
+          </Link>
+        </li>
       </ul>
     </Page>
   );
