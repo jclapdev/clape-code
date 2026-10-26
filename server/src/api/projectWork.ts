@@ -1,4 +1,4 @@
-// Projects: the board in PROGRESS.md, context files in docs/ and the CLAUDE.md lines that import them,
+// Projects: the board read from BACKLOG.md, context files in docs/ and the CLAUDE.md lines that import them,
 // and making a new project. Every file write goes through safeWrite.
 import { Hono } from "hono";
 import { mkdir, readdir, stat } from "node:fs/promises";
@@ -7,7 +7,8 @@ import { getConfig } from "../config";
 import { emit } from "../events";
 import { isInside, tildify, untildify } from "../fs/paths";
 import { readWithHash, safeWrite, WriteError } from "../fs/safeWrite";
-import { addCard, COLUMNS, deleteCard, editCard, moveCard, NEW_BOARD, parseBoard, type ColumnKey } from "../parsers/board";
+import { canRead } from "../fs/policy";
+import { attachSteps, parseBacklogBoard } from "../parsers/backlogBoard";
 import { addImport, importedPaths, removeImport } from "../parsers/imports";
 import { listProjects, projectDir } from "../scan/projects";
 import type { Env } from "./env";
@@ -27,61 +28,22 @@ const toPosix = (p: string) => p.split(sep).join("/");
 
 // ---- Board ----
 
+/** A project file's text, or null when it's missing or the access policy doesn't allow reading it. */
+async function readAllowed(abs: string) {
+  if (!canRead(abs)) return null;
+  return (await readWithHash(abs))?.content ?? null;
+}
+
+/** BACKLOG.md as Open / In spec / Done, with features.json's steps on in-spec cards. No BACKLOG.md: three empty columns. */
 export async function boardOf(dir: string) {
-  const path = join(dir, "PROGRESS.md");
-  const f = await readWithHash(path);
-  if (!f) return null;
-  return { path, hash: f.hash, columns: parseBoard(f.content) };
+  const path = join(dir, "BACKLOG.md");
+  const text = await readAllowed(path);
+  const columns = parseBacklogBoard(text ?? "");
+  if (columns[1].cards.length) attachSteps(columns, await readAllowed(join(dir, "features.json")));
+  return { path: text === null ? null : path, columns };
 }
 
-async function editBoard(id: string, hash: string, change: (text: string) => string) {
-  const abs = join(await requireProject(id), "PROGRESS.md");
-  const cur = await readWithHash(abs);
-  if (!cur) throw new WriteError(404, "PROGRESS.md not found.");
-  if (cur.hash !== hash) throw new WriteError(409, "The file changed on disk after you opened it.", cur);
-  let next: string;
-  try {
-    next = change(cur.content);
-  } catch (e: any) {
-    throw new WriteError(400, e.message);
-  }
-  const r = next === cur.content ? { hash: cur.hash, backupPath: null } : await safeWrite(abs, next, cur.hash);
-  emit({ area: "projects", path: abs });
-  return r;
-}
-
-const columnKey = (v: unknown): ColumnKey => {
-  if (COLUMNS.some((c) => c.key === v)) return v as ColumnKey;
-  throw new WriteError(400, "Unknown column.");
-};
-const lineNo = (v: unknown) => {
-  if (Number.isInteger(v) && (v as number) >= 0) return v as number;
-  throw new WriteError(400, "Which card? The line number is missing.");
-};
-
-projectWork.post("/projects/:id/board/start", async (c) => {
-  const abs = join(await requireProject(c.req.param("id")), "PROGRESS.md");
-  if (await readWithHash(abs)) throw new WriteError(409, "This project already has a PROGRESS.md.");
-  const r = await safeWrite(abs, NEW_BOARD, null);
-  emit({ area: "projects", path: abs });
-  return c.json(r);
-});
-projectWork.post("/projects/:id/board/add", async (c) => {
-  const b = await c.req.json();
-  return c.json(await editBoard(c.req.param("id"), b.hash, (t) => addCard(t, columnKey(b.column), String(b.text ?? ""))));
-});
-projectWork.post("/projects/:id/board/edit", async (c) => {
-  const b = await c.req.json();
-  return c.json(await editBoard(c.req.param("id"), b.hash, (t) => editCard(t, lineNo(b.line), String(b.text ?? ""))));
-});
-projectWork.post("/projects/:id/board/move", async (c) => {
-  const b = await c.req.json();
-  return c.json(await editBoard(c.req.param("id"), b.hash, (t) => moveCard(t, lineNo(b.line), columnKey(b.to))));
-});
-projectWork.post("/projects/:id/board/delete", async (c) => {
-  const b = await c.req.json();
-  return c.json(await editBoard(c.req.param("id"), b.hash, (t) => deleteCard(t, lineNo(b.line))));
-});
+projectWork.get("/projects/:id/board", async (c) => c.json(await boardOf(await requireProject(c.req.param("id")))));
 
 // ---- Context files ----
 
@@ -179,8 +141,6 @@ export const starterClaudeMd = (name: string) =>
   `# ${name}
 
 <!-- What this project is, how to build and test it, and the conventions Claude should follow. Run /init in a session to have Claude fill this in. -->
-
-Read PROGRESS.md at the start of a session. Keep its Next, In progress and Done lists up to date as work moves.
 `;
 
 /** Checks a new project's name and folder. The folder must sit directly in one of the project folders, which is where the app finds projects. */
@@ -212,7 +172,6 @@ projectWork.post("/projects-new", async (c) => {
   await listProjects(); // the folder is now a project, so safeWrite may write in it
   const git = await gitInit(folder);
   await safeWrite(join(folder, "CLAUDE.md"), starterClaudeMd(name), null);
-  await safeWrite(join(folder, "PROGRESS.md"), NEW_BOARD, null);
   emit({ area: "projects", path: folder });
   return c.json({ id: tildify(folder), name, git });
 });

@@ -411,10 +411,10 @@ export const nameOf = (i: LibraryItem) => (i.folder ? i.folder.split(/[\\/]/).fi
 
 const docItem: LibraryItem = { kind: "claude-md", name: "", description: "", path: "", display: "", folder: null, source: "project", sourceName: null, access: "edit", state: null, overrideKey: null, mtime: null, error: null, meta: {} };
 
-/** Unfinished steps from the project's plans, for a project without a board or BACKLOG.md. */
+/** Unfinished steps from the project's plans, for a project without a BACKLOG.md. */
 function PlanBacklog({ p }: { p: ProjectDetail }) {
   const open = p.plans.flatMap((pl) => pl.open.map((t) => ({ t, plan: pl.title.replace(/^plan:\s*/i, "") })));
-  if (!open.length) return <p className="text-[13.5px] text-muted-foreground">Nothing open. Start a board above to track what comes next.</p>;
+  if (!open.length) return <p className="text-[13.5px] text-muted-foreground">Nothing open.</p>;
   return (
     <div className="flex flex-col gap-2">
       <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
@@ -432,25 +432,8 @@ function PlanBacklog({ p }: { p: ProjectDetail }) {
   );
 }
 
-/** What's at the top of Next: the board's cards, else an older BACKLOG.md's open items, else unfinished plan steps. */
+/** What's at the top of Next: an older BACKLOG.md's open items, else unfinished plan steps. */
 function UpNext({ p }: { p: ProjectDetail }) {
-  if (p.board) {
-    const next = p.board.columns.find((c) => c.key === "next")?.cards ?? [];
-    if (!next.length) return <p className="text-[13.5px] text-muted-foreground">Nothing in Next. Add a card to the board's Next column.</p>;
-    return (
-      <ol className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
-        {next.slice(0, 5).map((c) => (
-          <li key={c.line} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-2.5">
-            <Md className="min-w-0 flex-1 break-words text-[14px] leading-relaxed [&_p]:m-0">{c.title}</Md>
-            {c.labels.map((l) => (
-              <Tag key={l}>#{l}</Tag>
-            ))}
-          </li>
-        ))}
-        {next.length > 5 && <li className="px-4 py-2 text-[13px] text-muted-foreground">and {next.length - 5} more on the board</li>}
-      </ol>
-    );
-  }
   if (p.backlog) {
     const open = p.backlog.sections.filter((s) => !/^(done|notes?)\b/i.test(s.name.trim())).flatMap((s) => s.items.filter((i) => i.done !== true));
     if (!open.length) return <p className="text-[13.5px] text-muted-foreground">Nothing open in BACKLOG.md.</p>;

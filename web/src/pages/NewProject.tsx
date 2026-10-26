@@ -1,4 +1,4 @@
-// New project: a folder in one of the project folders, with git, a starter CLAUDE.md and an empty board.
+// New project: a folder in one of the project folders, with git and a starter CLAUDE.md.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
@@ -41,7 +41,6 @@ export function NewProjectPage() {
             <li>Made the folder {p.id}</li>
             <li>{p.git ? "Started a git repository in it" : "Didn't start a git repository: git isn't installed on this computer"}</li>
             <li>Wrote a starter CLAUDE.md, the instructions Claude reads every session</li>
-            <li>Wrote a PROGRESS.md with empty Next, In progress and Done lists for the board</li>
           </ul>
           <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4">
             <p className="font-medium">Have Claude set it up</p>

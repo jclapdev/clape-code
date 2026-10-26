@@ -52,7 +52,7 @@ content.get("/projects", async (c) => c.json(await listProjects()));
 content.get("/projects/:id", async (c) => {
   const dir = await requireProject(c.req.param("id"));
   const summary = (await listProjects()).find((p) => untildify(p.id) === dir)!;
-  // The board reads PROGRESS.md; the older backlog editor is only for a BACKLOG.md.
+  // The board reads BACKLOG.md's tables; the older backlog editor reads its list items.
   const backlogFile = await readWithHash(join(dir, "BACKLOG.md"));
   const changelogFile = await readWithHash(join(dir, "CHANGELOG.md"));
   const worktrees = (await ls(join(dir, ".claude", "worktrees"))).map((n) => ({ name: n, path: tildify(join(dir, ".claude", "worktrees", n)) }));
@@ -616,8 +616,7 @@ content.get("/search", async (c) => {
     } else if (h.kind === "doc") {
       const p = projects.find((p) => isInside(h.ref, untildify(p.id)));
       const name = basename(h.ref);
-      if (p && name === "PROGRESS.md") link = `/projects/${encodeURIComponent(p.id)}#board`;
-      else if (p && name === "BACKLOG.md") link = `/projects/${encodeURIComponent(p.id)}#backlog`;
+      if (p && name === "BACKLOG.md") link = `/projects/${encodeURIComponent(p.id)}#backlog`;
       else if (p && name === "CHANGELOG.md") link = `/projects/${encodeURIComponent(p.id)}#changelog`;
     }
     return { ...h, link, display: h.kind === "session" ? h.subtitle : tildify(h.ref) };

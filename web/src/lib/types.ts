@@ -28,26 +28,28 @@ export interface BacklogItem {
   n: number | null;
   text: string;
 }
-/** PROGRESS.md read as Next / In progress / Done. */
-export type ColumnKey = "next" | "progress" | "done";
+/** BACKLOG.md's numbered table rows as Open / In spec / Done. */
+export type ColumnKey = "open" | "spec" | "done";
+export interface BoardStep {
+  id: string;
+  description: string;
+  passing: boolean;
+}
 export interface BoardCard {
-  line: number;
-  end: number;
-  done: boolean | null;
-  n: number | null;
-  text: string;
-  title: string;
-  labels: string[];
+  n: number;
+  idea: string;
+  verdict: string;
+  status: string;
+  spec: string | null;
+  steps: BoardStep[];
 }
 export interface BoardColumn {
   key: ColumnKey;
   name: string;
-  line: number | null;
   cards: BoardCard[];
 }
 export interface Board {
-  path: string;
-  hash: string;
+  path: string | null;
   columns: BoardColumn[];
 }
 
@@ -114,7 +116,7 @@ export interface Turn {
 export interface ProjectDetail extends Omit<Project, "sessions" | "backlog" | "docs"> {
   abs: string;
   backlog: { title: string | null; intro: string; sections: BacklogSection[]; numbered: boolean; checkboxes: boolean; hash: string; path: string; file: "BACKLOG.md" } | null;
-  board: Board | null;
+  board: Board;
   context: { folder: string; claudeMd: { path: string; display: string; hash: string | null }; files: { name: string; path: string; size: number; imported: boolean }[] };
   changelog: { title: string | null; days: { date: string; line: number; entries: string[]; kinds: (string | null)[] }[]; keep: boolean; hash: string; path: string } | null;
   docs: { name: string; path: string }[];

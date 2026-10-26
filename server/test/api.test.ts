@@ -68,7 +68,7 @@ beforeAll(async () => {
 afterAll(() => rm(root, { recursive: true, force: true }));
 
 describe("secrets never leave the server", () => {
-  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d", "/api/suggested", "/api/menu"];
+  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d", "/api/suggested", "/api/menu", "/api/projects/" + encodeURIComponent("~/projects/demo") + "/board"];
   for (const ep of endpoints) {
     test(ep, async () => {
       const res = await request(ep);
@@ -264,29 +264,31 @@ describe("project board, context files and new projects", () => {
   const demo = encodeURIComponent("~/projects/demo");
   const post = (path: string, body: unknown) => request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const detail = async () => (await (await request(`/api/projects/${demo}`)).json()) as any;
+  const detail2 = async (id: string) => (await (await request(`/api/projects/${id}`)).json()) as any;
 
-  test("Start a board, then add, move across all columns and delete a card", async () => {
-    expect((await detail()).board).toBeNull();
-    expect((await post(`/api/projects/${demo}/board/start`, {})).status).toBe(200);
-    expect((await post(`/api/projects/${demo}/board/start`, {})).status).toBe(409);
-    const file = join(root, "projects", "demo", "PROGRESS.md");
-    const start = await Bun.file(file).text();
-    let d = await detail();
-    expect(d.board.columns.map((c: any) => c.name)).toEqual(["Next", "In progress", "Done"]);
-    let r = await post(`/api/projects/${demo}/board/add`, { column: "next", text: "Try it #test", hash: d.board.hash });
-    expect(r.status).toBe(200);
-    for (const to of ["progress", "done", "next"]) {
-      d = await detail();
-      const card = d.board.columns.flatMap((c: any) => c.cards).find((c: any) => c.title === "Try it");
-      expect(card.labels).toEqual(["test"]);
-      r = await post(`/api/projects/${demo}/board/move`, { line: card.line, to, hash: d.board.hash });
-      expect(r.status).toBe(200);
-    }
-    expect((await post(`/api/projects/${demo}/board/move`, { line: 0, to: "done", hash: "stale" })).status).toBe(409);
-    d = await detail();
-    const card = d.board.columns[0].cards[0];
-    await post(`/api/projects/${demo}/board/delete`, { line: card.line, hash: d.board.hash });
-    expect(await Bun.file(file).text()).toBe(start);
+  test("the board reads BACKLOG.md's tables into Open, In spec and Done, with features.json steps on in-spec cards", async () => {
+    const dir = join(root, "projects", "boarded");
+    await mkdir(dir, { recursive: true });
+    const row = (n: number, idea: string, status: string) => `| ${n} | 2026-10-26 | ${idea} | build | why | where | ${status} |`;
+    const head = "| # | Date | Idea | Verdict | Reason | Source | Status |\n|---|---|---|---|---|---|---|";
+    await writeFile(join(dir, "BACKLOG.md"), ["# Backlog", "", "## One", "", head, row(1, "first", "open"), row(2, "a \\| b", "in spec 003"), "", "## Two", "", head, row(3, "third", "done"), row(4, "fourth", "parked"), ""].join("\n"));
+    await writeFile(join(dir, "features.json"), JSON.stringify({ steps: [{ id: "003-S1", spec: "specs/003-thing.md", description: "Server side", status: "passing" }, { id: "003-S2", spec: "specs/003-thing.md", description: "Page", status: "failing" }] }));
+    await request("/api/projects"); // the project list is where the access policy learns the new folder
+    const id = encodeURIComponent("~/projects/boarded");
+    const board = (await (await request(`/api/projects/${id}/board`)).json()) as any;
+    expect(board.columns.map((c: any) => [c.name, c.cards.map((x: any) => x.n)])).toEqual([["Open", [1, 4]], ["In spec", [2]], ["Done", [3]]]);
+    expect(board.columns[1].cards[0]).toMatchObject({ idea: "a | b", verdict: "build", status: "in spec 003", steps: [{ id: "003-S1", description: "Server side", passing: true }, { id: "003-S2", description: "Page", passing: false }] });
+    expect((await detail2(id)).board).toEqual(board);
+  });
+
+  test("a project with no BACKLOG.md but an old PROGRESS.md board shows three empty columns", async () => {
+    const dir = join(root, "projects", "progress-only");
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "PROGRESS.md"), "# Progress\n\n## Next\n\n- [ ] 1. an old card\n\n## Done\n\n- [x] 2. done card\n");
+    const res = await request(`/api/projects/${encodeURIComponent("~/projects/progress-only")}/board`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ path: null, columns: [{ key: "open", name: "Open", cards: [] }, { key: "spec", name: "In spec", cards: [] }, { key: "done", name: "Done", cards: [] }] });
+    for (const op of ["start", "add", "edit", "move", "delete"]) expect((await post(`/api/projects/${encodeURIComponent("~/projects/progress-only")}/board/${op}`, {})).status).toBe(404);
   });
 
   test("Add context takes text files, refuses binary and big ones, and the switch edits CLAUDE.md", async () => {
@@ -313,13 +315,13 @@ describe("project board, context files and new projects", () => {
     expect(await Bun.file(md).text()).toBe("");
   });
 
-  test("New project makes the folder, CLAUDE.md and an empty board, and shows up at once", async () => {
+  test("New project makes the folder and CLAUDE.md, and shows up at once", async () => {
     const r = await post("/api/projects-new", { name: "fresh-one" });
     expect(r.status).toBe(200);
     const body = (await r.json()) as any;
     expect(body.id).toBe("~/projects/fresh-one");
     const dir = join(root, "projects", "fresh-one");
-    expect(await Bun.file(join(dir, "PROGRESS.md")).text()).toBe("# Progress\n\n## Next\n\n## In progress\n\n## Done\n");
+    expect(await Bun.file(join(dir, "PROGRESS.md")).exists()).toBe(false);
     expect(await Bun.file(join(dir, "CLAUDE.md")).text()).toContain("# fresh-one");
     const list = (await (await request("/api/projects")).json()) as any[];
     expect(list.some((p) => p.id === "~/projects/fresh-one")).toBe(true);
