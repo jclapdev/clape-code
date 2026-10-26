@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Link, useParams } from "@tanstack/react-router";
-import { ArrowRight, ChevronDown, Pencil, Plus } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
-import { api, ApiError, enc } from "@/lib/api";
+import { ArrowRight, ChevronDown, Plus } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { api, enc } from "@/lib/api";
 import { when } from "@/lib/format";
-import type { BacklogItem, Catalog, LibraryItem, Project, ProjectDetail } from "@/lib/types";
+import type { Catalog, LibraryItem, Project, ProjectDetail } from "@/lib/types";
 import { featureById, type Feature, type FeatureId } from "@/lib/features";
 import { ProjectBoard } from "./ProjectBoard";
 import { ContextDropZone, ContextSection } from "./ProjectContext";
@@ -17,10 +16,8 @@ import { ItemActions } from "@/components/ItemActions";
 import { DetailHeader } from "@/components/Panes";
 import { Readable } from "@/components/Readable";
 import type { NewKind } from "./NewItem";
-import { EmptyState, ErrorNote, Loading, Md, Tag, cn } from "@/components/ui";
+import { ErrorNote, Loading, Md, Tag, cn } from "@/components/ui";
 import { SimpleSelect } from "@/components/SimpleSelect";
-import { IconButton } from "@/components/IconButton";
-import { Checkbox } from "@/components/ui/checkbox";
 
 function ProjectOverview() {
   const q = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
@@ -41,140 +38,6 @@ function ProjectOverview() {
           </Link>
         ))}
       </div>
-    </div>
-  );
-}
-
-function BacklogTab({ p }: { p: ProjectDetail }) {
-  const qc = useQueryClient();
-  const [editing, setEditing] = useState<number | null>(null);
-  const [draft, setDraft] = useState("");
-  const [adding, setAdding] = useState<number | null>(null);
-  const b = p.backlog;
-
-  const run = useMutation({
-    mutationFn: ({ op, body }: { op: string; body: object }) => api.post(`/projects/${enc(p.id)}/backlog/${op}`, { ...body, hash: b!.hash }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["project", p.id] }),
-    onError: (e: Error) => {
-      toast.error(e instanceof ApiError && e.status === 409 ? "BACKLOG.md changed on disk. It has been reloaded; try again." : e.message);
-      qc.invalidateQueries({ queryKey: ["project", p.id] });
-    },
-  });
-
-  if (!b) {
-    return (
-      <EmptyState title="No progress note yet">A progress note lists what's done, in progress and next, so whoever picks the project up next knows where it stands.</EmptyState>
-    );
-  }
-  const all = b.sections.flatMap((s) => s.items);
-  const done = all.filter((i) => i.done).length;
-
-  const toggle = (it: BacklogItem) => {
-    qc.setQueryData(["project", p.id], (old: ProjectDetail | undefined) =>
-      old?.backlog ? { ...old, backlog: { ...old.backlog, sections: old.backlog.sections.map((s) => ({ ...s, items: s.items.map((x) => (x.line === it.line ? { ...x, done: !x.done } : x)) })) } } : old,
-    );
-    run.mutate({ op: "toggle", body: { line: it.line } });
-  };
-
-  return (
-    <div className="flex flex-col gap-4 p-6 md:pl-12">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-ink-2">
-          {b.intro && <span>{b.intro} </span>}
-          {b.checkboxes && <span className="text-muted-foreground">{done} of {all.length} done.</span>}
-        </p>
-        <Link to="/file" search={{ path: b.path }} className="text-[13px]">
-          Edit as text
-        </Link>
-      </div>
-      {b.sections.map((s) => {
-        const sd = s.items.filter((i) => i.done).length;
-        return (
-          <section key={s.line} className="rounded-lg border border-line bg-surface px-4 py-2">
-            <div className="flex items-baseline justify-between py-2">
-              <h3 className="text-[15px] font-semibold">{s.name || "Items"}</h3>
-              {b.checkboxes && s.items.length > 0 && <span className="text-xs text-muted-foreground">{sd} of {s.items.length} done</span>}
-            </div>
-            {s.intro && <p className="pb-2 text-[13px] text-muted-foreground">{s.intro}</p>}
-            <ul>
-              {s.items.map((it) => (
-                <li key={it.line} className="group flex items-start gap-3 border-t border-line py-2">
-                  {it.done !== null ? (
-                    <Checkbox checked={it.done} onCheckedChange={() => toggle(it)} aria-label={`Mark ${it.n ?? ""} ${it.done ? "not done" : "done"}`} className="mt-1 flex-none" />
-                  ) : (
-                    <span className="mt-2 size-1.5 flex-none rounded-full bg-faint" aria-hidden />
-                  )}
-                  {it.n !== null && <span className="w-6 flex-none pt-px font-mono text-[12.5px] text-muted-foreground">{it.n}.</span>}
-                  {editing === it.line ? (
-                    <form
-                      className="flex flex-1 gap-2"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        run.mutate({ op: "edit", body: { line: it.line, text: draft } });
-                        setEditing(null);
-                      }}
-                    >
-                      <Input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setEditing(null)} className="flex-1" aria-label="Item text" />
-                      <Button type="submit" variant="default">
-                        Save
-                      </Button>
-                    </form>
-                  ) : (
-                    <>
-                      <span className={cn("flex-1 leading-relaxed", it.done && "text-muted-foreground")}>
-                        <Md className="[&_p]:m-0">{it.text}</Md>
-                      </span>
-                      <IconButton
-                        label="Edit item"
-                        size="icon-sm"
-                        onClick={() => {
-                          setEditing(it.line);
-                          setDraft(it.text);
-                        }}
-                        className="invisible flex-none text-muted-foreground group-hover:visible focus-visible:visible"
-                      >
-                        <Pencil />
-                      </IconButton>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {adding === s.line ? (
-              <form
-                className="flex gap-2 border-t border-line py-2"
-                onSubmit={(e: FormEvent) => {
-                  e.preventDefault();
-                  if (!draft.trim()) return;
-                  run.mutate({ op: "add", body: { sectionLine: s.line, text: draft } });
-                  setAdding(null);
-                  setDraft("");
-                }}
-              >
-                <Input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setAdding(null)} placeholder="What needs doing?" className="flex-1" aria-label="New item" />
-                <Button type="submit" variant="default">
-                  Add
-                </Button>
-              </form>
-            ) : (
-              <div className="border-t border-line py-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setAdding(s.line);
-                    setDraft("");
-                  }}
-                  className="text-muted-foreground"
-                >
-                  <Plus aria-hidden /> Add item
-                </Button>
-              </div>
-            )}
-          </section>
-        );
-      })}
-      <p className="text-xs text-muted-foreground">Changes edit only the line you touch. Every save keeps the previous file as a backup.</p>
     </div>
   );
 }
@@ -411,45 +274,6 @@ export const nameOf = (i: LibraryItem) => (i.folder ? i.folder.split(/[\\/]/).fi
 
 const docItem: LibraryItem = { kind: "claude-md", name: "", description: "", path: "", display: "", folder: null, source: "project", sourceName: null, access: "edit", state: null, overrideKey: null, mtime: null, error: null, meta: {} };
 
-/** Unfinished steps from the project's plans, for a project without a BACKLOG.md. */
-function PlanBacklog({ p }: { p: ProjectDetail }) {
-  const open = p.plans.flatMap((pl) => pl.open.map((t) => ({ t, plan: pl.title.replace(/^plan:\s*/i, "") })));
-  if (!open.length) return <p className="text-[13.5px] text-muted-foreground">Nothing open.</p>;
-  return (
-    <div className="flex flex-col gap-2">
-      <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
-        {open.slice(0, 5).map((o, i) => (
-          <li key={i} className="px-4 py-2.5">
-            <Md className="break-words text-[14px] leading-relaxed [&_p]:m-0">{o.t}</Md>
-            <div className="text-[12.5px] text-muted-foreground">From the plan "{o.plan}"</div>
-          </li>
-        ))}
-      </ul>
-      <Link to="/plans" search={{ project: p.id }} className="text-[13px]">
-        {open.length > 5 ? `All ${open.length} unfinished plan steps` : "Open this project's plans"}
-      </Link>
-    </div>
-  );
-}
-
-/** What's at the top of Next: an older BACKLOG.md's open items, else unfinished plan steps. */
-function UpNext({ p }: { p: ProjectDetail }) {
-  if (p.backlog) {
-    const open = p.backlog.sections.filter((s) => !/^(done|notes?)\b/i.test(s.name.trim())).flatMap((s) => s.items.filter((i) => i.done !== true));
-    if (!open.length) return <p className="text-[13.5px] text-muted-foreground">Nothing open in BACKLOG.md.</p>;
-    return (
-      <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
-        {open.slice(0, 5).map((i) => (
-          <li key={i.line} className="px-4 py-2.5">
-            <Md className="break-words text-[14px] leading-relaxed [&_p]:m-0">{i.text}</Md>
-          </li>
-        ))}
-      </ul>
-    );
-  }
-  return <PlanBacklog p={p} />;
-}
-
 /** What you build in a project, each with how many it has, what it is in one line, and a New button that creates it in this project. */
 const BUILD: { id: FeatureId; line: string }[] = [
   { id: "instructions", line: "Rules Claude follows in every session" },
@@ -573,9 +397,6 @@ function ProjectDetailView({ id }: { id: string }) {
         <Section id="board" title="Board">
           <ProjectBoard p={p} />
         </Section>
-        <Section id="next" title="Up next">
-          <UpNext p={p} />
-        </Section>
         <Section id="customize" title="Build your setup">
           <BuildCards p={p} />
         </Section>
@@ -588,11 +409,6 @@ function ProjectDetailView({ id }: { id: string }) {
         <Section id="changelog" title="Changelog">
           {p.changelog ? <ChangelogTab p={p} /> : <p className="text-[13.5px] text-muted-foreground">No CHANGELOG.md. A changelog lists the notable changes for the people who use the project, newest first. Ask Claude to start one when the project has users.</p>}
         </Section>
-        {p.backlog && (
-          <Section id="backlog" title="Backlog">
-            <BacklogTab p={p} />
-          </Section>
-        )}
         <Section id="docs" title="Docs">
           <ItemRows scope={p.id} items={p.docs.map((d) => ({ ...docItem, name: d.name.replace(/\.md$/i, ""), path: d.path, display: d.name }))} empty="No documents at the top of this project." />
         </Section>

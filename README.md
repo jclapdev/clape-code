@@ -59,7 +59,7 @@ Starting and answering sessions uses the Claude Code installed on the computer, 
 | View | What it does |
 |---|---|
 | Home | Everything waiting for you: approvals, questions, blocked background jobs. Recent changes across projects. |
-| Projects | Each project's backlog (tick, edit, add items), changelog (add today's entry), docs, `.claude` configuration and sessions. |
+| Projects | Each project's board of its BACKLOG.md (Open, In spec, Done; read-only), changelog (add today's entry), docs, `.claude` configuration and sessions. |
 | Sessions | Your conversations, one row each with its name, project and time since last activity; from a project page only that project's. `claude -p` runs and archived conversations show when you turn them on. Each opens as one page: the whole conversation with tool calls folded away, approvals and Claude's questions as cards you can answer, and a reply box at the bottom that keeps it going. Copy a resume command, archive or delete from the page's menu. |
 | New session | An empty conversation page: pick the project, model and permission mode in the row under the reply box and send the first message. Every New session button opens it with the current project filled in. |
 | Jobs | Background jobs and their timelines. |

@@ -19,10 +19,10 @@ Notable changes to Control Center, newest first.
 - The Plugins page turns each plugin on and off and uninstalls it, using Claude Code's own plugin commands and showing its message when it refuses. "Find plugins" searches every marketplace you have (about 3,800 plugins) with Install, and "New plugin" makes a starter plugin in your skills folder.
 - Plugins you made in your skills folder show on the Plugins page. Removing one moves its folder to Archived items.
 - The menu has Home, Sessions, Projects, Customize, Settings and Guides. On a phone it opens full screen; on tablets it's a strip of icons.
-- Each project page opens on a board of its BACKLOG.md: every numbered line in Open, In spec or Done by its status, with its number, idea and verdict. A line in a spec lists that spec's steps from features.json, each passing or failing. A project without BACKLOG.md shows three empty columns.
+- Each project page opens on a board of its BACKLOG.md: every numbered line in Open, In spec or Done by its status, with a count on each column. A card shows the number, the idea cut to two lines (the full text shows on hover) and the verdict. A line in a spec lists that spec's steps from features.json, each marked Passing or Failing. The board can't be edited; Claude changes a line's status as the work moves. A project without BACKLOG.md shows three empty columns.
 - New project makes a folder in your projects folder with git and a starter CLAUDE.md, and offers "Have Claude set it up", which opens a new session with /init.
 - Add context: drop text files on a project page, or pick them, to copy them into its docs/ folder. Each file has a "Claude reads this every session" switch that adds or removes its `@docs/…` line in CLAUDE.md.
-- The project page is now a summary: the board, Up next, how many instructions, skills, agents, hooks and so on the project has (each opens that page filtered to the project), recent sessions, context files, changelog, docs and .worktreeinclude.
+- The project page is now a summary: the board, how many instructions, skills, agents, hooks and so on the project has (each opens that page filtered to the project), recent sessions, context files, changelog, docs and .worktreeinclude.
 - A Settings page for permission rules, model, environment variables, status line, sandbox, keyboard shortcuts and themes, for every project, a project's shared settings or your own settings for it. It shows which file's value is in effect when more than one sets it, has "Edit as text" for each file, and hides environment variable values until "Show value".
 - Each project page has "Build your setup": a card for instructions, skills, agents, hooks, MCP servers and output styles with how many the project has, one line saying what it is, and a New button that creates it in that project. Home no longer has setup cards.
 - Home has one list of sessions (those that need you, those paused at a usage limit, then the 6 most recent), replacing the separate Background sessions, Projects and Changelog lists.
@@ -57,6 +57,7 @@ Notable changes to Control Center, newest first.
 
 ### Removed
 
+- The project page's Up next list and its editable Backlog section; the board shows BACKLOG.md instead.
 - The separate live session view and the "Resume a session" form, with the transcript page's "Only my messages" and "N prompts ↑↓" controls and its "Continue this session" button.
 - The sentence under Home's heading.
 - The Setup page. Its skills, agents and other lists are on the Customize pages, its settings on Settings; /setup opens Settings and /library opens Customize.
