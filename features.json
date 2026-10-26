@@ -4,19 +4,101 @@
       "id": "001-S1",
       "spec": "specs/001-home-sessions-and-suggested.md",
       "description": "Runs stopped by a usage limit over a day ago are ordinary sessions, not Paused, on Home and Sessions; remove the sentence under Home's heading.",
-      "checks": ["A1", "A2", "A3"],
+      "checks": [
+        "A1",
+        "A2",
+        "A3"
+      ],
       "status": "passing",
       "build_attempts": 1,
-      "screenshots": ["specs/screenshots/001-S1-A1.png", "specs/screenshots/001-S1-A2.png", "specs/screenshots/001-S1-A3.png"]
+      "screenshots": [
+        "specs/screenshots/001-S1-A1.png",
+        "specs/screenshots/001-S1-A2.png",
+        "specs/screenshots/001-S1-A3.png"
+      ]
     },
     {
       "id": "001-S2",
       "spec": "specs/001-home-sessions-and-suggested.md",
       "description": "Suggested section on Home: prompts typed 3+ times from history.jsonl with a Make it a skill button that opens New skill filled in; gone once the skill exists.",
-      "checks": ["A4", "A5", "A6", "A7"],
+      "checks": [
+        "A4",
+        "A5",
+        "A6",
+        "A7"
+      ],
       "status": "passing",
       "build_attempts": 1,
-      "screenshots": ["specs/screenshots/001-S2-A4.png", "specs/screenshots/001-S2-A5.png", "specs/screenshots/001-S2-A6.png", "specs/screenshots/001-S2-A7-light.png", "specs/screenshots/001-S2-A7-dark.png"]
+      "screenshots": [
+        "specs/screenshots/001-S2-A4.png",
+        "specs/screenshots/001-S2-A5.png",
+        "specs/screenshots/001-S2-A6.png",
+        "specs/screenshots/001-S2-A7-light.png",
+        "specs/screenshots/001-S2-A7-dark.png"
+      ]
+    },
+    {
+      "id": "002-S1",
+      "spec": "specs/002-one-page-per-conversation.md",
+      "description": "Server: a conversation is addressed by its session ID. GET /sessions/:sid returns the transcript plus live state (status, pending approvals/questions, model, permission mode). POST /sessions/:sid/send sends to the running session or resumes it with the same ID; respond, interrupt, mode and stop by session ID. POST /sessions/new starts a session and returns its session ID. Control Center records the session ID of every session it starts; session list entries carry a 'fromScript' flag (entrypoint starts with sdk- and Control Center did not start it) and an archived flag. Tests in server/test/api.test.ts.",
+      "checks": [
+        "A2",
+        "A3",
+        "A4"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "002-S2",
+      "spec": "specs/002-one-page-per-conversation.md",
+      "description": "The conversation page at /sessions/$sid: whole conversation, folded tool calls, one Show details switch, inline approval and question cards, reply box at the bottom with model and permission mode under it, Stop. Copy-command moves into a page menu. Live.tsx's live view and resume form are removed; /live/$id, /live?resume= and /jobs/$id redirect here.",
+      "checks": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "002-S3",
+      "spec": "specs/002-one-page-per-conversation.md",
+      "description": "Starting: /sessions/new is the same page empty, with project, model and permission mode under the box; the address becomes /sessions/<id> after the first message. Every New session button goes there with the current project filled in; /live redirects there.",
+      "checks": [
+        "A6"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "002-S4",
+      "spec": "specs/002-one-page-per-conversation.md",
+      "description": "Sessions list: one row style (title from name, AI title or first prompt, never 'user:'; project; time since last activity; state label only when working or waiting); rows open the conversation; claude -p runs hidden behind 'Show runs from scripts'; filtered to the project when opened from a project page with a switch for every project; 'Show archived'. Remove the sentence under the heading.",
+      "checks": [
+        "A7",
+        "A8"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "002-S5",
+      "spec": "specs/002-one-page-per-conversation.md",
+      "description": "Main menu: 'Continue last conversation' plus conversations that need you and ones running. Then the whole flow at 390, 768, 1024 and 1440 px in light and dark.",
+      "checks": [
+        "A9",
+        "A10"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
     }
   ]
 }
