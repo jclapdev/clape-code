@@ -9,7 +9,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { api, ApiError, enc } from "@/lib/api";
 import { when } from "@/lib/format";
 import type { BacklogItem, Catalog, LibraryItem, Project, ProjectDetail } from "@/lib/types";
-import { FEATURES } from "@/lib/features";
+import { featureById, type Feature, type FeatureId } from "@/lib/features";
 import { ProjectBoard } from "./ProjectBoard";
 import { ContextDropZone, ContextSection } from "./ProjectContext";
 import { openOnComputer } from "@/components/FileEditor";
@@ -469,28 +469,66 @@ function UpNext({ p }: { p: ProjectDetail }) {
   return <PlanBacklog p={p} />;
 }
 
-/** How many of each customization the project has, each linking to that feature's page filtered to it. */
-function FeatureCounts({ p }: { p: ProjectDetail }) {
+/** What you build in a project, each with how many it has, what it is in one line, and a New button that creates it in this project. */
+const BUILD: { id: FeatureId; line: string }[] = [
+  { id: "instructions", line: "Rules Claude follows in every session" },
+  { id: "skills", line: "Procedures Claude runs on request or by itself" },
+  { id: "agents", line: "Helpers that take on a side task and report back" },
+  { id: "hooks", line: "Commands that run on their own, such as after every edit" },
+  { id: "mcp", line: "Connections to GitHub, databases and other services" },
+  { id: "output-styles", line: "How long and in what format Claude answers" },
+];
+// Made by Claude rather than built by you, so they keep a plain count.
+const MADE_BY_CLAUDE: FeatureId[] = ["plans", "memory", "workflows"];
+
+function BuildCards({ p }: { p: ProjectDetail }) {
   const cat = useQuery({ queryKey: ["catalog"], queryFn: () => api.get<Catalog>("/catalog") });
-  // Plugins and scheduled tasks never belong to one project; Slash commands repeats Skills.
-  const shown = FEATURES.filter((f) => !["commands", "plugins", "scheduled"].includes(f.id));
   const mine = (cat.data?.items ?? []).filter((i) => i.projectId === p.id);
+  const count = (f: Feature) => (cat.isLoading ? "…" : mine.filter((i) => f.kinds.includes(i.kind)).length || "none");
   return (
-    <ul className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))]">
-      {shown.map((f) => {
-        const n = mine.filter((i) => f.kinds.includes(i.kind)).length;
-        const Icon = f.icon;
-        return (
-          <li key={f.id}>
-            <Link to={`/${f.id}` as "/skills"} search={{ project: p.id }} className="flex items-center gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5 text-ink no-underline hover:border-line-strong">
-              <Icon aria-hidden className="size-4 flex-none text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate text-[13.5px]">{f.label}</span>
-              <span className={cn("text-[13.5px] font-semibold tabular-nums", !n && "font-normal text-muted-foreground")}>{cat.isLoading ? "…" : n}</span>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="flex flex-col gap-3">
+      <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))]">
+        {BUILD.map(({ id, line }) => {
+          const f = featureById(id)!;
+          const Icon = f.icon;
+          const n = count(f);
+          return (
+            <li key={id} className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4">
+              <div className="flex items-center gap-2">
+                <Icon aria-hidden className="size-4 flex-none text-muted-foreground" />
+                <Link to={`/${f.id}` as "/skills"} search={{ project: p.id }} className="min-w-0 flex-1 truncate font-semibold text-ink no-underline hover:underline">
+                  {f.label}
+                </Link>
+                <span className={cn("text-[13px] tabular-nums", n === "none" ? "text-muted-foreground" : "font-semibold")}>{n}</span>
+              </div>
+              <p className="flex-1 text-[13.5px] text-ink-2">{line}</p>
+              {f.create && (
+                <Button asChild size="sm" variant="outline" className="self-start no-underline">
+                  <Link to={f.create.to} search={{ ...f.create.search, scope: p.id } as never}>
+                    {f.create.label}
+                  </Link>
+                </Button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <ul className="flex flex-wrap gap-2">
+        {MADE_BY_CLAUDE.map((id) => {
+          const f = featureById(id)!;
+          const Icon = f.icon;
+          return (
+            <li key={id}>
+              <Link to={`/${f.id}` as "/skills"} search={{ project: p.id }} className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-[13.5px] text-ink no-underline hover:border-line-strong">
+                <Icon aria-hidden className="size-4 flex-none text-muted-foreground" />
+                {f.label}
+                <span className="font-semibold tabular-nums">{count(f)}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -557,8 +595,8 @@ function ProjectDetailView({ id }: { id: string }) {
         <Section id="next" title="Up next">
           <UpNext p={p} />
         </Section>
-        <Section id="customize" title="Customizations">
-          <FeatureCounts p={p} />
+        <Section id="customize" title="Build your setup">
+          <BuildCards p={p} />
         </Section>
         <Section id="sessions" title="Recent sessions">
           <SessionRows p={p} />
