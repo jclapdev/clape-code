@@ -1,0 +1,24 @@
+GET /api/projects/~%2Fprojects%2Fno-backlog/board
+{"path":null,"columns":[{"key":"open","name":"Open","cards":[]},{"key":"spec","name":"In spec","cards":[]},{"key":"done","name":"Done","cards":[]}]}
+HTTP 200
+board inside GET /api/projects/~%2Fprojects%2Fno-backlog:
+{
+ "path": null,
+ "columns": [
+  {
+   "key": "open",
+   "name": "Open",
+   "cards": []
+  },
+  {
+   "key": "spec",
+   "name": "In spec",
+   "cards": []
+  },
+  {
+   "key": "done",
+   "name": "Done",
+   "cards": []
+  }
+ ]
+}

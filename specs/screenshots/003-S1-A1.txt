@@ -1,0 +1,183 @@
+GET /api/projects/~%2Fprojects%2Fboard-full/board
+{
+    "path": "/Users/john/.claude/jobs/eed59524/tmp/verify-003-s1/home/projects/board-full/BACKLOG.md",
+    "columns": [
+        {
+            "key": "open",
+            "name": "Open",
+            "cards": [
+                {
+                    "n": 1,
+                    "idea": "\"Open idea one\"",
+                    "verdict": "good",
+                    "status": "open",
+                    "spec": null,
+                    "steps": []
+                },
+                {
+                    "n": 2,
+                    "idea": "\"Idea with a pipe a | b inside\"",
+                    "verdict": "maybe",
+                    "status": "open",
+                    "spec": null,
+                    "steps": []
+                },
+                {
+                    "n": 6,
+                    "idea": "\"Third open item\"",
+                    "verdict": "pending",
+                    "status": "open",
+                    "spec": null,
+                    "steps": []
+                }
+            ]
+        },
+        {
+            "key": "spec",
+            "name": "In spec",
+            "cards": [
+                {
+                    "n": 3,
+                    "idea": "\"Board idea in spec\"",
+                    "verdict": "good, build it",
+                    "status": "in spec 003",
+                    "spec": "003",
+                    "steps": [
+                        {
+                            "id": "003-S1",
+                            "description": "Server reads the thing",
+                            "passing": true
+                        },
+                        {
+                            "id": "003-S2",
+                            "description": "Page shows the thing",
+                            "passing": false
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "done",
+            "name": "Done",
+            "cards": [
+                {
+                    "n": 4,
+                    "idea": "\"Fixed bug\"",
+                    "verdict": "fix",
+                    "status": "done",
+                    "spec": null,
+                    "steps": []
+                },
+                {
+                    "n": 5,
+                    "idea": "\"Another done thing\"",
+                    "verdict": "fixed",
+                    "status": "done",
+                    "spec": null,
+                    "steps": []
+                },
+                {
+                    "n": 7,
+                    "idea": "\"Done from later table\"",
+                    "verdict": "shipped",
+                    "status": "done",
+                    "spec": null,
+                    "steps": []
+                }
+            ]
+        }
+    ]
+}
+
+board inside GET /api/projects/~%2Fprojects%2Fboard-full:
+{
+ "path": "/Users/john/.claude/jobs/eed59524/tmp/verify-003-s1/home/projects/board-full/BACKLOG.md",
+ "columns": [
+  {
+   "key": "open",
+   "name": "Open",
+   "cards": [
+    {
+     "n": 1,
+     "idea": "\"Open idea one\"",
+     "verdict": "good",
+     "status": "open",
+     "spec": null,
+     "steps": []
+    },
+    {
+     "n": 2,
+     "idea": "\"Idea with a pipe a | b inside\"",
+     "verdict": "maybe",
+     "status": "open",
+     "spec": null,
+     "steps": []
+    },
+    {
+     "n": 6,
+     "idea": "\"Third open item\"",
+     "verdict": "pending",
+     "status": "open",
+     "spec": null,
+     "steps": []
+    }
+   ]
+  },
+  {
+   "key": "spec",
+   "name": "In spec",
+   "cards": [
+    {
+     "n": 3,
+     "idea": "\"Board idea in spec\"",
+     "verdict": "good, build it",
+     "status": "in spec 003",
+     "spec": "003",
+     "steps": [
+      {
+       "id": "003-S1",
+       "description": "Server reads the thing",
+       "passing": true
+      },
+      {
+       "id": "003-S2",
+       "description": "Page shows the thing",
+       "passing": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "done",
+   "name": "Done",
+   "cards": [
+    {
+     "n": 4,
+     "idea": "\"Fixed bug\"",
+     "verdict": "fix",
+     "status": "done",
+     "spec": null,
+     "steps": []
+    },
+    {
+     "n": 5,
+     "idea": "\"Another done thing\"",
+     "verdict": "fixed",
+     "status": "done",
+     "spec": null,
+     "steps": []
+    },
+    {
+     "n": 7,
+     "idea": "\"Done from later table\"",
+     "verdict": "shipped",
+     "status": "done",
+     "spec": null,
+     "steps": []
+    }
+   ]
+  }
+ ]
+}
