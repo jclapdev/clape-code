@@ -83,9 +83,9 @@
       "checks": [
         "A6"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": ["specs/screenshots/002-S3-new-empty.png", "specs/screenshots/002-S3-after-first-message.png", "specs/screenshots/002-S3-from-home.png", "specs/screenshots/002-S3-from-sessions.png", "specs/screenshots/002-S3-from-sessions-project.png", "specs/screenshots/002-S3-new-plan.png", "specs/screenshots/002-S3-run-in-new-session.png", "specs/screenshots/002-S3-set-it-up.png", "specs/screenshots/002-S3-live-redirect.png", "specs/screenshots/002-S3-390-light.png", "specs/screenshots/002-S3-390-dark.png", "specs/screenshots/002-S3-390-dark-conversation.png"]
     },
     {
       "id": "002-S4",
