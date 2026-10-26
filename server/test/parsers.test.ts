@@ -203,6 +203,26 @@ describe("transcript", () => {
     expect(t.map((x) => x.role)).toEqual(["user", "assistant"]);
     expect(t[1].blocks[1]).toMatchObject({ kind: "tool", name: "Bash", summary: "ls", result: "a.txt" });
   });
+
+  test("a message sent while Claude works is a user turn, once, and the first entrypoint is kept", () => {
+    // Shapes from a Claude Code 2.1 transcript (2026-10-26): the mid-turn message exists only as these lines.
+    const lines = [
+      { type: "user", entrypoint: "sdk-cli", sessionId: "s", uuid: "u1", timestamp: "2026-10-26T02:37:10Z", message: { role: "user", content: "sleep then reply" } },
+      { type: "assistant", entrypoint: "cli", sessionId: "s", uuid: "a1", timestamp: "2026-10-26T02:37:12Z", message: { id: "m1", role: "assistant", model: "m", content: [{ type: "text", text: "working" }] } },
+      { type: "queue-operation", operation: "enqueue", timestamp: "2026-10-26T02:37:19Z", sessionId: "s", content: "also say TWO" },
+      { type: "attachment", uuid: "q1", sessionId: "s", timestamp: "2026-10-26T02:37:20Z", attachment: { type: "queued_command", prompt: "also say TWO", commandMode: "prompt", timestamp: "2026-10-26T02:37:19Z" } },
+      { type: "queue-operation", operation: "remove", timestamp: "2026-10-26T02:37:27Z", sessionId: "s", content: "also say TWO", reason: "absorbed_mid_turn" },
+      { type: "assistant", sessionId: "s", uuid: "a2", timestamp: "2026-10-26T02:37:30Z", message: { id: "m2", role: "assistant", model: "m", content: [{ type: "text", text: "DONE TWO" }] } },
+    ].map((l) => JSON.stringify(l)).join("\n");
+    const t = toTurns(lines);
+    expect(t.map((x) => [x.role, x.blocks.map((b: any) => b.text).join("|")])).toEqual([
+      ["user", "sleep then reply"],
+      ["assistant", "working"],
+      ["user", "also say TWO"],
+      ["assistant", "DONE TWO"],
+    ]);
+    expect(summarize(lines, "s").entrypoint).toBe("sdk-cli");
+  });
 });
 
 // ---- Board (PROGRESS.md as Next / In progress / Done) ----

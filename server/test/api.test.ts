@@ -473,3 +473,177 @@ describe("suggested", () => {
     expect(prompts[0]).toBe("ship it now");
   });
 });
+
+describe("a conversation is addressed by its session ID", () => {
+  // Stands in for the Agent SDK's query(): answers each message in turn, asks for approval on "make a file", asks a
+  // question on "ask me", and holds a "slow" message until `release` is called.
+  const OLD = "e2644826-95f0-4880-8af9-8169d229cf1d";
+  const TERMINAL = "7a1b2c3d-0000-4000-8000-000000000001";
+  const queries: { options: any; received: string[]; mode: string; interrupts: number }[] = [];
+  let release: () => void = () => {};
+  const post = (path: string, body: unknown = {}) => request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const get = async (path: string) => (await request(path)).json();
+  const until = async (fn: () => Promise<boolean> | boolean) => {
+    for (let i = 0; i < 200; i++) {
+      if (await fn()) return;
+      await Bun.sleep(10);
+    }
+    throw new Error("timed out");
+  };
+
+  function fakeQuery({ prompt, options }: any) {
+    const sid = options.sessionId ?? options.resume;
+    const rec = { options, received: [] as string[], mode: options.permissionMode, interrupts: 0 };
+    queries.push(rec);
+    const say = (text: string) => ({ type: "assistant", session_id: sid, message: { content: [{ type: "text", text }] } });
+    async function* run() {
+      yield { type: "system", subtype: "init", session_id: sid, model: options.model ?? "fake-model" };
+      for await (const m of prompt as AsyncIterable<any>) {
+        const text = m.message.content as string;
+        rec.received.push(text);
+        if (text.includes("slow")) await new Promise<void>((r) => (release = r));
+        if (text.includes("make a file")) {
+          const r = await options.canUseTool("Write", { file_path: "a.txt", content: "hi" }, { requestId: "req-write", signal: new AbortController().signal, suggestions: [] });
+          yield say(`write ${r.behavior}`);
+        }
+        if (text.includes("ask me")) {
+          const r = await options.canUseTool("AskUserQuestion", { questions: [{ question: "Which name?", options: [{ label: "a" }, { label: "b" }] }] }, { requestId: "req-ask", signal: new AbortController().signal });
+          yield say(`answered ${JSON.stringify(r.updatedInput?.answers)}`);
+        }
+        yield say(`reply to ${text}`);
+        yield { type: "result", subtype: "success", session_id: sid, total_cost_usd: 0, is_error: false };
+      }
+    }
+    return Object.assign(run(), {
+      interrupt: async () => void rec.interrupts++,
+      setPermissionMode: async (mode: string) => void (rec.mode = mode),
+      supportedCommands: async () => [],
+      accountInfo: async () => Promise.reject(new Error("no account in tests")),
+    });
+  }
+
+  beforeAll(async () => {
+    const { setQueryForTests } = await import("../src/live/sessions");
+    setQueryForTests(fakeQuery as any);
+    // A session typed in the terminal, which is never from a script.
+    await writeFile(
+      join(root, ".claude", "projects", "-demo", `${TERMINAL}.jsonl`),
+      JSON.stringify({ type: "user", entrypoint: "cli", sessionId: TERMINAL, cwd: join(root, "projects", "demo"), timestamp: "2026-10-20T10:00:00Z", message: { role: "user", content: "hello from the terminal" } }) + "\n",
+    );
+    const { indexSessions } = await import("../src/db/index");
+    await indexSessions();
+  });
+  afterAll(async () => {
+    const { setQueryForTests, stopAll } = await import("../src/live/sessions");
+    stopAll();
+    setQueryForTests(null);
+  });
+
+  test("list entries say whether a script ran them and whether they're archived", async () => {
+    const list = await get("/api/sessions?empty=1");
+    const of = (id: string) => list.find((s: any) => s.sessionId === id);
+    // The fixture's entrypoint is "sdk-cli" and Control Center has no record of starting it: a `claude -p` run.
+    expect(of(OLD)).toMatchObject({ fromScript: true, archived: false });
+    expect(of(TERMINAL)).toMatchObject({ fromScript: false, archived: false });
+    await post("/api/sessions/archive", { ids: [TERMINAL], archived: true });
+    expect((await get("/api/sessions?empty=1&archived=1")).find((s: any) => s.sessionId === TERMINAL)).toMatchObject({ archived: true });
+    await post("/api/sessions/archive", { ids: [TERMINAL], archived: false });
+  });
+
+  test("a finished conversation has its transcript and no live state", async () => {
+    const one = await get(`/api/sessions/${OLD}`);
+    expect(one.totalTurns).toBeGreaterThan(0);
+    expect(one).toMatchObject({ status: "done", liveId: null, pending: [], permissionMode: null });
+    expect(one.events).toBeUndefined();
+    expect((await request("/api/sessions/not-a-session")).status).toBe(400);
+    expect((await request("/api/sessions/00000000-0000-4000-8000-000000000000")).status).toBe(404);
+  });
+
+  test("New starts a session, returns its session ID at once and records it as started by Control Center", async () => {
+    expect((await post("/api/sessions/new", { project: "~/projects/demo", prompt: " " })).status).toBe(400);
+    expect((await post("/api/sessions/new", { project: "~/nowhere", prompt: "hi" })).status).toBe(400);
+    const res = await post("/api/sessions/new", { project: "~/projects/demo", prompt: "hello", model: "sonnet", permissionMode: "acceptEdits" });
+    expect(res.status).toBe(200);
+    const { sessionId } = await res.json();
+    expect(sessionId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(queries.at(-1)!.options).toMatchObject({ sessionId, model: "sonnet", permissionMode: "acceptEdits" });
+    expect(queries.at(-1)!.options.resume).toBeUndefined();
+    // No transcript yet: the page still opens, with the live state.
+    await until(async () => (await get(`/api/sessions/${sessionId}`)).status === "idle");
+    const one = await get(`/api/sessions/${sessionId}`);
+    expect(one).toMatchObject({ sessionId, turns: [], fromScript: false, permissionMode: "acceptEdits", model: "sonnet" });
+    const { startedSessions } = await import("../src/live/started");
+    await until(async () => !!(await startedSessions())[sessionId]);
+    expect(JSON.parse(await readFile(join(root, "app", "started-sessions.json"), "utf8"))[sessionId]).toBeString();
+  });
+
+  test("A3: a message sent while Claude works goes to the same session without stopping it; Stop stops it", async () => {
+    const { sessionId } = await (await post("/api/sessions/new", { project: "~/projects/demo", prompt: "slow one" })).json();
+    const q = queries.at(-1)!;
+    await until(() => q.received.length === 1);
+    expect((await get(`/api/sessions/${sessionId}`)).status).toBe("working");
+    const sent = await (await post(`/api/sessions/${sessionId}/send`, { text: "and another" })).json();
+    expect(sent).toMatchObject({ sessionId, resumed: false });
+    expect(queries.at(-1)).toBe(q);
+    expect(q.interrupts).toBe(0);
+    release();
+    await until(() => q.received.length === 2);
+    expect(q.received).toEqual(["slow one", "and another"]);
+    expect((await post(`/api/sessions/${sessionId}/interrupt`)).status).toBe(200);
+    expect(q.interrupts).toBe(1);
+    expect((await post(`/api/sessions/${sessionId}/stop`)).status).toBe(200);
+    expect((await get(`/api/sessions/${sessionId}`)).status).toBe("stopped");
+    expect((await post(`/api/sessions/${sessionId}/interrupt`)).status).toBe(409);
+  });
+
+  test("A2: sending to a finished conversation resumes it under the same session ID", async () => {
+    const res = await (await post(`/api/sessions/${OLD}/send`, { text: "carry on", permissionMode: "plan" })).json();
+    expect(res).toMatchObject({ sessionId: OLD, resumed: true });
+    const q = queries.at(-1)!;
+    expect(q.options.resume).toBe(OLD);
+    expect(q.options.sessionId).toBeUndefined();
+    expect(q.options.permissionMode).toBe("plan");
+    await until(() => q.received.length === 1);
+    expect((await get(`/api/sessions/${OLD}`)).liveId).toBe(res.liveId);
+    // Now Control Center has started it, so it's no longer taken for a script run.
+    await until(async () => (await get("/api/sessions?empty=1")).find((s: any) => s.sessionId === OLD).fromScript === false);
+    // A second message goes to the running session; after Stop, the next one resumes again with the same ID.
+    expect((await (await post(`/api/sessions/${OLD}/send`, { text: "more" })).json()).resumed).toBe(false);
+    await post(`/api/sessions/${OLD}/stop`);
+    const again = await (await post(`/api/sessions/${OLD}/send`, { text: "back again" })).json();
+    expect(again).toMatchObject({ sessionId: OLD, resumed: true });
+    expect(queries.at(-1)!.options).toMatchObject({ resume: OLD, permissionMode: "plan" });
+    // Only one live session per conversation.
+    expect((await get("/api/live")).filter((l: any) => l.sessionId === OLD)).toHaveLength(1);
+    await post(`/api/sessions/${OLD}/stop`);
+  });
+
+  test("A4: approvals and questions wait in the conversation's live state and are answered by session ID", async () => {
+    const { sessionId } = await (await post("/api/sessions/new", { project: "~/projects/demo", prompt: "make a file", permissionMode: "default" })).json();
+    await until(async () => (await get(`/api/sessions/${sessionId}`)).pending.length === 1);
+    const waiting = await get(`/api/sessions/${sessionId}`);
+    expect(waiting.status).toBe("waiting");
+    expect(waiting.pending[0]).toMatchObject({ requestId: "req-write", type: "approval", toolName: "Write" });
+    expect((await post(`/api/sessions/${sessionId}/respond`, { requestId: "nope", decision: "allow" })).status).toBe(409);
+    expect((await post(`/api/sessions/${sessionId}/respond`, { requestId: "req-write", decision: "allow" })).status).toBe(200);
+    await until(async () => (await get(`/api/sessions/${sessionId}`)).status === "idle");
+
+    await post(`/api/sessions/${sessionId}/send`, { text: "ask me" });
+    await until(async () => (await get(`/api/sessions/${sessionId}`)).pending[0]?.type === "question");
+    await post(`/api/sessions/${sessionId}/respond`, { requestId: "req-ask", decision: "allow", answers: { "Which name?": "b" } });
+    await until(async () => (await get(`/api/sessions/${sessionId}`)).status === "idle");
+    const { getSession } = await import("../src/live/sessions");
+    const texts = getSession((await get(`/api/sessions/${sessionId}`)).liveId)!
+      .view()
+      .events.filter((e) => e.kind === "text")
+      .map((e: any) => e.text);
+    expect(texts).toContain("write allow");
+    expect(texts).toContain('answered {"Which name?":"b"}');
+
+    expect((await post(`/api/sessions/${sessionId}/mode`, { mode: "nonsense" })).status).toBe(400);
+    expect((await post(`/api/sessions/${sessionId}/mode`, { mode: "acceptEdits" })).status).toBe(200);
+    expect((await get(`/api/sessions/${sessionId}`)).permissionMode).toBe("acceptEdits");
+    await post(`/api/sessions/${sessionId}/stop`);
+    expect((await post(`/api/sessions/${sessionId}/respond`, { requestId: "x", decision: "allow" })).status).toBe(409);
+  });
+});

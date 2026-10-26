@@ -28,6 +28,7 @@ export interface SessionSummary {
   costUSD: number | null;
   continuedIn: string | null;
   kind: string | null; // e.g. "bg" for background jobs
+  entrypoint: string | null; // what started it: "cli", "sdk-cli" (the Agent SDK, `claude -p`), "sdk-ts"...
   plans: string[]; // plan files this session wrote in plan mode, oldest first
   searchText: string; // prompts and Claude's replies in conversation order, capped, for search
 }
@@ -90,6 +91,7 @@ export class Summarizer {
       costUSD: null,
       continuedIn: null,
       kind: null,
+      entrypoint: null,
       plans: [],
       searchText: "",
     };
@@ -115,6 +117,7 @@ export class Summarizer {
     if (d.gitBranch) s.gitBranch = d.gitBranch;
     if (d.version) s.version = d.version;
     if (d.sessionKind && !s.kind) s.kind = d.sessionKind;
+    if (typeof d.entrypoint === "string" && !s.entrypoint) s.entrypoint = d.entrypoint;
     if (typeof d.timestamp === "string" && (d.type === "user" || d.type === "assistant")) {
       if (!s.firstAt) s.firstAt = d.timestamp;
       s.lastAt = d.timestamp;
@@ -251,6 +254,14 @@ export class TurnBuilder {
       const p = promptTextOf(d);
       if (p) {
         this.current = { uuid: d.uuid, role: "user", at: d.timestamp ?? null, blocks: [{ kind: "text", text: p }] };
+        this.turns.push(this.current);
+      }
+    } else if (d.type === "attachment" && d.attachment?.type === "queued_command" && d.attachment.commandMode === "prompt") {
+      // A message sent while Claude was working is recorded only as this attachment, never as a user line.
+      const a = d.attachment;
+      const p = (typeof a.prompt === "string" ? a.prompt : resultText(a.prompt)).trim();
+      if (p) {
+        this.current = { uuid: d.uuid, role: "user", at: a.timestamp ?? d.timestamp ?? null, blocks: [{ kind: "text", text: p }] };
         this.turns.push(this.current);
       }
     } else if (d.type === "system" && d.subtype === "compact_boundary") {

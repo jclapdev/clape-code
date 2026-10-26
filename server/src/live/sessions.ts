@@ -5,6 +5,7 @@ import { appDir, tildify } from "../fs/paths";
 import { toolSummary } from "../parsers/transcript";
 import { pickSessionAccount, saveSessionAccount, type SessionAccount } from "../account/sessions";
 import { claudeEnv, findClaude } from "./claude";
+import { recordStarted } from "./started";
 
 export { findClaude };
 
@@ -42,7 +43,7 @@ interface Waiter {
 
 export interface LiveSessionView {
   id: string;
-  sessionId: string | null;
+  sessionId: string;
   cwd: string;
   model: string | null;
   permissionMode: PermissionMode;
@@ -85,6 +86,12 @@ const compiled = import.meta.path.includes("$bunfs") || /^[A-Z]:[\\/]~BUN/.test(
 // of the SDK's own Claude Code.
 const embedded = () => compiled || globalThis.__CC_ASSETS !== undefined;
 
+// Tests swap in a stand-in for the Agent SDK's query().
+let runQuery: typeof query = query;
+export function setQueryForTests(q: typeof query | null) {
+  runQuery = q ?? query;
+}
+
 function claudeExecutable(): string | undefined {
   if (!embedded()) return undefined; // running from source: the SDK uses its own bundled copy
   const p = findClaude();
@@ -94,7 +101,7 @@ function claudeExecutable(): string | undefined {
 
 class LiveSession {
   id = crypto.randomUUID();
-  sessionId: string | null = null;
+  sessionId: string;
   status: LiveStatus = "starting";
   startedAt = now();
   events: LiveEvent[] = [];
@@ -114,13 +121,16 @@ class LiveSession {
     public permissionMode: PermissionMode,
     resume: string | null,
   ) {
-    this.q = query({
+    // A new session gets its ID up front, so its address is known before Claude answers. Resuming keeps the ID.
+    this.sessionId = resume ?? crypto.randomUUID();
+    void recordStarted(this.sessionId).catch(() => {});
+    this.q = runQuery({
       prompt: this.input,
       options: {
         cwd,
         model: model ?? undefined,
         permissionMode,
-        resume: resume ?? undefined,
+        ...(resume ? { resume } : { sessionId: this.sessionId }),
         abortController: this.abort,
         settingSources: ["user", "project", "local"],
         pathToClaudeCodeExecutable: claudeExecutable(),
@@ -235,7 +245,10 @@ class LiveSession {
 
   private handle(m: SDKMessage) {
     const at = now();
-    if ("session_id" in m && m.session_id && !this.sessionId) this.sessionId = m.session_id;
+    if ("session_id" in m && m.session_id && m.session_id !== this.sessionId) {
+      this.sessionId = m.session_id;
+      void recordStarted(m.session_id).catch(() => {});
+    }
     if (m.type === "system" && (m as any).subtype === "commands_changed") {
       this.setCommands((m as any).commands ?? []);
       return;
@@ -307,6 +320,8 @@ class LiveSession {
 const sessions = new Map<string, LiveSession>();
 
 export function startSession(o: { cwd: string; prompt: string; model?: string | null; permissionMode?: PermissionMode; resume?: string | null }) {
+  // One live session per conversation: a finished one is replaced by its resumption.
+  if (o.resume) for (const old of [...sessions.values()]) if (old.sessionId === o.resume) removeSession(old.id);
   const s = new LiveSession(o.cwd, o.model ?? null, o.permissionMode ?? "default", o.resume ?? null);
   sessions.set(s.id, s);
   s.send(o.prompt);
@@ -314,6 +329,11 @@ export function startSession(o: { cwd: string; prompt: string; model?: string | 
 }
 
 export const getSession = (id: string) => sessions.get(id) ?? null;
+/** The newest live session for a conversation, running or finished, or null. */
+export const liveBySessionId = (sessionId: string) =>
+  [...sessions.values()].filter((s) => s.sessionId === sessionId).sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0] ?? null;
+/** Whether it can take a message now; otherwise sending resumes it. */
+export const isOpen = (s: { status: LiveStatus }) => s.status !== "stopped" && s.status !== "error";
 export const listLive = () => [...sessions.values()].map((s) => s.view()).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 export const waitingCount = () => [...sessions.values()].filter((s) => s.waiters.size > 0).length;
 

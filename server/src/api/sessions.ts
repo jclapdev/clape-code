@@ -8,7 +8,8 @@ import { WriteError } from "../fs/safeWrite";
 import { TurnBuilder } from "../parsers/transcript";
 import { readLines } from "../fs/lines";
 import { sessionAccounts, type SessionAccount } from "../account/sessions";
-import { getSession, knownCommands, listLive, removeSession, startSession, waitingCount } from "../live/sessions";
+import { getSession, isOpen, knownCommands, listLive, liveBySessionId, removeSession, startSession, waitingCount } from "../live/sessions";
+import { isFromScript, startedSessions } from "../live/started";
 import { globalLibrary, projectLibrary } from "../scan/library";
 import { listJobs, listLiveProcesses } from "../scan/jobs";
 import { listProjects, projectDir, projectPathOf } from "../scan/projects";
@@ -20,7 +21,9 @@ export const sessions = new Hono<Env>();
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
-function publicSession(s: IndexedSession, archived: Record<string, string>, running: Set<string>, projectOf: (cwd: string | null) => string | null, accounts: Record<string, SessionAccount> = {}) {
+type Ctx = Awaited<ReturnType<typeof context>>;
+
+function publicSession(s: IndexedSession, { archived, running, projectOf, accounts, started }: Ctx) {
   const { file, ...rest } = s;
   return {
     ...rest,
@@ -28,6 +31,8 @@ function publicSession(s: IndexedSession, archived: Record<string, string>, runn
     cwd: s.cwd ? tildify(s.cwd) : null,
     project: projectOf(s.cwd),
     archivedAt: archived[s.sessionId] ?? null,
+    archived: !!archived[s.sessionId],
+    fromScript: isFromScript(s.entrypoint, s.sessionId, started),
     running: running.has(s.sessionId),
     account: accounts[s.sessionId] ?? null,
     resumeCommand: s.cwd ? `cd "${s.cwd}" && claude --resume ${s.sessionId}` : `claude --resume ${s.sessionId}`,
@@ -35,33 +40,82 @@ function publicSession(s: IndexedSession, archived: Record<string, string>, runn
 }
 
 async function context() {
-  const [state, procs, projects, accounts] = await Promise.all([readState(), listLiveProcesses(), listProjects(), sessionAccounts()]);
+  const [state, procs, projects, accounts, started] = await Promise.all([readState(), listLiveProcesses(), listProjects(), sessionAccounts(), startedSessions()]);
   const running = new Set(procs.map((p) => p.sessionId));
   for (const l of listLive()) if (l.sessionId && l.status !== "stopped") running.add(l.sessionId);
   const dirs = projects.map((p) => ({ id: p.id, dir: untildify(p.id) }));
   const projectOf = (cwd: string | null) => (cwd ? dirs.find((d) => isInside(projectPathOf(cwd), d.dir))?.id ?? null : null);
-  return { archived: state.archivedSessions, running, projectOf, state, accounts };
+  return { archived: state.archivedSessions, running, projectOf, state, accounts, started };
 }
 
 sessions.get("/sessions", async (c) => {
   const showArchived = c.req.query("archived") === "1";
   const includeEmpty = c.req.query("empty") === "1";
   const project = c.req.query("project");
-  const { archived, running, projectOf, accounts } = await context();
+  const ctx = await context();
+  const { archived } = ctx;
   const list = listSessions()
     .filter((s) => includeEmpty || s.prompts > 0)
     .filter((s) => (showArchived ? !!archived[s.sessionId] : !archived[s.sessionId]))
-    .map((s) => publicSession(s, archived, running, projectOf, accounts))
+    .map((s) => publicSession(s, ctx))
     .filter((s) => !project || s.project === project);
   return c.json(list);
 });
 
-sessions.get("/sessions/:sid", async (c) => {
+const PERMISSION_MODES = ["default", "acceptEdits", "plan", "auto", "dontAsk"];
+const modeOf = (m: unknown) => (PERMISSION_MODES.includes(m as string) ? (m as any) : null);
+
+function sidOf(c: { req: { param: (k: string) => string } }) {
   const sid = c.req.param("sid");
   if (!UUID.test(sid)) throw new WriteError(400, "That isn't a valid session link.");
-  const s = sessionById(sid);
-  if (!s) throw new WriteError(404, "No such session.");
-  const { archived, running, projectOf, accounts } = await context();
+  return sid;
+}
+
+/** The indexed transcript, re-indexing once when a session just started hasn't been seen yet. */
+async function findSession(sid: string) {
+  return sessionById(sid) ?? (liveBySessionId(sid) ? (await indexSessions(), sessionById(sid)) : null);
+}
+
+/**
+ * What Claude is doing in a conversation now. Messages come only from the transcript, so this carries no events.
+ * status: the live session's own, "running" when a terminal or background process has it open, otherwise "done".
+ */
+function liveState(sid: string, s: IndexedSession | null, running: Set<string>) {
+  const l = liveBySessionId(sid)?.view() ?? null;
+  return {
+    status: l ? l.status : running.has(sid) ? "running" : "done",
+    liveId: l?.id ?? null,
+    pending: l?.pending ?? [],
+    model: l?.model ?? s?.model ?? null,
+    permissionMode: l?.permissionMode ?? null,
+    commands: l?.commands ?? [],
+  };
+}
+
+sessions.get("/sessions/:sid", async (c) => {
+  const sid = sidOf(c);
+  const s = await findSession(sid);
+  const ctx = await context();
+  if (!s) {
+    // Started a moment ago: Claude Code hasn't written its transcript yet.
+    const l = liveBySessionId(sid)?.view();
+    if (!l) throw new WriteError(404, "No such session.");
+    const first = l.events.find((e) => e.kind === "user");
+    return c.json({
+      sessionId: sid,
+      cwd: l.cwd,
+      project: ctx.projectOf(untildify(l.cwd)),
+      displayTitle: untitled(first?.kind === "user" ? first.text : null),
+      archived: !!ctx.archived[sid],
+      fromScript: false,
+      account: l.account,
+      turns: [],
+      totalTurns: 0,
+      offset: 0,
+      subagentList: [],
+      ...liveState(sid, null, ctx.running),
+    });
+  }
   // Turns come in pages so long sessions open quickly; the client asks for more with ?offset=.
   const offset = Math.max(0, Number(c.req.query("offset") ?? 0) || 0);
   const limit = Math.min(1000, Math.max(1, Number(c.req.query("limit") ?? 200) || 200));
@@ -74,11 +128,12 @@ sessions.get("/sessions/:sid", async (c) => {
     subagents.push({ agentId: f.replace(/^agent-/, "").replace(/\.meta\.json$/, ""), type: meta?.agentType ?? null, description: meta?.description ?? null });
   }
   return c.json({
-    ...publicSession(s, archived, running, projectOf, accounts),
+    ...publicSession(s, ctx),
     turns: builder.turns.slice(offset, offset + limit),
     totalTurns: builder.turns.length,
     offset,
     subagentList: subagents,
+    ...liveState(sid, s, ctx.running),
   });
 });
 
@@ -93,6 +148,69 @@ sessions.get("/sessions/:sid/subagents/:agentId", async (c) => {
   const builder = new TurnBuilder(true);
   for await (const line of readLines(file)) builder.push(line);
   return c.json({ turns: builder.turns });
+});
+
+/** Starts a conversation in a project and returns its session ID, which is its address from then on. */
+sessions.post("/sessions/new", async (c) => {
+  const body = await c.req.json();
+  const prompt = String(body.prompt ?? "").trim();
+  if (!prompt) throw new WriteError(400, "Write a first message for Claude.");
+  const cwd = await projectDir(String(body.project ?? ""));
+  if (!cwd) throw new WriteError(400, "Pick a project to run in.");
+  const v = startSession({ cwd, prompt, model: body.model || null, permissionMode: modeOf(body.permissionMode) ?? "default" });
+  return c.json({ sessionId: v.sessionId, liveId: v.id });
+});
+
+/** Sends to the running session, or resumes the conversation under the same session ID when Claude isn't running. */
+sessions.post("/sessions/:sid/send", async (c) => {
+  const sid = sidOf(c);
+  const body = await c.req.json();
+  const text = String(body.text ?? "");
+  if (!text.trim()) throw new WriteError(400, "Empty message.");
+  const l = liveBySessionId(sid);
+  if (l && isOpen(l)) {
+    l.send(text);
+    return c.json({ sessionId: sid, liveId: l.id, resumed: false });
+  }
+  const s = await findSession(sid);
+  const cwd = s?.cwd ?? l?.cwd ?? null;
+  if (!cwd) throw new WriteError(404, "Can't find that session's folder.");
+  const v = startSession({ cwd, prompt: text, model: body.model || l?.model || null, permissionMode: modeOf(body.permissionMode) ?? l?.permissionMode ?? "default", resume: sid });
+  return c.json({ sessionId: v.sessionId, liveId: v.id, resumed: true });
+});
+
+function running(sid: string) {
+  const l = liveBySessionId(sid);
+  if (!l || !isOpen(l)) throw new WriteError(409, "Claude isn't running in this conversation.");
+  return l;
+}
+
+sessions.post("/sessions/:sid/respond", async (c) => {
+  const l = running(sidOf(c));
+  const b = await c.req.json();
+  try {
+    l.respond(b.requestId, { decision: b.decision, message: b.message, answers: b.answers });
+  } catch (e: any) {
+    throw new WriteError(409, e.message);
+  }
+  return c.json({ ok: true });
+});
+sessions.post("/sessions/:sid/interrupt", async (c) => {
+  await running(sidOf(c)).interrupt();
+  return c.json({ ok: true });
+});
+sessions.post("/sessions/:sid/mode", async (c) => {
+  const l = running(sidOf(c));
+  const mode = modeOf((await c.req.json()).mode);
+  if (!mode) throw new WriteError(400, "That isn't a permission mode.");
+  await l.setMode(mode);
+  return c.json({ ok: true });
+});
+/** Ends Claude's process for this conversation. The transcript stays; sending again resumes it. */
+sessions.post("/sessions/:sid/stop", (c) => {
+  const l = liveBySessionId(sidOf(c));
+  if (l && l.status !== "stopped") l.stop();
+  return c.json({ ok: true });
 });
 
 sessions.post("/sessions/archive", async (c) => {
@@ -206,9 +324,7 @@ sessions.post("/live", async (c) => {
     cwd = await projectDir(String(body.project ?? ""));
   }
   if (!cwd) throw new WriteError(400, "Pick a project to run in.");
-  const allowed = ["default", "acceptEdits", "plan", "auto", "dontAsk"];
-  const permissionMode = allowed.includes(body.permissionMode) ? body.permissionMode : "default";
-  return c.json(startSession({ cwd, prompt, model: body.model || null, permissionMode, resume }));
+  return c.json(startSession({ cwd, prompt, model: body.model || null, permissionMode: modeOf(body.permissionMode) ?? "default", resume }));
 });
 
 function live(id: string) {

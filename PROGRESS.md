@@ -2,11 +2,13 @@
 
 Replaced after every step. History is in git.
 
-- **Feature:** specs/001-home-sessions-and-suggested.md, finished: both steps pass.
-- **Last step done:** 001-S2 (verified in the browser: A4-A7 pass against a fake home), then #109 fixed in commit 5b47e14. Home has a "Suggested" section under Sessions from `GET /api/suggested` (`{prompt, name, count}` only), counted from `~/.claude/history.jsonl`; "Make it a skill" opens `/new?kind=skill&name=…&body=…` filled in; a suggestion drops once a skill folder of that name exists in `~/.claude/skills` or any project's `.claude/skills`.
-- **Next step:** judge #108, John's complaint about the Sessions view, together with #38 (one page per conversation) and #93.
+- **Feature:** specs/002-one-page-per-conversation.md, step 1 of its steps built (not yet verified).
+- **Last step done:** 002-S1, server side. A conversation is addressed by its session ID: `GET /api/sessions/:sid` returns the transcript turns plus `status` (the live session's own, `running` when a terminal has it, otherwise `done`), `liveId`, `pending`, `model`, `permissionMode` and `commands`; it also answers for a session started a moment ago whose transcript isn't written yet. `POST /api/sessions/new` (`project`, `prompt`, `model`, `permissionMode`) starts a session with its ID chosen up front (the Agent SDK's `sessionId` option) and returns `{sessionId, liveId}`. `POST /api/sessions/:sid/send` sends to the running session (`resumed: false`) or resumes it under the same ID (`resumed: true`); `/respond`, `/interrupt`, `/mode` and `/stop` work by session ID. Every session Control Center starts or resumes is recorded in `started-sessions.json` in the app folder. List entries carry `fromScript` (first `entrypoint` starts with `sdk-` and not recorded as started) and `archived`. A message sent while Claude works is recorded in the transcript only as a `queued_command` attachment; the conversation now shows it as a user turn. The old `/api/live` endpoints still work for the current pages.
+- **Next step:** 002-S2, the conversation page at `/sessions/$sid` built on these endpoints, with `/live/$id`, `/live?resume=` and `/jobs/$id` redirecting there.
 - **How to run it:** open Control Center from Applications. After merging into `main`, run `bun run app` in the main checkout so the installed app gets the change. `bun run desktop` opens a development copy. For a browser check on its own port: `bun run build`, then `PORT=<free port> CC_APP_DIR=<empty folder> bun server/src/index.ts` and open http://127.0.0.1:<port>.
-- **How to test it:** `bun run typecheck && bun run test && bun run build`. The overview test is in `server/test/api.test.ts` ("overview"); the Suggested rules are in the same file ("suggested").
+- **How to test it:** `bun run typecheck && bun run test && bun run build`. The session-ID endpoints are tested with a stand-in for the Agent SDK in `server/test/api.test.ts` ("a conversation is addressed by its session ID"); the mid-turn message in `server/test/parsers.test.ts`.
 - **Known problems:**
+  - Sessions Control Center started before this step aren't recorded, so the ones with an `sdk-` entrypoint count as `fromScript`: 194 of 283 sessions on John's computer with an empty app folder.
+  - Sending to a conversation open in a terminal resumes a second Claude on it (BACKLOG #112).
   - The project board still reads PROGRESS.md's old columns, so the control-center board is empty until #64 is built.
   - Sessions still has a sentence under its heading (BACKLOG #26, #104).
