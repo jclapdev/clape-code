@@ -61,9 +61,20 @@
         "A4",
         "A5"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": [
+        "specs/screenshots/002-S2-A1.png",
+        "specs/screenshots/002-S2-A2.png",
+        "specs/screenshots/002-S2-A3.png",
+        "specs/screenshots/002-S2-A4-approval.png",
+        "specs/screenshots/002-S2-A4-question.png",
+        "specs/screenshots/002-S2-A4.png",
+        "specs/screenshots/002-S2-A5.png",
+        "specs/screenshots/002-S2-stop-new.png",
+        "specs/screenshots/002-S2-390-light.png",
+        "specs/screenshots/002-S2-390-dark.png"
+      ]
     },
     {
       "id": "002-S3",
