@@ -209,9 +209,21 @@
         "A6",
         "A7"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": [
+        "specs/screenshots/003-S3-A4-board.png",
+        "specs/screenshots/003-S3-A4-other-page.png",
+        "specs/screenshots/003-S3-A4-saved.png",
+        "specs/screenshots/003-S3-A5.png",
+        "specs/screenshots/003-S3-A6-draft-kept.png",
+        "specs/screenshots/003-S3-A6-empty-after-save.png",
+        "specs/screenshots/003-S3-A7-1440-dark.png",
+        "specs/screenshots/003-S3-A7-1440-light.png",
+        "specs/screenshots/003-S3-A7-390-dark.png",
+        "specs/screenshots/003-S3-A7-390-light-board.png",
+        "specs/screenshots/003-S3-A7-390-light.png"
+      ]
     }
   ]
 }
