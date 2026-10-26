@@ -69,6 +69,7 @@ export class Summarizer {
   private seen = new Set<string>();
   private aiTitle: string | null = null;
   private customTitle: string | null = null;
+  private summary: string | null = null;
   private text: string[] = [];
   private chars = 0;
 
@@ -129,6 +130,9 @@ export class Summarizer {
       case "custom-title":
         this.customTitle = d.customTitle ?? this.customTitle;
         break;
+      case "summary":
+        if (typeof d.summary === "string" && d.summary.trim()) this.summary = d.summary.trim();
+        break;
       case "agent-name":
         s.agentName = d.agentName ?? s.agentName;
         break;
@@ -173,7 +177,7 @@ export class Summarizer {
   }
 
   result(): SessionSummary {
-    return { ...this.s, title: this.customTitle ?? this.aiTitle, searchText: this.text.join("\n\n").slice(0, SEARCH_TEXT_CAP) };
+    return { ...this.s, title: this.customTitle ?? this.aiTitle ?? this.summary, searchText: this.text.join("\n\n").slice(0, SEARCH_TEXT_CAP) };
   }
 }
 

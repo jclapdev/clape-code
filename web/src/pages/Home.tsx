@@ -9,8 +9,11 @@ import { ErrorNote, Loading } from "@/components/ui";
 
 function SessionList() {
   const { requests, entries, isLoading, error } = useSessionEntries();
-  const first = entries.filter((e) => e.status === "needs");
-  const recent = entries.filter((e) => !first.includes(e)).slice(0, 6);
+  // A request row already stands for its session; `claude -p` runs stay out, as on Sessions.
+  const asking = new Set(requests.map((r) => r.sessionId));
+  const mine = entries.filter((e) => !e.fromScript && !(e.sessionId && asking.has(e.sessionId)));
+  const first = mine.filter((e) => e.status === "needs");
+  const recent = mine.filter((e) => !first.includes(e)).slice(0, 6);
   const empty = !requests.length && !first.length && !recent.length;
 
   return (

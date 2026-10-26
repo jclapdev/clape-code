@@ -60,7 +60,7 @@ Starting and answering sessions uses the Claude Code installed on the computer, 
 |---|---|
 | Home | Everything waiting for you: approvals, questions, blocked background jobs. Recent changes across projects. |
 | Projects | Each project's backlog (tick, edit, add items), changelog (add today's entry), docs, `.claude` configuration and sessions. |
-| Sessions | Every conversation in every project. Each opens as one page: the whole conversation with tool calls folded away, approvals and Claude's questions as cards you can answer, and a reply box at the bottom that keeps it going. Copy a resume command, archive or delete from the page's menu. |
+| Sessions | Your conversations, one row each with its name, project and time since last activity; from a project page only that project's. `claude -p` runs and archived conversations show when you turn them on. Each opens as one page: the whole conversation with tool calls folded away, approvals and Claude's questions as cards you can answer, and a reply box at the bottom that keeps it going. Copy a resume command, archive or delete from the page's menu. |
 | New session | An empty conversation page: pick the project, model and permission mode in the row under the reply box and send the first message. Every New session button opens it with the current project filled in. |
 | Jobs | Background jobs and their timelines. |
 | Library | Skills, agents, commands, rules, output styles, hooks, hook scripts, settings files, CLAUDE.md files, plans, memory notes and plugins, globally or per project. Edit, create, archive or delete one item or many, turn skills and plugins on or off. Skills are checked against the Agent Skills spec when saved. |

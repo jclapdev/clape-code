@@ -51,6 +51,18 @@ export function AccessTag({ access }: { access: Access }) {
   return <Tag>Outside</Tag>;
 }
 
+/** A labelled on/off switch. */
+export function Switch({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className="flex min-h-9 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 hover:text-ink">
+      <span className={cn("relative h-5 w-9 flex-none rounded-full border transition-colors", on ? "border-primary bg-primary" : "border-line-strong bg-sunken")}>
+        <span className={cn("absolute top-0.5 size-3.5 rounded-full bg-surface shadow transition-all", on ? "left-[18px]" : "left-0.5")} />
+      </span>
+      {label}
+    </button>
+  );
+}
+
 export function Dot({ tone }: { tone: "attn" | "ok" | "accent" | "muted" | "danger" }) {
   const c = { attn: "bg-attn-dot", ok: "bg-ok-dot", accent: "bg-primary", muted: "bg-faint", danger: "bg-destructive" }[tone];
   return <span aria-hidden className={cn("inline-block size-2 flex-none rounded-full", c)} />;

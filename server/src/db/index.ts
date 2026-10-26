@@ -6,7 +6,7 @@ import { readLines } from "../fs/lines";
 import { Summarizer, type SessionSummary } from "../parsers/transcript";
 
 // A rebuildable cache. Files on disk are the truth; deleting index.sqlite only costs a re-scan.
-const SCHEMA_VERSION = 5; // 3: search text includes Claude's replies; 4: plan files per session; 5: entrypoint
+const SCHEMA_VERSION = 6; // 3: search text includes Claude's replies; 4: plan files per session; 5: entrypoint; 6: summary titles
 
 let db: Database | null = null;
 
@@ -45,9 +45,13 @@ export interface IndexedSession extends Omit<SessionSummary, "searchText"> {
   sizeBytes: number;
 }
 
-/** A readable name for a session without a title: the first real line of its first prompt. */
+/**
+ * A readable name for a session without a title: the first real line of its first prompt. Scripts often pass a
+ * transcript as the prompt, so a leading "user:" is dropped (BACKLOG #50, #94).
+ */
 export function untitled(firstPrompt: string | null): string {
   const line = (firstPrompt ?? "")
+    .replace(/^\s*user:\s*/i, "")
     .split("\n")
     .map((l) => l.replace(/<\/?[\w-]+>/g, "").replace(/^#+\s*/, "").trim())
     .find(Boolean);

@@ -8,7 +8,7 @@ import { WriteError } from "../fs/safeWrite";
 import { TurnBuilder } from "../parsers/transcript";
 import { readLines } from "../fs/lines";
 import { sessionAccounts, type SessionAccount } from "../account/sessions";
-import { getSession, isOpen, knownCommands, listLive, liveBySessionId, removeSession, startSession, waitingCount } from "../live/sessions";
+import { getSession, isOpen, knownCommands, listLive, liveBySessionId, removeSession, startSession, waitingCount, type LiveStatus } from "../live/sessions";
 import { isFromScript, startedSessions } from "../live/started";
 import { globalLibrary, projectLibrary } from "../scan/library";
 import { listJobs, listLiveProcesses } from "../scan/jobs";
@@ -23,7 +23,7 @@ const UUID = /^[0-9a-f-]{36}$/i;
 
 type Ctx = Awaited<ReturnType<typeof context>>;
 
-function publicSession(s: IndexedSession, { archived, running, projectOf, accounts, started }: Ctx) {
+function publicSession(s: IndexedSession, { archived, running, activity, projectOf, accounts, started }: Ctx) {
   const { file, ...rest } = s;
   return {
     ...rest,
@@ -34,29 +34,49 @@ function publicSession(s: IndexedSession, { archived, running, projectOf, accoun
     archived: !!archived[s.sessionId],
     fromScript: isFromScript(s.entrypoint, s.sessionId, started),
     running: running.has(s.sessionId),
+    activity: activity.get(s.sessionId) ?? null,
     account: accounts[s.sessionId] ?? null,
     resumeCommand: s.cwd ? `cd "${s.cwd}" && claude --resume ${s.sessionId}` : `claude --resume ${s.sessionId}`,
   };
 }
 
+/**
+ * What the Sessions list labels: Claude working, or waiting for an answer. An idle or finished session has none.
+ * A session started here knows its own state; a terminal or background process counts as working unless it says idle.
+ */
+export function sessionActivity(procs: { sessionId: string; status: string | null }[], live: { sessionId: string; status: LiveStatus; pending: unknown[] }[]) {
+  const activity = new Map<string, "working" | "waiting">();
+  for (const p of procs) if (p.status !== "idle") activity.set(p.sessionId, "working");
+  for (const l of [...live].reverse()) {
+    if (!l.sessionId) continue;
+    if (l.pending.length || l.status === "waiting") activity.set(l.sessionId, "waiting");
+    else if (l.status === "starting" || l.status === "working") activity.set(l.sessionId, "working");
+    else activity.delete(l.sessionId);
+  }
+  return activity;
+}
+
 async function context() {
   const [state, procs, projects, accounts, started] = await Promise.all([readState(), listLiveProcesses(), listProjects(), sessionAccounts(), startedSessions()]);
   const running = new Set(procs.map((p) => p.sessionId));
-  for (const l of listLive()) if (l.sessionId && l.status !== "stopped") running.add(l.sessionId);
+  const live = listLive();
+  for (const l of live) if (l.sessionId && l.status !== "stopped") running.add(l.sessionId);
+  const activity = sessionActivity(procs, live);
   const dirs = projects.map((p) => ({ id: p.id, dir: untildify(p.id) }));
   const projectOf = (cwd: string | null) => (cwd ? dirs.find((d) => isInside(projectPathOf(cwd), d.dir))?.id ?? null : null);
-  return { archived: state.archivedSessions, running, projectOf, state, accounts, started };
+  return { archived: state.archivedSessions, running, activity, projectOf, state, accounts, started };
 }
 
 sessions.get("/sessions", async (c) => {
-  const showArchived = c.req.query("archived") === "1";
+  // archived=1: only archived sessions; archived=all: archived ones too.
+  const archivedQ = c.req.query("archived");
   const includeEmpty = c.req.query("empty") === "1";
   const project = c.req.query("project");
   const ctx = await context();
   const { archived } = ctx;
   const list = listSessions()
     .filter((s) => includeEmpty || s.prompts > 0)
-    .filter((s) => (showArchived ? !!archived[s.sessionId] : !archived[s.sessionId]))
+    .filter((s) => archivedQ === "all" || (archivedQ === "1" ? !!archived[s.sessionId] : !archived[s.sessionId]))
     .map((s) => publicSession(s, ctx))
     .filter((s) => !project || s.project === project);
   return c.json(list);

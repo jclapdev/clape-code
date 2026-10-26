@@ -15,7 +15,7 @@ import { DetailHeader } from "@/components/Panes";
 import { MessageBox } from "@/components/MessageBox";
 import { SimpleSelect } from "@/components/SimpleSelect";
 import { Transcript } from "@/components/Transcript";
-import { ErrorNote, Loading, Tag, cn } from "@/components/ui";
+import { ErrorNote, Loading, Switch, Tag, cn } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -215,17 +215,6 @@ function SubagentDialog({ sid, agent, onClose }: { sid: string; agent: Agent | n
 }
 
 /** An on/off switch with its name beside it. */
-function Switch({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className="flex min-h-9 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 hover:text-ink">
-      <span className={cn("relative h-5 w-9 flex-none rounded-full border transition-colors", on ? "border-primary bg-primary" : "border-line-strong bg-sunken")}>
-        <span className={cn("absolute top-0.5 size-3.5 rounded-full bg-surface shadow transition-all", on ? "left-[18px]" : "left-0.5")} />
-      </span>
-      {label}
-    </button>
-  );
-}
-
 const textOf = (t: Turn) => ((t.blocks[0] as { text?: string } | undefined)?.text ?? "").trim();
 
 const SELECT = "h-8 min-w-[130px] max-w-full text-[13px]";

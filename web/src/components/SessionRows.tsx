@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { accountLabel, ago, when } from "@/lib/format";
+import { ago } from "@/lib/format";
 import type { Job, PendingRequest, Session } from "@/lib/types";
 import { Tag } from "@/components/ui";
 
@@ -27,33 +27,63 @@ export interface SessionEntry {
   cwd: string | null;
   project: string | null;
   at: string | null;
-  session: Session | null;
-  job: { id: string; detail: string | null } | null;
+  sessionId: string | null;
+  jobId: string | null;
+  fromScript: boolean;
+  archived: boolean;
+  /** needs: waiting for an answer; running: Claude is working. */
   status: "needs" | "running" | null;
 }
 
 export const useOverview = () => useQuery({ queryKey: ["overview"], queryFn: () => api.get<Overview>("/overview") });
 
-/** Live requests waiting for an answer, and every session newest first. */
-export function useSessionEntries() {
+/** Live requests waiting for an answer, and every session newest first. `archived` adds archived sessions. */
+export function useSessionEntries({ archived = false }: { archived?: boolean } = {}) {
   const overview = useOverview();
-  const sessions = useQuery({ queryKey: ["sessions", "all"], queryFn: () => api.get<Session[]>("/sessions") });
+  const sessions = useQuery({
+    queryKey: ["sessions", archived ? "with-archived" : "all"],
+    queryFn: () => api.get<Session[]>(archived ? "/sessions?archived=all" : "/sessions"),
+  });
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: () => api.get<{ jobs: Job[] }>("/jobs") });
   const o = overview.data;
   const needsJobs = new Set(o?.needsYou.flatMap((n) => (n.type === "job" ? [n.id] : [])) ?? []);
+  const asking = new Set(o?.needsYou.flatMap((n) => (n.type === "live" ? [n.sessionId] : [])) ?? []);
   const bySession = new Map((jobs.data?.jobs ?? []).flatMap((j) => (j.sessionId ? [[j.sessionId, j] as const] : [])));
   const listed = new Set((sessions.data ?? []).map((s) => s.sessionId));
-  const statusOf = (job: Job | undefined, running: boolean): SessionEntry["status"] =>
-    job && needsJobs.has(job.id) ? "needs" : running ? "running" : null;
 
   const entries: SessionEntry[] = [
-    ...(sessions.data ?? []).map((s) => {
+    ...(sessions.data ?? []).map((s): SessionEntry => {
       const job = bySession.get(s.sessionId);
-      return { key: s.sessionId, title: job?.name ?? s.displayTitle, cwd: s.cwd, project: s.project, at: s.lastAt, session: s, job: job ? { id: job.id, detail: job.detail } : null, status: statusOf(job, s.running) };
+      const needs = (job && needsJobs.has(job.id)) || asking.has(s.sessionId) || s.activity === "waiting";
+      return {
+        key: s.sessionId,
+        title: job?.name ?? s.displayTitle,
+        cwd: s.cwd,
+        project: s.project,
+        at: s.lastAt,
+        sessionId: s.sessionId,
+        jobId: job?.id ?? null,
+        fromScript: s.fromScript,
+        archived: s.archived,
+        status: needs ? "needs" : s.activity === "working" ? "running" : null,
+      };
     }),
     ...(jobs.data?.jobs ?? [])
       .filter((j) => !j.sessionId || !listed.has(j.sessionId))
-      .map((j) => ({ key: "job" + j.id, title: j.name ?? "Background session", cwd: j.cwd, project: null, at: j.updatedAt, session: null, job: { id: j.id, detail: j.detail }, status: statusOf(j, false) })),
+      .map(
+        (j): SessionEntry => ({
+          key: "job" + j.id,
+          title: j.name ?? "Background session",
+          cwd: j.cwd,
+          project: null,
+          at: j.updatedAt,
+          sessionId: null,
+          jobId: j.id,
+          fromScript: false,
+          archived: false,
+          status: needsJobs.has(j.id) ? "needs" : null,
+        }),
+      ),
   ].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
 
   const requests = (o?.needsYou ?? []).filter((n): n is LiveRequest => n.type === "live");
@@ -68,7 +98,7 @@ export function useSessionEntries() {
 export const folder = (cwd: string | null) => (cwd ? cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd : null);
 const join = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
 
-/** One line in a session list: what it is, where and when, a tag, and what you can do. */
+/** One line in a list: what it is, where and when, a tag, and what you can do. */
 export function Row({ title, about, tag, children }: { title: ReactNode; about: ReactNode; tag?: ReactNode; children: ReactNode }) {
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
@@ -118,41 +148,45 @@ export function LiveRequestRow({ item }: { item: LiveRequest }) {
   );
 }
 
+/** The state label, shown only while Claude is working or waiting for you. Words match the conversation page. */
 const TAGS = {
-  needs: <Tag tone="attn">Needs you</Tag>,
-  running: <Tag tone="ok">Running</Tag>,
+  needs: <Tag tone="attn">Waiting for you</Tag>,
+  running: <Tag tone="accent">Working</Tag>,
 };
 
+const ROW =
+  "flex min-h-14 items-center gap-3 px-4 py-2.5 text-inherit no-underline hover:bg-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";
+
 /**
- * A session's line. A background session opens on its own page (state, what it's doing, transcript link);
- * any other opens its transcript. `search` is kept on the transcript link so a filtered list stays filtered.
+ * A session's line, the same for every session: title, project and time since last activity, a state label while
+ * Claude is working or waiting, and "Archived" when it is. The whole line opens the conversation.
  */
-export function SessionRow({ e, search }: { e: SessionEntry; search?: Record<string, string | boolean | undefined> }) {
-  const sid = e.session?.sessionId ?? null;
-  const about =
-    e.status === "needs"
-      ? join(folder(e.project ?? e.cwd), e.job?.detail || "Stopped and waiting for an answer before it can go on.")
-      : join(folder(e.project ?? e.cwd), e.job && "Background", when(e.at), accountLabel(e.session?.account));
-  return (
-    <Row tag={e.status ? TAGS[e.status] : undefined} title={e.title} about={about}>
-      {e.status === "needs" && sid && (
-        <Button asChild size="sm" className="no-underline">
-          <Link to="/sessions/$sid" params={{ sid }}>
-            Answer
-          </Link>
-        </Button>
+export function SessionRow({ e }: { e: SessionEntry }) {
+  const body = (
+    <>
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium text-ink">{e.title}</div>
+        <div className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{join(folder(e.project ?? e.cwd) ?? "Not in a project", ago(e.at))}</div>
+      </div>
+      {(e.status || e.archived) && (
+        <div className="flex flex-none flex-wrap justify-end gap-1.5">
+          {e.status && TAGS[e.status]}
+          {e.archived && <Tag>Archived</Tag>}
+        </div>
       )}
-      <Button asChild size="sm" variant="outline" className="no-underline">
-        {e.job ? (
-          <Link to="/jobs/$id" params={{ id: e.job.id }}>
-            Open
-          </Link>
-        ) : (
-          <Link to="/sessions/$sid" params={{ sid: sid! }}>
-            Open
-          </Link>
-        )}
-      </Button>
-    </Row>
+    </>
+  );
+  return (
+    <li>
+      {e.sessionId ? (
+        <Link to="/sessions/$sid" params={{ sid: e.sessionId }} className={ROW}>
+          {body}
+        </Link>
+      ) : (
+        <Link to="/jobs/$id" params={{ id: e.jobId! }} className={ROW}>
+          {body}
+        </Link>
+      )}
+    </li>
   );
 }

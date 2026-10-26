@@ -350,12 +350,10 @@ function SessionRows({ p }: { p: ProjectDetail }) {
           </li>
         ))}
       </ul>
-      {p.sessions.length > 5 && (
-        <Link to="/sessions" search={{ project: p.id }} className="mt-2 inline-flex items-center gap-1 text-[13px]">
-          Show all {p.sessions.length} sessions
-          <ArrowRight className="size-3.5" aria-hidden />
-        </Link>
-      )}
+      <Link to="/sessions" search={{ project: p.id }} className="mt-2 inline-flex items-center gap-1 text-[13px]">
+        All sessions
+        <ArrowRight className="size-3.5" aria-hidden />
+      </Link>
     </>
   );
 }

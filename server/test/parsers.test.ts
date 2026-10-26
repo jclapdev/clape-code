@@ -174,6 +174,25 @@ describe("transcript", () => {
     expect(s.cwd).toBe("/p/a");
   });
 
+  test("title: the name you set, then the AI title, then the conversation summary", () => {
+    const sum = line({ type: "summary", summary: "Fixing the lab", leafUuid: "u1" });
+    const named = line({ type: "custom-title", customTitle: "my lab", sessionId: "s1" });
+    expect(summarize([TRANSCRIPT, sum].join("\n"), "f").title).toBe("lab-fix");
+    expect(summarize([TRANSCRIPT, sum, named].join("\n"), "f").title).toBe("my lab");
+    expect(summarize([TRANSCRIPT.split("\n")[0], sum].join("\n"), "f").title).toBe("Fixing the lab");
+    expect(summarize(TRANSCRIPT.split("\n")[0], "f").title).toBeNull();
+  });
+
+  test("a title from the first prompt never starts with user:", async () => {
+    const { untitled } = await import("../src/db/index");
+    // Real first prompts from `claude -p` runs on John's computer, which pass a transcript as the prompt.
+    expect(untitled("user: The next button sucks. Its hard to look at")).toBe("The next button sucks. Its hard to look at");
+    expect(untitled("user: <command-name>/clear</command-name>\n            <command-message>clear</command-message>")).toBe("/clear");
+    expect(untitled("User:\nReview the pending changes")).toBe("Review the pending changes");
+    expect(untitled("Fix the user: field")).toBe("Fix the user: field");
+    expect(untitled(null)).toBe("Untitled session");
+  });
+
   test("search text holds prompts and Claude's replies in order", () => {
     expect(summarize(TRANSCRIPT, "f").searchText).toBe("Fix the lab\n\nLooking.");
   });

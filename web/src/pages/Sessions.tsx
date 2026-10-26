@@ -6,11 +6,9 @@ import { ChevronLeft, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { plural } from "@/lib/format";
-import { ErrorNote, Loading, useConfirm } from "@/components/ui";
-import { Toggle } from "@/components/ui/toggle";
+import { ErrorNote, Loading, Switch, useConfirm } from "@/components/ui";
 import { Input } from "@/components/ui/input";
-import { SimpleSelect } from "@/components/SimpleSelect";
-import { LiveRequestRow, SessionRow, folder, useSessionEntries } from "@/components/SessionRows";
+import { SessionRow, folder, useSessionEntries } from "@/components/SessionRows";
 
 export function useSessionActions() {
   const qc = useQueryClient();
@@ -45,13 +43,14 @@ export function useSessionActions() {
   return { archive, del, askDelete };
 }
 
-export type SessionsSearch = { project?: string; needs?: boolean; q?: string };
-
-/** "none" picks sessions outside every project. */
-const OUTSIDE = "none";
+/**
+ * project: opened from that project's page, so the list starts filtered to it; all: the switch that shows every
+ * project. scripts: also list `claude -p` runs. archived: also list archived sessions.
+ */
+export type SessionsSearch = { project?: string; all?: boolean; scripts?: boolean; archived?: boolean; needs?: boolean; q?: string };
 
 function SessionsList({ search }: { search: SessionsSearch }) {
-  const { requests, entries, isLoading, error } = useSessionEntries();
+  const { entries, isLoading, error } = useSessionEntries({ archived: !!search.archived });
   const navigate = useNavigate();
   const [q, setQLocal] = useState(search.q ?? "");
   const go = (next: Partial<SessionsSearch>) => void navigate({ to: ".", search: (s: SessionsSearch) => ({ ...s, ...next }) as never, replace: true });
@@ -59,19 +58,12 @@ function SessionsList({ search }: { search: SessionsSearch }) {
     setQLocal(v);
     go({ q: v || undefined });
   };
-  const project = search.project ?? "";
+  const project = search.project && !search.all ? search.project : "";
   const needs = !!search.needs;
-  const projects = [...new Set(entries.flatMap((e) => (e.project ? [e.project] : [])))].sort((a, b) => folder(a)!.localeCompare(folder(b)!));
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  const shown = entries.filter(
-    (e) =>
-      (!project || (project === OUTSIDE ? !e.project : e.project === project)) &&
-      (!needs || e.status === "needs") &&
-      words.every((w) => e.title.toLowerCase().includes(w)),
-  );
-  // Live requests have no title or project to filter by; they show whenever no project is picked and nothing is typed.
-  const asks = !project && !words.length ? requests : [];
-  const filtered = !!project || needs || !!words.length;
+  // Like Claude Code's session picker: `claude -p` runs left out, and the current project's sessions unless widened.
+  const listed = entries.filter((e) => (search.scripts || !e.fromScript) && (!project || e.project === project));
+  const shown = listed.filter((e) => (!needs || e.status === "needs") && words.every((w) => e.title.toLowerCase().includes(w)));
   const ordered = [...shown.filter((e) => e.status === "needs"), ...shown.filter((e) => e.status !== "needs")];
 
   return (
@@ -79,45 +71,46 @@ function SessionsList({ search }: { search: SessionsSearch }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-[24px] font-semibold tracking-[-0.01em]">Sessions</h1>
         <Button asChild className="no-underline">
-          <Link to="/sessions/new" search={project && project !== OUTSIDE ? { project } : {}}>
+          <Link to="/sessions/new" search={project ? { project } : {}}>
             <Plus aria-hidden /> New session
           </Link>
         </Button>
       </div>
-      <p className="leading-relaxed text-ink-2">Every conversation with Claude Code in every project, newest first, including ones run in the background. Open one to read it, or continue it where it stopped.</p>
-      <div className="flex flex-wrap gap-2">
-        <div className="relative min-w-[180px] flex-1">
-          <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search titles" aria-label="Search session titles" className="h-9 pl-8" />
-        </div>
-        <SimpleSelect
-          label="Show sessions for"
-          value={project}
-          onChange={(v) => go({ project: v || undefined })}
-          className="h-9 min-w-[160px]"
-          options={[{ value: "", label: "Every project" }, ...projects.map((p) => ({ value: p, label: folder(p)! })), { value: OUTSIDE, label: "Not in a project" }]}
-        />
-        <Toggle variant="outline" size="sm" pressed={needs} onPressedChange={(v) => go({ needs: v || undefined })} className="h-9 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground">
-          Needs you
-        </Toggle>
+      <div className="relative">
+        <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search titles" aria-label="Search session titles" className="h-9 pl-8" />
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {search.project && <Switch label="Every project" on={!!search.all} onChange={(v) => go({ all: v || undefined })} />}
+        <Switch label="Needs you" on={needs} onChange={(v) => go({ needs: v || undefined })} />
+        <Switch label="Show runs from scripts" on={!!search.scripts} onChange={(v) => go({ scripts: v || undefined })} />
+        <Switch label="Show archived" on={!!search.archived} onChange={(v) => go({ archived: v || undefined })} />
       </div>
       {error && <ErrorNote error={error} />}
       {isLoading ? (
         <Loading />
       ) : (
         <>
-          <p className="text-[13px] text-muted-foreground">{filtered ? `${shown.length} of ${plural(entries.length, "session")}` : plural(entries.length, "session")}</p>
-          {asks.length + ordered.length ? (
-            <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
-              {asks.map((r) => (
-                <LiveRequestRow key={"live" + r.id} item={r} />
-              ))}
+          <p className="text-[13px] text-muted-foreground">
+            {project ? `${folder(project)}: ` : ""}
+            {shown.length === listed.length ? plural(listed.length, "session") : `${shown.length} of ${plural(listed.length, "session")}`}
+          </p>
+          {ordered.length ? (
+            <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
               {ordered.map((e) => (
-                <SessionRow key={e.key} e={e} search={search} />
+                <SessionRow key={e.key} e={e} />
               ))}
             </ul>
           ) : (
-            <p className="text-[13.5px] text-muted-foreground">{entries.length ? (needs ? "Nothing needs you right now." : "Nothing matches. Try other words or another project.") : 'No sessions yet. Press "New session" to give Claude a task.'}</p>
+            <p className="text-[13.5px] text-muted-foreground">
+              {listed.length
+                ? needs
+                  ? "Nothing needs you right now."
+                  : "Nothing matches. Try other words."
+                : entries.length
+                  ? `No sessions${project ? ` in ${folder(project)}` : ""} yet.${project ? ' Turn on "Every project" to see the others.' : ""}`
+                  : 'No sessions yet. Press "New session" to give Claude a task.'}
+            </p>
           )}
         </>
       )}

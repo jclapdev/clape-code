@@ -33,7 +33,15 @@ const project = createRoute({
   validateSearch: (s: Record<string, unknown>): { tab?: string } => ({ tab: str(s.tab) }),
 });
 
-const sessionsSearch = (s: Record<string, unknown>): SessionsSearch => ({ project: str(s.project), needs: s.needs === true || s.needs === "true" || s.needs === "1" || s.needs === 1 ? true : undefined, q: str(s.q) });
+const flag = (v: unknown) => (v === true || v === "true" || v === "1" || v === 1 ? true : undefined);
+const sessionsSearch = (s: Record<string, unknown>): SessionsSearch => ({
+  project: str(s.project),
+  all: flag(s.all),
+  scripts: flag(s.scripts),
+  archived: flag(s.archived),
+  needs: flag(s.needs),
+  q: str(s.q),
+});
 const sessions = createRoute({ getParentRoute: () => root, path: "/sessions", component: SessionsPage, validateSearch: sessionsSearch });
 const session = createRoute({ getParentRoute: () => root, path: "/sessions/$sid", component: ConversationPage });
 

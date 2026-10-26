@@ -548,7 +548,34 @@ describe("a conversation is addressed by its session ID", () => {
     expect(of(TERMINAL)).toMatchObject({ fromScript: false, archived: false });
     await post("/api/sessions/archive", { ids: [TERMINAL], archived: true });
     expect((await get("/api/sessions?empty=1&archived=1")).find((s: any) => s.sessionId === TERMINAL)).toMatchObject({ archived: true });
+    expect((await get("/api/sessions?empty=1")).some((s: any) => s.sessionId === TERMINAL)).toBe(false);
+    // "Show archived" lists archived sessions beside the others.
+    const both = await get("/api/sessions?empty=1&archived=all");
+    expect(both.find((s: any) => s.sessionId === TERMINAL)).toMatchObject({ archived: true });
+    expect(both.find((s: any) => s.sessionId === OLD)).toMatchObject({ archived: false });
     await post("/api/sessions/archive", { ids: [TERMINAL], archived: false });
+  });
+
+  test("list entries carry a state only while Claude is working or waiting", async () => {
+    expect((await get("/api/sessions?empty=1")).find((s: any) => s.sessionId === TERMINAL)).toMatchObject({ activity: null });
+    const { sessionActivity } = await import("../src/api/sessions");
+    const a = sessionActivity(
+      [
+        { sessionId: "term-busy", status: "busy" },
+        { sessionId: "term-idle", status: "idle" },
+        { sessionId: "here", status: "busy" },
+      ],
+      // Newest first, as listLive returns them: the newest live session for a conversation wins.
+      [
+        { sessionId: "here", status: "idle", pending: [] },
+        { sessionId: "asks", status: "working", pending: [{}] },
+        { sessionId: "works", status: "working", pending: [] },
+        { sessionId: "starts", status: "starting", pending: [] },
+        { sessionId: "ended", status: "stopped", pending: [] },
+        { sessionId: "ended", status: "working", pending: [] },
+      ],
+    );
+    expect(Object.fromEntries(a)).toEqual({ "term-busy": "working", asks: "waiting", works: "working", starts: "working" });
   });
 
   test("a finished conversation has its transcript and no live state", async () => {

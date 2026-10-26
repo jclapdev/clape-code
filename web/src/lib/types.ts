@@ -87,7 +87,12 @@ export interface Session {
   sizeBytes: number;
   project: string | null;
   archivedAt: string | null;
+  archived: boolean;
+  /** A `claude -p` or Agent SDK run that Control Center didn't start. */
+  fromScript: boolean;
   running: boolean;
+  /** Claude working or waiting for an answer now; null when idle or finished. */
+  activity: "working" | "waiting" | null;
   resumeCommand: string;
   /** Saved when the app started the session; null for sessions started elsewhere. */
   account: SessionAccount | null;
