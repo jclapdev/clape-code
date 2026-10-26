@@ -5,9 +5,9 @@
       "spec": "specs/001-home-sessions-and-suggested.md",
       "description": "Runs stopped by a usage limit over a day ago are ordinary sessions, not Paused, on Home and Sessions; remove the sentence under Home's heading.",
       "checks": ["A1", "A2", "A3"],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": ["specs/screenshots/001-S1-A1.png", "specs/screenshots/001-S1-A2.png", "specs/screenshots/001-S1-A3.png"]
     },
     {
       "id": "001-S2",
