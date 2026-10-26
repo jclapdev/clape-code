@@ -436,22 +436,30 @@ describe("overview", () => {
 });
 
 describe("suggested", () => {
-  const suggested = async () => (await (await request("/api/suggested")).json()) as { prompt: string; count: number }[];
+  const suggested = async () => (await (await request("/api/suggested")).json()) as { prompt: string; name: string; count: number }[];
 
   test("counts prompts ignoring capitals and trailing spaces, skips commands and one-word prompts, most typed first, at most 5", async () => {
     const list = await suggested();
-    expect(list[0]).toEqual({ prompt: "read your instructions", count: 11 });
-    expect(list[1]).toEqual({ prompt: "wrap up", count: 4 });
+    expect(list[0]).toEqual({ prompt: "read your instructions", name: "read-your-instructions", count: 11 });
+    expect(list[1]).toEqual({ prompt: "wrap up", name: "wrap-up", count: 4 });
     expect(list).toHaveLength(5);
     const prompts = list.map((s) => s.prompt);
     for (const p of ["exit", "/clear", "run the tests"]) expect(prompts).not.toContain(p);
   });
 
-  test("sends only the prompt and its count", async () => {
+  test("sends only the prompt, its skill name and its count", async () => {
     const res = await request("/api/suggested");
     const text = await res.text();
     for (const s of [root, "e2644826", "demo", "timestamp"]) expect(text).not.toContain(s);
-    for (const s of JSON.parse(text)) expect(Object.keys(s).sort()).toEqual(["count", "prompt"]);
+    for (const s of JSON.parse(text)) expect(Object.keys(s).sort()).toEqual(["count", "name", "prompt"]);
+  });
+
+  test("the skill name is always one the New skill form accepts", async () => {
+    const { skillNameOf } = await import("../src/scan/suggested");
+    expect(skillNameOf("Fix the bug!  Then commit.")).toBe("fix-the-bug-then-commit");
+    const long = skillNameOf("please read every instruction file in this project and then summarise what changed since yesterday");
+    expect(long.length).toBeLessThanOrEqual(64);
+    expect(long).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
   });
 
   test("a prompt is dropped once a skill of its name exists, globally or in a project", async () => {

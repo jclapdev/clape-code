@@ -43,7 +43,7 @@ function SessionList() {
 
 /** Prompts typed 3 or more times that no skill covers yet. Hidden when there are none. */
 function Suggested() {
-  const { data } = useQuery({ queryKey: ["suggested"], queryFn: () => api.get<{ prompt: string; count: number }[]>("/suggested") });
+  const { data } = useQuery({ queryKey: ["suggested"], queryFn: () => api.get<{ prompt: string; name: string; count: number }[]>("/suggested") });
   if (!data?.length) return null;
   return (
     <section aria-labelledby="home-suggested" className="flex flex-col gap-3">
@@ -54,7 +54,7 @@ function Suggested() {
         {data.map((s) => (
           <Row key={s.prompt} title={<span title={s.prompt}>{s.prompt}</span>} about={`Typed ${s.count} times`}>
             <Button asChild size="sm" variant="outline" className="no-underline">
-              <Link to="/new" search={{ kind: "skill", name: s.prompt.trim().toLowerCase().replace(/\s+/g, "-"), body: s.prompt } as never}>
+              <Link to="/new" search={{ kind: "skill", name: s.name, body: s.prompt } as never}>
                 Make it a skill
               </Link>
             </Button>

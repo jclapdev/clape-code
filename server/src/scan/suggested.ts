@@ -8,14 +8,17 @@ import { discoverProjectDirs } from "./projects";
 
 export interface Suggestion {
   prompt: string;
+  /** The skill name the New skill form starts with. */
+  name: string;
   count: number;
 }
 
 const THRESHOLD = 3;
 const MAX = 5;
 
-/** The skill name a prompt becomes: lower case, spaces as hyphens. */
-export const skillNameOf = (prompt: string) => prompt.trim().toLowerCase().replace(/\s+/g, "-");
+/** The skill name a prompt becomes: lower-case letters and digits joined by single hyphens, at most 64 characters, as the form requires. */
+export const skillNameOf = (prompt: string) =>
+  prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64).replace(/-$/, "");
 
 /**
  * Counts typed prompts, ignoring capitals and trailing spaces. Skips commands ("/…") and one-word prompts.
@@ -35,8 +38,11 @@ export function countPrompts(displays: string[], skillNames: Set<string>): Sugge
   });
   return [...groups.values()]
     .filter((g) => g.count >= THRESHOLD)
-    .map((g) => ({ prompt: [...g.spellings].sort((a, b) => b[1].n - a[1].n || b[1].last - a[1].last)[0]![0], count: g.count }))
-    .filter((s) => !skillNames.has(skillNameOf(s.prompt)))
+    .map((g) => {
+      const prompt = [...g.spellings].sort((a, b) => b[1].n - a[1].n || b[1].last - a[1].last)[0]![0];
+      return { prompt, name: skillNameOf(prompt), count: g.count };
+    })
+    .filter((s) => s.name && !skillNames.has(s.name))
     .sort((a, b) => b.count - a.count)
     .slice(0, MAX);
 }
