@@ -33,7 +33,9 @@ link to the plan it follows.
   conversations. Folders that only hold projects (the Project folders in Preferences,
   such as `~/projects`) and folders in no added project are ignored. When the
   conversations fall in more than one project, the project with the most of them
-  wins, and on a tie the one with the newest conversation. A plan with no such
+  wins, and on a tie the one with the newest conversation. A conversation that moved
+  between folders counts for every project it ran in; otherwise "Control Center as a
+  desktop app" would get no project (found while building 004-S1). A plan with no such
   conversation stays "All projects". On 27 Oct, 33 of the 40 matched plans ran only
   inside one project; 7 also ran in `~/projects` itself, and
   `rustling-moseying-thunder` ran in cka-prep and control-center (script over the same
