@@ -1,9 +1,10 @@
 // The real API, against a fixture home folder seeded with secrets: nothing secret may come back,
 // and the login lockout can't be reset with a client-set header.
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
+import * as fsp from "node:fs/promises";
 import { mkdtemp, mkdir, rm, writeFile, copyFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { installFakeClaude } from "./fakeClaude";
 
 let root: string;
@@ -11,12 +12,15 @@ let root: string;
 const SECRETS = ["token-source-secret", "org-secret-id", "sk-ant-oat01-secret-token", "secret@example.com", "user-secret-id", "machine-secret-id", "peer-secret-token", "rv-secret", "control-secret"];
 let app: any;
 const PLAN_SID = "7a1b2c3d-0000-4000-8000-000000000004";
+const OUTSIDE_SID = "7a1b2c3d-0000-4000-8000-000000000039";
+let OUTSIDE: string[] = [];
 
 const request = (path: string, init: RequestInit = {}, ip = "127.0.0.1") =>
   app.request(path, { ...init, headers: { host: "127.0.0.1:4317", ...(init.headers ?? {}) } }, { server: { requestIP: () => ({ address: ip, family: "IPv4", port: 1 }) } });
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "cc-api-"));
+  OUTSIDE = [join(root, "Documents", "vault"), join(root, "Library", "Mail")];
   const claude = join(root, ".claude");
   process.env.CC_HOME = root;
   process.env.CC_CLAUDE_DIR = claude;
@@ -75,6 +79,23 @@ beforeAll(async () => {
       pl({ type: "user", uuid: "u2", timestamp: "2026-10-05T10:02:00Z", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "User has approved your plan. You can now start coding." }] } }),
     ].join("\n") + "\n",
   );
+  // Folders outside the project folders (#39): a conversation ran in one, ~/.claude.json names the other. Each looks
+  // like a project with MCP servers, so any scan that reached them would read something.
+  for (const d of OUTSIDE) {
+    await mkdir(join(d, ".claude", "skills", "outside-skill"), { recursive: true });
+    await writeFile(join(d, ".claude", "skills", "outside-skill", "SKILL.md"), "---\nname: outside-skill\ndescription: x\n---\n");
+    await writeFile(join(d, ".mcp.json"), JSON.stringify({ mcpServers: { outside: { command: "x" } } }));
+    await writeFile(join(d, "BACKLOG.md"), "# Backlog\n");
+  }
+  const cjNow = JSON.parse(await readFile(join(root, ".claude.json"), "utf8"));
+  cjNow.projects[OUTSIDE[1]] = { mcpServers: { "outside-local": { command: "x" } } };
+  await writeFile(join(root, ".claude.json"), JSON.stringify(cjNow));
+  await mkdir(join(claude, "projects", "-vault"), { recursive: true });
+  const vl = (o: object) => JSON.stringify({ sessionId: OUTSIDE_SID, cwd: OUTSIDE[0], ...o });
+  await writeFile(
+    join(claude, "projects", "-vault", `${OUTSIDE_SID}.jsonl`),
+    [vl({ type: "user", uuid: "v1", timestamp: "2026-01-02T10:00:00Z", message: { content: "tidy the vault" } }), vl({ type: "assistant", uuid: "v2", timestamp: "2026-01-02T10:01:00Z", message: { id: "vm1", model: "claude", content: [{ type: "text", text: "Done." }] } })].join("\n") + "\n",
+  );
   ({ app } = await import("../src/index"));
   const { indexSessions } = await import("../src/db/index");
   const { listProjects } = await import("../src/scan/projects");
@@ -103,6 +124,40 @@ describe("secrets never leave the server", () => {
       for (const s of SECRETS) expect(body).not.toContain(s);
     });
   }
+});
+
+describe("folders outside the project folders are never looked at (#39)", () => {
+  test("a conversation's folder and a ~/.claude.json project outside them are neither listed nor read", async () => {
+    const touched: string[] = [];
+    const record = (p: unknown) => touched.push(String(p instanceof URL ? p.pathname : p));
+    const wrap = <T extends object>(obj: T, key: keyof T) => {
+      const orig = (obj as any)[key].bind(obj);
+      return spyOn(obj as any, key as any).mockImplementation(((p: any, ...a: any[]) => (record(p), orig(p, ...a))) as any);
+    };
+    const origSpawn = Bun.spawn;
+    const spies = [
+      ...(["stat", "lstat", "readdir", "readFile", "access", "opendir", "realpath"] as const).map((k) => wrap(fsp, k)),
+      wrap(Bun, "file"),
+      spyOn(Bun, "spawn").mockImplementation(((cmd: any, o: any) => (record(o?.cwd ?? ""), (origSpawn as any)(cmd, o))) as any),
+    ];
+    try {
+      const { listProjects } = await import("../src/scan/projects");
+      await listProjects();
+      for (const ep of ["/api/projects", "/api/catalog", "/api/library", "/api/map", "/api/overview", "/api/suggested", "/api/menu", "/api/search?q=outside", "/api/sessions?empty=1"]) expect((await request(ep)).status).toBe(200);
+    } finally {
+      for (const s of spies) s.mockRestore();
+    }
+    expect(touched.filter((p) => OUTSIDE.some((d) => p === d || p.startsWith(d + sep)))).toEqual([]);
+    expect(touched.length).toBeGreaterThan(0);
+
+    const projects = await (await request("/api/projects")).json();
+    expect(projects.map((p: any) => p.id)).toEqual(["~/projects/demo"]);
+    const cat = await (await request("/api/catalog")).json();
+    expect(cat.items.some((i: any) => /outside/.test(i.name))).toBe(false);
+    // The conversation itself still shows on Sessions, with its folder and no project.
+    const s = (await (await request("/api/sessions?empty=1")).json()).find((x: any) => x.sessionId === OUTSIDE_SID);
+    expect(s).toMatchObject({ cwd: "~/Documents/vault", project: null });
+  });
 });
 
 describe("plans and their conversations", () => {

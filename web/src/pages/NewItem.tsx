@@ -154,7 +154,7 @@ export function NewItemPage() {
 
   const scopes = [
     ...(spec.projectOnly ? [] : [{ value: "global", label: "All projects" }]),
-    ...(projects.data ?? []).filter((p) => p.group === "root").map((p) => ({ value: p.id, label: p.name })),
+    ...(projects.data ?? []).map((p) => ({ value: p.id, label: p.name })),
   ];
   const nameOk = !spec.name || /^[a-z0-9]+(-[a-z0-9]+)*$/.test(name);
   const ready = !!scope && nameOk && (!spec.name || !!name) && (!spec.description?.required || !!description.trim()) && (kind === "skill" || kind === "command" || kind === "agent" || kind === "output-style" || !!body.trim());

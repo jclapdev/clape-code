@@ -85,7 +85,7 @@ function Group({ id, label, to, onPick, children }: { id: string; label: string;
 
 function useProjects() {
   const q = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
-  return (q.data ?? []).filter((p) => p.group === "root");
+  return q.data ?? [];
 }
 
 function useNeeds() {

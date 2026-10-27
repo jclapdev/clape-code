@@ -24,7 +24,7 @@ function ProjectOverview() {
   const q = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
-  const mine = (q.data ?? []).filter((p) => p.group === "root");
+  const mine = q.data ?? [];
   return (
     <div className={`${PAGE_COLUMN} py-6`}>
       <h1 className="text-[24px] font-semibold tracking-[-0.01em]">Projects</h1>

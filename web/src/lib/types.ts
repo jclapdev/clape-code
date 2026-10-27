@@ -11,7 +11,6 @@ export interface Project {
   id: string;
   name: string;
   path: string;
-  group: "root" | "other";
   empty: boolean;
   hasClaudeDir: boolean;
   isPlugin: boolean;

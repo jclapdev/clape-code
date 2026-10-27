@@ -1,11 +1,11 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, sep } from "node:path";
 import { getConfig } from "../config";
-import { listSessions, type IndexedSession } from "../db/index";
-import { claudeJson, home, isInside, tildify, untildify } from "../fs/paths";
+import { listSessions } from "../db/index";
+import { isInside, tildify, untildify } from "../fs/paths";
 import { setProjectDirs } from "../fs/policy";
 import { countBacklog } from "../parsers/backlog";
-import { isDir, ls, readJson } from "./md";
+import { isDir, ls } from "./md";
 
 export interface GitInfo {
   branch: string | null;
@@ -18,7 +18,6 @@ export interface ProjectSummary {
   id: string; // tildified path, stable and readable
   name: string;
   path: string;
-  group: "root" | "other";
   empty: boolean;
   hasClaudeDir: boolean;
   isPlugin: boolean;
@@ -80,43 +79,36 @@ async function backlogCounts(dir: string, entries: string[]) {
   return countBacklog(await read("BACKLOG.md"), await read(handoffName(entries)));
 }
 
-export async function discoverProjectDirs(sessions: IndexedSession[]): Promise<{ dir: string; group: "root" | "other" }[]> {
+/**
+ * The folders inside the Project folders set in Preferences. No other folder on the computer is looked at (BRIEF.md
+ * won't-do, S10): folders named in transcripts or ~/.claude.json set off macOS prompts for Documents, iCloud Drive
+ * and Mail.
+ */
+export async function discoverProjectDirs(): Promise<string[]> {
   const cfg = await getConfig();
-  const out = new Map<string, "root" | "other">();
+  const out: string[] = [];
   for (const r of cfg.projectRoots.map(untildify)) {
     for (const n of await ls(r)) {
       const p = join(r, n);
-      if (await isDir(p)) out.set(p, "root");
+      if (!out.includes(p) && (await isDir(p))) out.push(p);
     }
   }
-  const roots = cfg.projectRoots.map(untildify);
-  const others = new Set<string>();
-  for (const s of sessions) if (s.cwd) others.add(projectPathOf(s.cwd));
-  const cj = await readJson<{ projects?: Record<string, unknown> }>(claudeJson());
-  for (const p of Object.keys(cj?.projects ?? {})) others.add(projectPathOf(p));
-  for (const p of others) {
-    if (out.has(p) || p === home() || roots.some((r) => p === r)) continue;
-    // Folders inside a known project are part of it, not projects of their own.
-    if ([...out.keys()].some((k) => isInside(p, k))) continue;
-    if (await isDir(p)) out.set(p, "other");
-  }
-  return [...out].map(([dir, group]) => ({ dir, group }));
+  return out;
 }
 
 export async function listProjects(): Promise<ProjectSummary[]> {
   const sessions = listSessions();
-  const dirs = await discoverProjectDirs(sessions);
-  setProjectDirs(dirs.map((d) => d.dir));
+  const dirs = await discoverProjectDirs();
+  setProjectDirs(dirs);
 
   return Promise.all(
-    dirs.map(async ({ dir, group }) => {
+    dirs.map(async (dir) => {
       const entries = await readdir(dir).catch(() => [] as string[]);
       const mine = sessions.filter((s) => s.cwd && isInside(projectPathOf(s.cwd), dir));
       return {
         id: tildify(dir),
         name: basename(dir),
         path: tildify(dir),
-        group,
         empty: entries.filter((e) => e !== ".DS_Store").length === 0,
         hasClaudeDir: entries.includes(".claude"),
         isPlugin: entries.includes(".claude-plugin"),
@@ -128,13 +120,12 @@ export async function listProjects(): Promise<ProjectSummary[]> {
       } satisfies ProjectSummary;
     }),
   ).then((list) =>
-    list.sort((a, b) => (a.group === b.group ? (b.lastSessionAt ?? "").localeCompare(a.lastSessionAt ?? "") || a.name.localeCompare(b.name) : a.group === "root" ? -1 : 1)),
+    list.sort((a, b) => (b.lastSessionAt ?? "").localeCompare(a.lastSessionAt ?? "") || a.name.localeCompare(b.name)),
   );
 }
 
 /** Resolve a project id from the browser to its folder, refusing anything not discovered. */
 export async function projectDir(id: string): Promise<string | null> {
-  const dirs = await discoverProjectDirs(listSessions());
   const abs = untildify(id);
-  return dirs.find((d) => d.dir === abs)?.dir ?? null;
+  return (await discoverProjectDirs()).find((d) => d === abs) ?? null;
 }

@@ -593,7 +593,7 @@ content.post("/keybindings/remove", async (c) => {
 // ---- Map and search ----
 
 content.get("/map", async (c) => {
-  const projects = (await listProjects()).filter((p) => p.group === "root" && !p.empty);
+  const projects = (await listProjects()).filter((p) => !p.empty);
   const groups = await buildMap(projects.map((p) => ({ id: p.id, name: p.name, dir: untildify(p.id) })));
   // Which settings file wins, highest first (command-line --settings is per launch and not on disk).
   const precedence = [

@@ -723,7 +723,7 @@ export function SettingsPage() {
     { id: "shortcuts", title: "Keyboard shortcuts", node: <Shortcuts view={view.data.keybindings} /> },
     { id: "themes", title: "Themes", node: <Themes ctx={ctx} themes={view.data.themes} /> },
   ];
-  const projectOptions = (projects.data ?? []).filter((p) => p.group === "root" && !p.empty);
+  const projectOptions = (projects.data ?? []).filter((p) => !p.empty);
 
   return (
     <Page title="Settings">

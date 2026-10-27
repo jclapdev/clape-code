@@ -109,7 +109,7 @@ export function PreferencesPage() {
         </Card>
 
         <Card title="Project folders">
-          <p className="text-[13px] text-muted-foreground">Each folder inside these is listed as a project. Folders where you've run Claude elsewhere are found automatically.</p>
+          <p className="text-[13px] text-muted-foreground">Each folder inside these is listed as a project.</p>
           <Textarea rows={3} value={roots} onChange={(e) => setRoots(e.target.value)} aria-label="Project folders, one per line" className="font-mono text-[13px]" />
           <div>
             <Button variant="default" busy={saveRoots.isPending} onClick={() => saveRoots.mutate()}>

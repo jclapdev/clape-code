@@ -89,7 +89,7 @@ const SKIP = new Set(["settings"]); // settings files have their own page
 
 export async function catalog(): Promise<Catalog> {
   const { items: globalItems, plugins } = await globalLibrary();
-  const projects = (await listProjects()).filter((p) => p.group === "root");
+  const projects = await listProjects();
   const dirs = projects.map((p) => ({ id: p.id, name: p.name, dir: untildify(p.id) }));
   const encOf = (dir: string) => dir.replace(/[^A-Za-z0-9]/g, "-");
   const tag = (i: LibraryItem, project: { id: string; name: string } | null): CatalogItem => ({ ...i, projectId: project?.id ?? null, projectName: project?.name ?? null });

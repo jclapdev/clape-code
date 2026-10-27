@@ -1,6 +1,5 @@
 // Prompts typed often enough to be worth a skill, counted from ~/.claude/history.jsonl.
 import { basename, join } from "node:path";
-import { listSessions } from "../db/index";
 import { readLines } from "../fs/lines";
 import { claudeDir } from "../fs/paths";
 import { globalLibrary, projectLibrary } from "./library";
@@ -49,8 +48,8 @@ export function countPrompts(displays: string[], skillNames: Set<string>): Sugge
 
 /** Folder names of your skills in ~/.claude and in every project, the names a new skill can't reuse. */
 async function skillNames(): Promise<Set<string>> {
-  const dirs = await discoverProjectDirs(listSessions());
-  const items = [...(await globalLibrary()).items, ...(await Promise.all(dirs.map((d) => projectLibrary(d.dir)))).flat()];
+  const dirs = await discoverProjectDirs();
+  const items = [...(await globalLibrary()).items, ...(await Promise.all(dirs.map((d) => projectLibrary(d)))).flat()];
   return new Set(items.filter((i) => i.kind === "skill" && i.source !== "plugin").map((i) => (i.folder ? basename(i.folder) : i.name)));
 }
 

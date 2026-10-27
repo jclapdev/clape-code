@@ -50,6 +50,7 @@ Notable changes to Control Center, newest first.
 
 ### Changed
 
+- Control Center reads only `~/.claude` and the folders inside your Project folders. Folders where a conversation ran or that `~/.claude.json` names, such as Documents, Desktop, Mail or iCloud Drive, are no longer looked at, so macOS stops asking for access to them. Their conversations still show on Sessions.
 - Every page's content starts at the same left edge and has the same width, including Projects and pages that scroll.
 - Cards on Projects, a project's "Build your setup", Customize and Guides are all the same height.
 - Every conversation has one page, at /sessions/<session id>: the whole conversation with tool calls folded into one line, Claude's approvals and questions as cards where it stopped, and a reply box at the bottom with the model and permission mode under it. Pressing Enter sends, whether Claude is working, finished, or the session was started in a terminal; Stop sits next to the box. "Show details" unfolds tool calls and thinking. "Copy command for the terminal", subagent runs, Archive and Delete are in the page's menu. The header names the conversation, its project and whether Claude is working, waiting for you or done. Old /live/<id>, /live?resume=<id> and /jobs/<id> links open this page.
