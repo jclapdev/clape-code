@@ -7,7 +7,8 @@ import { ArrowRight, ChevronDown, Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { api, enc } from "@/lib/api";
 import { plural, when } from "@/lib/format";
-import type { Catalog, LibraryItem, Project, ProjectDetail } from "@/lib/types";
+import type { Catalog, CatalogItem, LibraryItem, Project, ProjectDetail } from "@/lib/types";
+import { keyOf } from "./Feature";
 import { featureById, type Feature, type FeatureId } from "@/lib/features";
 import { ProjectBoard } from "./ProjectBoard";
 import { ContextDropZone, ContextSection } from "./ProjectContext";
@@ -337,6 +338,32 @@ function BuildCards({ p }: { p: ProjectDetail }) {
   );
 }
 
+const SHARED_TAG: Partial<Record<CatalogItem["kind"], string>> = { "claude-md": "Instructions", rule: "Rule", plugin: "Plugin" };
+const SHARED_FEATURE: Partial<Record<CatalogItem["kind"], FeatureId>> = { "claude-md": "instructions", rule: "instructions", plugin: "plugins" };
+
+/** Your instructions and rules for every project, and the plugins turned on here, each linking to its own page. */
+function SharedItems({ p }: { p: ProjectDetail }) {
+  const cat = useQuery({ queryKey: ["catalog"], queryFn: () => api.get<Catalog>("/catalog") });
+  if (cat.isLoading) return <Loading />;
+  const on = new Set(p.pluginsOn);
+  const items = (cat.data?.items ?? [])
+    .filter((i) => (i.projectId === null && i.source === "user" && (i.kind === "claude-md" || i.kind === "rule")) || (i.kind === "plugin" && !!i.overrideKey && on.has(i.overrideKey)))
+    .sort((a, b) => Number(a.kind === "plugin") - Number(b.kind === "plugin") || Number(a.kind === "rule") - Number(b.kind === "rule") || a.name.localeCompare(b.name));
+  if (!items.length) return <p className="text-[13.5px] text-muted-foreground">None.</p>;
+  return (
+    <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
+      {items.map((i) => (
+        <li key={keyOf(i)}>
+          <Link to={`/${SHARED_FEATURE[i.kind]}` as "/skills"} search={{ item: keyOf(i) } as never} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-ink no-underline hover:bg-sunken">
+            <span className="min-w-0 break-words font-medium">{i.name}</span>
+            <Tag>{SHARED_TAG[i.kind]}</Tag>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function WorktreeInclude({ p }: { p: ProjectDetail }) {
   const w = p.worktreeInclude;
   if (!w.exists)
@@ -399,6 +426,9 @@ function ProjectDetailView({ id }: { id: string }) {
         </Section>
         <Section id="customize" title="Build your setup">
           <BuildCards p={p} />
+        </Section>
+        <Section id="shared" title="Shared instructions and plugins">
+          <SharedItems p={p} />
         </Section>
         <Section id="sessions" title="Recent sessions">
           <SessionRows p={p} />

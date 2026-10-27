@@ -5,7 +5,9 @@ import { archiveDir, statePath } from "./paths";
 import { canWrite, classify } from "./policy";
 import { backup, exists, WriteError } from "./safeWrite";
 
-export type ArchiveKind = "agent" | "skill" | "command" | "plan" | "memory" | "rule" | "output-style" | "workflow" | "scheduled-task" | "plugin" | "file";
+export type ArchiveKind = "agent" | "skill" | "command" | "plan" | "memory" | "rule" | "output-style" | "workflow" | "scheduled-task" | "plugin" | "file" | EntryKind;
+/** Archived items that are an entry inside a settings file, not a file of their own. */
+export type EntryKind = "hook" | "mcp";
 
 export interface ArchiveRecord {
   id: string;
@@ -40,6 +42,40 @@ export async function archiveItem(abs: string, kind: ArchiveKind): Promise<Archi
   return rec;
 }
 
+const entryOf = (id: string) => join(archiveDir(), id, "entry.json");
+
+/**
+ * Keep a removed settings entry (a hook, an MCP server) so it can be put back. The entry itself goes in its own
+ * file, readable only by you, since a server's environment or headers can hold keys; the record the browser sees
+ * has only its name and the file it was in.
+ */
+export async function archiveEntry(kind: EntryKind, name: string, originalPath: string, entry: unknown): Promise<ArchiveRecord> {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const rec: ArchiveRecord = { id, kind, name, originalPath, archivedAt: new Date().toISOString() };
+  await mkdir(join(archiveDir(), id), { recursive: true });
+  await writeFile(entryOf(id), JSON.stringify(entry, null, 2), { mode: 0o600 });
+  await writeFile(manifestOf(id), JSON.stringify(rec, null, 2));
+  return rec;
+}
+
+/** An archived item's record, and its kept entry when it's a hook or MCP server. */
+export async function readArchived(id: string): Promise<{ rec: ArchiveRecord; entry: any }> {
+  if (!/^[\w-]+$/.test(id)) throw new WriteError(400, "That isn't a valid archived item.");
+  let rec: ArchiveRecord;
+  try {
+    rec = JSON.parse(await readFile(manifestOf(id), "utf8"));
+  } catch {
+    throw new WriteError(404, "No archived item with that id.");
+  }
+  if (rec.kind !== "hook" && rec.kind !== "mcp") return { rec, entry: null };
+  return { rec, entry: JSON.parse(await readFile(entryOf(id), "utf8")) };
+}
+
+/** Forget an archived entry once it's been put back. */
+export async function dropArchived(id: string) {
+  await rm(join(archiveDir(), id), { recursive: true, force: true });
+}
+
 export async function listArchive(): Promise<ArchiveRecord[]> {
   let ids: string[] = [];
   try {
@@ -59,18 +95,12 @@ export async function listArchive(): Promise<ArchiveRecord[]> {
 }
 
 export async function restoreItem(id: string): Promise<ArchiveRecord> {
-  if (!/^[\w-]+$/.test(id)) throw new WriteError(400, "That isn't a valid archived item.");
-  let rec: ArchiveRecord;
-  try {
-    rec = JSON.parse(await readFile(manifestOf(id), "utf8"));
-  } catch {
-    throw new WriteError(404, "No archived item with that id.");
-  }
+  const { rec } = await readArchived(id);
   if (await exists(rec.originalPath)) {
     throw new WriteError(409, "Something already exists where this item came from. Move it first.");
   }
   await move(join(archiveDir(), id, "item", rec.name), rec.originalPath);
-  await rm(join(archiveDir(), id), { recursive: true, force: true });
+  await dropArchived(id);
   return rec;
 }
 

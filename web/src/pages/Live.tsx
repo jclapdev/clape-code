@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { api } from "@/lib/api";
 import type { LiveSession } from "@/lib/types";
 import { ErrorNote, Loading } from "@/components/ui";
+import { PAGE_COLUMN, PAGE_SCROLL } from "@/components/Panes";
 
 /** Old /live/<id> links: the conversation page for that live session's session ID. */
 function LiveRedirect({ id }: { id: string }) {
@@ -15,8 +16,8 @@ function LiveRedirect({ id }: { id: string }) {
   }, [sid, navigate]);
   if (q.error)
     return (
-      <div className="flex flex-col gap-3 px-6 py-8 md:pl-12">
-        <ErrorNote error={q.error} />
+      <div className={`${PAGE_COLUMN} flex flex-col items-start gap-3 py-6`}>
+        <ErrorNote error={q.error} className="w-full" />
         <Link to="/sessions" search={{}}>
           Sessions
         </Link>
@@ -28,7 +29,7 @@ function LiveRedirect({ id }: { id: string }) {
 export function LivePage() {
   const { id } = useParams({ strict: false }) as { id: string };
   return (
-    <div className="h-full overflow-auto">
+    <div className={PAGE_SCROLL}>
       <LiveRedirect key={id} id={id} />
     </div>
   );

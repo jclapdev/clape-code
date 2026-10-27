@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { removeHook } from "../src/api/content";
+import { putHookBack, removeHook } from "../src/api/content";
 import { workflowMeta } from "../src/scan/catalog";
 
 describe("workflow meta", () => {
@@ -54,5 +54,27 @@ describe("removing a hook", () => {
     expect(() => removeHook(settings(), "PostToolUse", 0, 5)).toThrow(/already changed/);
     expect(() => removeHook(settings(), "SessionStart", 0, 0)).toThrow(/already changed/);
     expect(() => removeHook({}, "Stop", 0, 0)).toThrow(/already changed/);
+  });
+});
+
+describe("putting a hook back", () => {
+  test("joins the group with the same matcher, or makes a new one", () => {
+    const o: any = { hooks: { PostToolUse: [{ matcher: "Edit", hooks: [{ type: "command", command: "a" }] }] } };
+    putHookBack(o, { event: "PostToolUse", group: { matcher: "Edit" }, hook: { type: "command", command: "b" } });
+    expect(o.hooks.PostToolUse).toEqual([{ matcher: "Edit", hooks: [{ type: "command", command: "a" }, { type: "command", command: "b" }] }]);
+    putHookBack(o, { event: "Stop", group: {}, hook: { type: "command", command: "c" } });
+    expect(o.hooks.Stop).toEqual([{ hooks: [{ type: "command", command: "c" }] }]);
+  });
+  test("round-trips with removeHook", () => {
+    const o: any = { model: "opus", hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "x", timeout: 5 }] }] } };
+    const copy = structuredClone(o);
+    const kept = removeHook(o, "PreToolUse", 0, 0);
+    expect(o).toEqual({ model: "opus" });
+    putHookBack(o, kept);
+    expect(o).toEqual(copy);
+  });
+  test("refuses a hook that's already there", () => {
+    const o: any = { hooks: { Stop: [{ hooks: [{ type: "command", command: "c" }] }] } };
+    expect(() => putHookBack(o, { event: "Stop", group: {}, hook: { type: "command", command: "c" } })).toThrow(/already there/);
   });
 });

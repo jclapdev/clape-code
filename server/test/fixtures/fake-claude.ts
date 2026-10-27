@@ -1,6 +1,6 @@
 // Stands in for `claude auth …` in tests, printing what Claude Code 2.1.304 printed on John's computer.
 // FAKE_CLAUDE_LOG gets one line per call: args | cwd | CLAUDE_CONFIG_DIR.
-import { appendFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 const args = process.argv.slice(2);
@@ -61,6 +61,32 @@ if (args[0] === "auth" && args[1] === "login") {
 if (args[0] === "auth" && args[1] === "logout") {
   writeFileSync(loggedOutFlag, "");
   console.log("Successfully logged out from your Anthropic account.");
+  process.exit(0);
+}
+
+// `claude mcp remove|add-json <name> … --scope user|project`: edits FAKE_CLAUDE_JSON (user) or ./.mcp.json (project).
+if (args[0] === "mcp" && (args[1] === "remove" || args[1] === "add-json")) {
+  const scope = args[args.indexOf("--scope") + 1];
+  const file = scope === "project" ? join(process.cwd(), ".mcp.json") : process.env.FAKE_CLAUDE_JSON!;
+  const o = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
+  o.mcpServers ??= {};
+  const name = args[2];
+  if (args[1] === "remove") {
+    if (!o.mcpServers[name]) {
+      console.error(`No ${scope}-scoped MCP server found with name: ${name}`);
+      process.exit(1);
+    }
+    delete o.mcpServers[name];
+    console.log(`Removed MCP server ${name} from ${scope} config`);
+  } else {
+    if (o.mcpServers[name]) {
+      console.error(`MCP server ${name} already exists in ${scope} config`);
+      process.exit(1);
+    }
+    o.mcpServers[name] = JSON.parse(args[3]);
+    console.log(`Added stdio MCP server ${name} to ${scope} config`);
+  }
+  writeFileSync(file, JSON.stringify(o, null, 2));
   process.exit(0);
 }
 

@@ -2,9 +2,9 @@ import { Hono } from "hono";
 import { cp, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { archiveItem, listArchive, restoreItem, trashItem, type ArchiveKind } from "../fs/archive";
+import { archiveEntry, archiveItem, dropArchived, listArchive, readArchived, restoreItem, trashItem, type ArchiveKind } from "../fs/archive";
 import { emit } from "../events";
-import { claudeDir, isInside, tildify, untildify } from "../fs/paths";
+import { claudeDir, claudeJson, isInside, tildify, untildify } from "../fs/paths";
 import { canRead, classify } from "../fs/policy";
 import { readWithHash, safeWrite, WriteError } from "../fs/safeWrite";
 import { addEntry, isKeepAChangelog, parseChangelog } from "../parsers/changelog";
@@ -12,12 +12,12 @@ import { effective, type Source } from "../parsers/settings";
 import { applySettingsChange, redactEnv, removeKeybinding, setKeybinding, type SettingsChange } from "../parsers/settingsEdit";
 import { KEY_ACTIONS, KEY_CONTEXTS } from "../parsers/keybindingDocs";
 import { search as searchDocs, listSessions, untitled } from "../db/index";
-import { globalLibrary, listThemes, memoryItems, projectLibrary, readKeybindings, readWorktreeInclude } from "../scan/library";
+import { globalLibrary, listPlugins, listThemes, memoryItems, projectLibrary, readKeybindings, readWorktreeInclude } from "../scan/library";
 import { catalog } from "../scan/catalog";
 import { initArgs, initResult, marketplaceCounts, parseAvailable, parseMarketplaces, pluginArgs, pluginResult, searchAvailable, skillsDirPlugins, type Available } from "../scan/plugins";
 import { buildMap, managedSettingsPath } from "../scan/map";
 import { listProjects, projectDir, projectPathOf } from "../scan/projects";
-import { isDir, ls, readMd } from "../scan/md";
+import { isDir, ls, readJson, readMd } from "../scan/md";
 import type { Env } from "./env";
 import { boardOf, contextOf } from "./projectWork";
 import { findClaude, runClaude } from "../live/claude";
@@ -71,8 +71,21 @@ content.get("/projects/:id", async (c) => {
     worktreeInclude: await readWorktreeInclude(dir),
     worktrees,
     sessions,
+    pluginsOn: await pluginsOnIn(dir),
   });
 });
+
+/**
+ * The plugins turned on in a project: `enabledPlugins` from your settings, then the project's shared and local
+ * settings, each overriding the one before (the settings docs: "Settings precedence, highest first: managed
+ * settings, command line, project local, shared project, user").
+ */
+export async function pluginsOnIn(dir: string): Promise<string[]> {
+  const files = [join(claudeDir(), "settings.json"), join(dir, ".claude", "settings.json"), join(dir, ".claude", "settings.local.json")];
+  const enabled: Record<string, boolean> = {};
+  for (const f of files) Object.assign(enabled, (await readJson<{ enabledPlugins?: Record<string, boolean> }>(f))?.enabledPlugins ?? {});
+  return (await listPlugins(enabled)).filter((p) => p.enabled).map((p) => p.key);
+}
 
 /** Plans the project's sessions wrote, newest first, each with the session that wrote it. */
 async function projectPlans(sessions: ReturnType<typeof listSessions>) {
@@ -222,7 +235,15 @@ content.post("/library/delete", async (c) => {
 
 content.get("/archive", async (c) => c.json((await listArchive()).map((r) => ({ ...r, originalDisplay: tildify(r.originalPath) }))));
 content.post("/archive/:id/restore", async (c) => {
-  const rec = await restoreItem(c.req.param("id"));
+  const id = c.req.param("id");
+  const { rec, entry } = await readArchived(id);
+  if (rec.kind === "hook") {
+    await updateJson(rec.originalPath, (o) => putHookBack(o, entry));
+    await dropArchived(id);
+  } else if (rec.kind === "mcp") {
+    await putMcpBack(entry);
+    await dropArchived(id);
+  } else await restoreItem(id);
   emit({ area: "library" });
   emit({ area: "archive" });
   return c.json(rec);
@@ -611,35 +632,91 @@ content.get("/search", async (c) => {
 
 content.get("/catalog", async (c) => c.json(await catalog()));
 
-/** Removes one hook from a settings file, and its event entry when it was the last one. */
-export function removeHook(o: Record<string, any>, event: string, group: number, index: number) {
+/** A removed hook as Archived items keeps it: its event, its group's other fields (such as `matcher`) and the hook. */
+export interface KeptHook {
+  event: string;
+  group: Record<string, any>;
+  hook: Record<string, any>;
+}
+
+/** Removes one hook from a settings file, and its event entry when it was the last one. Returns what was removed. */
+export function removeHook(o: Record<string, any>, event: string, group: number, index: number): KeptHook {
   const groups = o.hooks?.[event];
   const g = Array.isArray(groups) ? groups[group] : null;
   if (!g || !Array.isArray(g.hooks) || !g.hooks[index]) throw new WriteError(409, "That hook has already changed. Reload and try again.");
-  g.hooks.splice(index, 1);
+  const { hooks: _, ...rest } = g;
+  const [hook] = g.hooks.splice(index, 1);
   if (!g.hooks.length) groups.splice(group, 1);
   if (!groups.length) delete o.hooks[event];
   if (!Object.keys(o.hooks).length) delete o.hooks;
+  return { event, group: rest, hook };
 }
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/** Puts a removed hook back: into a group with the same matcher when there is one, otherwise in a new group. */
+export function putHookBack(o: Record<string, any>, k: KeptHook) {
+  o.hooks ??= {};
+  o.hooks[k.event] ??= [];
+  const groups: any[] = o.hooks[k.event];
+  const g = groups.find((x) => x && Array.isArray(x.hooks) && same(Object.fromEntries(Object.entries(x).filter(([key]) => key !== "hooks")), k.group));
+  if (g?.hooks.some((h: unknown) => same(h, k.hook))) throw new WriteError(409, "That hook is already there.");
+  if (g) g.hooks.push(k.hook);
+  else groups.push({ ...k.group, hooks: [k.hook] });
+}
+
+const hookName = (k: KeptHook) => `${k.event}: ${k.hook.command ?? k.hook.prompt ?? k.hook.url ?? k.hook.type ?? "hook"}`;
 
 content.post("/hooks/remove", async (c) => {
   const { path, event, group, index } = await c.req.json();
   const abs = untildify(String(path ?? ""));
   if (!/settings(\.local)?\.json$/.test(abs)) throw new WriteError(400, "Hooks are removed from settings files only.");
-  const r = await updateJson(abs, (o) => removeHook(o, String(event), Number(group), Number(index)));
+  let kept: KeptHook | null = null;
+  const r = await updateJson(abs, (o) => {
+    kept = removeHook(o, String(event), Number(group), Number(index));
+  });
+  await archiveEntry("hook", hookName(kept!), abs, kept);
   emit({ area: "library" });
+  emit({ area: "archive" });
   return c.json(r);
 });
+
+/** A removed MCP server as Archived items keeps it: what `claude mcp add-json` needs to add it back. */
+interface KeptMcp {
+  name: string;
+  scope: "user" | "project" | "local";
+  cwd: string;
+  config: Record<string, any>;
+}
+
+/** Where Claude Code keeps a server of each scope (the MCP docs' scope table) and its definition there. */
+async function mcpDefinition(name: string, scope: KeptMcp["scope"], cwd: string) {
+  if (scope === "project") {
+    const file = join(cwd, ".mcp.json");
+    return { file, config: (await readJson<{ mcpServers?: Record<string, any> }>(file))?.mcpServers?.[name] };
+  }
+  const cj = (await readJson<{ mcpServers?: Record<string, any>; projects?: Record<string, { mcpServers?: Record<string, any> }> }>(claudeJson())) ?? {};
+  return { file: claudeJson(), config: scope === "user" ? cj.mcpServers?.[name] : cj.projects?.[cwd]?.mcpServers?.[name] };
+}
+
+async function putMcpBack(k: KeptMcp) {
+  if (!(await isDir(k.cwd))) throw new WriteError(409, `${tildify(k.cwd)} isn't there any more, so the server can't be added back to it.`);
+  const r = await runClaude(["mcp", "add-json", k.name, JSON.stringify(k.config), "--scope", k.scope], k.cwd);
+  if (r.code !== 0) throw new WriteError(400, (r.err || r.out).trim().split("\n")[0] || "Claude Code couldn't add the server back.");
+}
 
 content.post("/mcp/remove", async (c) => {
   const { name, scope, project } = await c.req.json();
   if (!/^[\w.-]+$/.test(String(name ?? ""))) throw new WriteError(400, "That server name isn't valid.");
   if (!["user", "project", "local"].includes(scope)) throw new WriteError(400, "Servers from a plugin are removed with the plugin.");
   const cwd = scope === "user" ? claudeDir() : await requireProject(String(project ?? ""));
+  const { file, config } = await mcpDefinition(String(name), scope, cwd);
   const r = await runClaude(["mcp", "remove", String(name), "--scope", scope], cwd);
   if (r.code !== 0) throw new WriteError(400, (r.err || r.out).trim().split("\n")[0] || "Claude Code couldn't remove the server.");
+  if (config) await archiveEntry("mcp", String(name), file, { name: String(name), scope, cwd, config } satisfies KeptMcp);
   emit({ area: "library" });
-  return c.json({ ok: true });
+  emit({ area: "archive" });
+  return c.json({ ok: true, archived: !!config });
 });
 
 // ---- Plugins, through Claude Code's own plugin commands ----

@@ -832,3 +832,54 @@ describe("page security policy", () => {
     expect(PAGE_CSP).toContain("connect-src 'self'");
   });
 });
+
+describe("deleted hooks and MCP servers go to Archived items (#88)", () => {
+  const post = (path: string, body?: unknown) => request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
+  const json = async (f: string) => JSON.parse(await readFile(f, "utf8"));
+  const archive = async () => (await (await request("/api/archive")).json()) as { id: string; kind: string; name: string; originalDisplay: string }[];
+
+  test("a removed hook is listed and goes back into its group", async () => {
+    const file = join(root, ".claude", "settings.json");
+    const before = await json(file);
+    const group = before.hooks.PreToolUse.findIndex((g: any) => g.matcher === "Bash");
+    const hook = before.hooks.PreToolUse[group].hooks[0];
+    expect((await post("/api/hooks/remove", { path: file, event: "PreToolUse", group, index: 0 })).status).toBe(200);
+    expect((await json(file)).hooks.PreToolUse.some((g: any) => g.matcher === "Bash")).toBe(false);
+    const rec = (await archive()).find((r) => r.kind === "hook")!;
+    expect(rec.name).toBe(`PreToolUse: ${hook.command}`);
+    expect(rec.originalDisplay).toBe("~/.claude/settings.json");
+    expect((await post(`/api/archive/${rec.id}/restore`)).status).toBe(200);
+    const after = await json(file);
+    expect(after.hooks.PreToolUse.find((g: any) => g.matcher === "Bash")).toEqual({ matcher: "Bash", hooks: [hook] });
+    expect((await archive()).some((r) => r.id === rec.id)).toBe(false);
+  });
+
+  test("a removed MCP server is added back with claude mcp add-json, and its environment never reaches the browser", async () => {
+    const cj = join(root, ".claude.json");
+    process.env.FAKE_CLAUDE_JSON = cj;
+    const server = { type: "stdio", command: "npx", args: ["-y", "docs-mcp"], env: { DOCS_KEY: "mcp-env-secret" } };
+    await writeFile(cj, JSON.stringify({ ...(await json(cj)), mcpServers: { docs: server } }));
+    const r = await post("/api/mcp/remove", { name: "docs", scope: "user" });
+    expect(await r.json()).toEqual({ ok: true, archived: true });
+    expect((await json(cj)).mcpServers.docs).toBeUndefined();
+    const list = await (await request("/api/archive")).text();
+    expect(list).not.toContain("mcp-env-secret");
+    const rec = (await archive()).find((x) => x.kind === "mcp")!;
+    expect(rec.name).toBe("docs");
+    expect((await post(`/api/archive/${rec.id}/restore`)).status).toBe(200);
+    expect((await json(cj)).mcpServers.docs).toEqual(server);
+    const calls = await readFile(join(root, "claude-calls.log"), "utf8");
+    expect(calls).toContain(`mcp add-json docs ${JSON.stringify(server)} --scope user`);
+  });
+
+  test("putting a server back that exists again shows Claude Code's message and keeps the archived copy", async () => {
+    const cj = join(root, ".claude.json");
+    await post("/api/mcp/remove", { name: "docs", scope: "user" });
+    const rec = (await archive()).find((x) => x.kind === "mcp")!;
+    await writeFile(cj, JSON.stringify({ ...(await json(cj)), mcpServers: { docs: { command: "other" } } }));
+    const res = await post(`/api/archive/${rec.id}/restore`);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("already exists");
+    expect((await archive()).some((r) => r.id === rec.id)).toBe(true);
+  });
+});

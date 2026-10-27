@@ -113,6 +113,7 @@ export interface ProjectDetail extends Omit<Project, "sessions" | "backlog" | "d
   worktreeInclude: { path: string; display: string; exists: boolean; access: string; patterns: string[] };
   worktrees: { name: string; path: string }[];
   sessions: (Session & { worktree: boolean })[];
+  pluginsOn: string[]; // ids of the plugins turned on in this project
 }
 
 /** ~/.claude/keybindings.json, as GET /settings returns it. A null action unbinds a default shortcut. */

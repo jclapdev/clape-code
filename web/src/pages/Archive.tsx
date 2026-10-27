@@ -17,6 +17,8 @@ const KIND_LABEL: Record<string, [string, string]> = {
   workflow: ["Workflow", "Workflows"],
   "scheduled-task": ["Scheduled task", "Scheduled tasks"],
   plugin: ["Plugin", "Plugins"],
+  hook: ["Hook", "Hooks"],
+  mcp: ["MCP server", "MCP servers"],
 };
 
 interface Rec {

@@ -38,9 +38,23 @@ interface Row {
   item: CatalogItem | null;
   projectId: string | null;
   command?: string; // what you type to run it, for the Slash commands page
+  tag?: string; // shown instead of where the item applies
 }
 
-const keyOf = (i: Pick<CatalogItem, "kind" | "path" | "name" | "projectId" | "meta">) => [i.kind, i.path, i.name, i.projectId ?? "", i.meta?.group ?? "", i.meta?.index ?? ""].join("|");
+/**
+ * Claude Code's built-in subagents, each with its description quoted from https://code.claude.com/docs/en/sub-agents.md
+ * ("Built-in subagents"): the first line under each name, and the "When Claude uses it" column for the others.
+ */
+export const BUILT_IN_AGENTS: { name: string; description: string }[] = [
+  { name: "Explore", description: "A fast, read-only agent optimized for searching and analyzing codebases." },
+  { name: "Plan", description: "A research agent used during plan mode to gather context before presenting a plan." },
+  { name: "General-purpose", description: "A capable agent for complex, multi-step tasks that require both exploration and action." },
+  { name: "claude", description: "When a task doesn't fit a more specialized agent. A catch-all with every tool available to subagents." },
+  { name: "statusline-setup", description: "When you run /statusline to configure your status line" },
+  { name: "claude-code-guide", description: "When you ask questions about Claude Code features" },
+];
+
+export const keyOf = (i: Pick<CatalogItem, "kind" | "path" | "name" | "projectId" | "meta">) => [i.kind, i.path, i.name, i.projectId ?? "", i.meta?.group ?? "", i.meta?.index ?? ""].join("|");
 const baseName = (i: CatalogItem) => (i.folder ? i.folder.split(/[\\/]/).filter(Boolean).pop()! : i.name).replace(/\.md$/, "");
 const slashOf = (i: CatalogItem) => (i.kind === "workflow" ? String(i.meta?.command ?? `/${i.name}`) : `/${i.source === "plugin" ? `${i.sourceName}:` : ""}${baseName(i)}`);
 
@@ -70,7 +84,13 @@ const COMMAND_KINDS: CatalogItem["kind"][] = ["skill", "command", "workflow"];
 /** The rows for one feature. Slash commands mixes your own commands with Claude Code's built-in ones. */
 function rowsFor(f: Feature, items: CatalogItem[], live: SlashCommand[] | undefined): { rows: Row[]; builtIn: number } {
   if (f.id !== "commands") {
-    return { rows: items.filter((i) => f.kinds.includes(i.kind)).map((i) => ({ key: keyOf(i), name: i.name, description: i.description, item: i, projectId: i.projectId })), builtIn: 0 };
+    const rows: Row[] = items.filter((i) => f.kinds.includes(i.kind)).map((i) => ({ key: keyOf(i), name: i.name, description: i.description, item: i, projectId: i.projectId }));
+    if (f.id === "agents") {
+      // The docs: "A user or project subagent named `Explore` overrides the built-in", so yours for every project hides it.
+      const yours = new Set(rows.filter((r) => !r.projectId && r.item?.source === "user").map((r) => r.name.toLowerCase()));
+      for (const a of BUILT_IN_AGENTS) if (!yours.has(a.name.toLowerCase())) rows.push({ key: `builtin-agent|${a.name}`, name: a.name, description: a.description, item: null, projectId: null, tag: "Built in" });
+    }
+    return { rows, builtIn: 0 };
   }
   const custom = items.filter((i) => COMMAND_KINDS.includes(i.kind));
   const rows: Row[] = custom.map((i) => ({ key: keyOf(i), name: slashOf(i), description: i.description, item: i, projectId: i.projectId, command: slashOf(i) }));
@@ -86,7 +106,7 @@ function matches(r: Row, q: string, project: string) {
   if (project === "global" && r.projectId) return false;
   if (project && project !== "global" && r.projectId !== project) return false;
   if (!q) return true;
-  const hay = `${r.name} ${r.description} ${whereLabel(r.item)} ${agentLabel(r.item) ?? ""} ${onlyYou(r.item) ? "only you" : ""}`.toLowerCase();
+  const hay = `${r.name} ${r.description} ${r.tag ?? whereLabel(r.item)} ${agentLabel(r.item) ?? ""} ${onlyYou(r.item) ? "only you" : ""}`.toLowerCase();
   return q
     .toLowerCase()
     .split(/\s+/)
@@ -98,7 +118,7 @@ function RowTags({ r, f }: { r: Row; f: Feature }) {
   const i = r.item;
   return (
     <>
-      <Tag tone={i ? "muted" : "accent"}>{whereLabel(i)}</Tag>
+      <Tag tone={i ? "muted" : "accent"}>{r.tag ?? whereLabel(i)}</Tag>
       {agentLabel(i) && <Tag>{agentLabel(i)}</Tag>}
       {onlyYou(i) && <Tag>Only you</Tag>}
       {i?.kind === "plugin" && <Tag className="max-w-full break-all">{isSkillsDirPlugin(i) ? "Your skills folder" : `From ${String(i.meta?.marketplace ?? i.sourceName)}`}</Tag>}

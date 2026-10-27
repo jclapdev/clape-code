@@ -79,7 +79,7 @@ export function Loading({ label = "Loading" }: { label?: string }) {
 
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <Empty className="items-start text-left md:pl-12">
+    <Empty className="items-start px-0 text-left">
       <EmptyHeader className="items-start text-left">
         <EmptyTitle>{title}</EmptyTitle>
         {children && <EmptyDescription>{children}</EmptyDescription>}
@@ -90,12 +90,12 @@ export function EmptyState({ title, children, action }: { title: string; childre
 }
 
 /** A failed request, in words, with a way to try again. */
-export function ErrorNote({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+export function ErrorNote({ error, onRetry, className = "m-4 w-auto" }: { error: unknown; onRetry?: () => void; className?: string }) {
   const qc = useQueryClient();
   if (!error) return null;
   const retry = onRetry ?? (() => void qc.refetchQueries({ type: "active" }));
   return (
-    <Alert variant="destructive" className="m-4 w-auto">
+    <Alert variant="destructive" className={className}>
       <AlertDescription className="flex flex-wrap items-center gap-3">
         <span className="flex-1">{(error as Error).message || "Something went wrong."}</span>
         <Button size="sm" variant="outline" onClick={retry}>

@@ -79,7 +79,8 @@ export function ItemActions({ i, scope, projectId, onDeleting, onDeleted }: { i:
     },
     onSuccess: (r) => {
       const said = (r as { message?: string } | undefined)?.message;
-      const msg = said || (how?.by === "archive" ? `Moved ${i.name} to Archived items.` : `Removed ${i.name}.`);
+      const kept = how?.by === "archive" || how?.by === "hook" || (how?.by === "mcp" && (r as { archived?: boolean } | undefined)?.archived);
+      const msg = said || (kept ? `Moved ${i.name} to Archived items.` : `Removed ${i.name}.`);
       toast.success(msg, msg.includes("Archived items") ? { action: { label: "Open Archived items", onClick: () => void navigate({ to: "/archive" }) } } : undefined);
       onDeleted?.();
       // The item's own file is gone; re-fetching it while its view closes would only fail.
@@ -105,8 +106,8 @@ export function ItemActions({ i, scope, projectId, onDeleting, onDeleted }: { i:
   if (!canState && !canDelete && !canCheck && !note) return null;
 
   const ask = () => {
-    if (how?.by === "hook") return { body: `It's taken out of ${i.display}. The previous version of that file is kept as a backup.`, confirm: "Delete" };
-    if (how?.by === "mcp") return { body: "Claude Code removes it from its settings. You can add it again later with Add server.", confirm: "Remove" };
+    if (how?.by === "hook") return { body: `It's taken out of ${i.display} and moves to Archived items. You can restore it from there.`, confirm: "Delete" };
+    if (how?.by === "mcp") return { body: "Claude Code removes it from its settings, and it moves to Archived items. You can restore it from there.", confirm: "Remove" };
     if (how?.by === "uninstall" && isSkillsDirPlugin(i))
       return { body: `Its folder, ${i.display.replace(/[\\/]\.claude-plugin[\\/]plugin\.json$/, "")}, moves to Archived items, where Claude Code no longer loads it. You can restore it from there.`, confirm: "Move to archive" };
     if (how?.by === "uninstall") return { body: "Claude Code uninstalls it and deletes the options and data it saved. You can install it again from Find plugins.", confirm: "Uninstall" };
