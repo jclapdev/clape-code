@@ -263,6 +263,60 @@
         "specs/screenshots/004-S2-A5-A3-390-light.png",
         "specs/screenshots/004-S2-A5-A3-390-dark.png"
       ]
+    },
+    {
+      "id": "005-S1",
+      "spec": "specs/005-every-setting.md",
+      "description": "Server: parse the settings reference page (fetched live, cached in the app folder, with a parsed copy shipped in the repo for offline) into topics and settings with key, first sentence, type, choices, default and scope; drop Managed and Global config settings and the index/enterprise/global/see-also topics; API returns them with each setting's value now and which file set it.",
+      "checks": [
+        "A1",
+        "A2"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "005-S2",
+      "spec": "specs/005-every-setting.md",
+      "description": "Settings page: one section per topic below Themes, rows with key, description, value now and source file or default, contents list names the topics, Find a setting box, settings owned by an existing section link to it, object-typed settings show value and an Edit as text link at that key.",
+      "checks": [
+        "A1",
+        "A2",
+        "A5",
+        "A6"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "005-S3",
+      "spec": "specs/005-every-setting.md",
+      "description": "Change in place: switch, choice, number, text and list controls write to the file picked in Change settings for through safeWrite, off/empty removes the key, User or managed settings are only editable for every project.",
+      "checks": [
+        "A3",
+        "A4",
+        "A6"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "006-S1",
+      "spec": "specs/006-built-in-commands.md",
+      "description": "Built-in slash commands from the docs' All commands table (fetched live, cached in the app folder, parsed copy shipped for offline), merged with the last session's list; bundled skills tagged Built-in skill, MCP prompts tagged by server; Slash commands page shows them with purpose and argument hint and loses the 'after a session has run' sentence.",
+      "checks": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
     }
   ]
 }
