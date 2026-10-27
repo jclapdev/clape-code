@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { firstPage, newSessionSearch, pickProject } from "../../web/src/lib/newSession";
+import { firstPage, keepDraft, newSessionSearch, pickProject } from "../../web/src/lib/newSession";
 
 const WEB = join(import.meta.dir, "..", "..", "web", "src");
 const files = (dir: string): string[] =>
@@ -12,6 +12,17 @@ const files = (dir: string): string[] =>
   });
 
 describe("New session page", () => {
+  test("a link that fills in the prompt keeps the draft you had typed (BACKLOG #117)", () => {
+    expect(keepDraft("fix the login bug", null, "/init")).toBe("fix the login bug");
+    // Nothing to keep: no link, an empty box, or the box already holds the linked prompt.
+    expect(keepDraft("fix the login bug", null, undefined)).toBe(null);
+    expect(keepDraft("  ", "older", "/init")).toBe("older");
+    expect(keepDraft("/init", null, "/init")).toBe(null);
+    // A second link doesn't push out the draft kept the first time; opening the same link twice keeps it once.
+    expect(keepDraft("draft two", "draft one", "/init")).toBe("draft one\n\ndraft two");
+    expect(keepDraft("draft one", "draft one", "/init")).toBe("draft one");
+  });
+
   test("the address fills in the project, first message and a known permission mode only", () => {
     expect(newSessionSearch({ project: "~/projects/demo", prompt: "/init", mode: "plan" })).toEqual({ project: "~/projects/demo", prompt: "/init", mode: "plan" });
     expect(newSessionSearch({ mode: "bypassPermissions", project: "", new: "1" })).toEqual({ project: undefined, prompt: undefined, mode: undefined });

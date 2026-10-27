@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Component, createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { remarkKbd } from "@/lib/kbd";
 import { cn } from "@/lib/utils";
 import type { Access } from "@/lib/types";
 import { Alert, AlertDescription } from "./ui/alert";
@@ -152,7 +153,7 @@ const nestedHeadings = Object.fromEntries(
 export function Md({ children, className, nested }: { children: string; className?: string; nested?: boolean }) {
   return (
     <div className={cn("prose-cc", className)}>
-      <Markdown remarkPlugins={[remarkGfm]} components={{ ...(nested ? nestedHeadings : {}), a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a> }}>
+      <Markdown remarkPlugins={[remarkGfm, remarkKbd]} components={{ ...(nested ? nestedHeadings : {}), a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a> }}>
         {children}
       </Markdown>
     </div>

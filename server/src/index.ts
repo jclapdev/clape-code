@@ -66,6 +66,10 @@ const TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
+// Pictures may come from the page itself and from mintcdn.com, the server the Claude Code docs shown in Guides use
+// (John's yes on 2026-10-26, BACKLOG #115). Nothing else from outside.
+export const PAGE_CSP = "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://mintcdn.com; connect-src 'self'";
+
 async function asset(pathname: string): Promise<Response | null> {
   const clean = pathname.replace(/\.\.+/g, "").replace(/\/+/g, "/");
   const embedded = globalThis.__CC_ASSETS;
@@ -75,7 +79,7 @@ async function asset(pathname: string): Promise<Response | null> {
   if (!(await f.exists())) return null;
   const headers: Record<string, string> = { "content-type": TYPES[extname(clean)] ?? "application/octet-stream" };
   if (clean.startsWith("/assets/")) headers["cache-control"] = "public, max-age=31536000, immutable";
-  headers["content-security-policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'";
+  headers["content-security-policy"] = PAGE_CSP;
   return new Response(f, { headers });
 }
 

@@ -3,6 +3,7 @@
 // converted and saving changes only what was typed.
 import { syntaxTree } from "@codemirror/language";
 import type { EditorState, Extension } from "@codemirror/state";
+import { kbdSpans } from "@/lib/kbd";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 
 class BulletWidget extends WidgetType {
@@ -198,6 +199,21 @@ function build(view: EditorView): DecorationSet {
     });
   }
 
+  // <kbd>⌘S</kbd> shows as a key; its tags show again on the line the cursor is on. Not inside code.
+  for (const { from, to } of view.visibleRanges) {
+    for (let n = state.doc.lineAt(from).number; n <= state.doc.lineAt(to).number; n++) {
+      const l = state.doc.line(n);
+      if (n <= fmEnd || !l.text.includes("<")) continue;
+      for (const k of kbdSpans(l.text)) {
+        if (/Code/.test(syntaxTree(state).resolveInner(l.from + k.key[0], 1).name)) continue;
+        decos.push({ from: l.from + k.key[0], to: l.from + k.key[1], deco: mark("cm-lp-kbd") });
+        if (active.has(n)) continue;
+        decos.push({ from: l.from + k.open[0], to: l.from + k.open[1], deco: hide });
+        decos.push({ from: l.from + k.close[0], to: l.from + k.close[1], deco: hide });
+      }
+    }
+  }
+
   // Replacements must not overlap; the rest CodeMirror sorts itself.
   decos.sort((a, b) => a.from - b.from || a.to - b.to);
   let hiddenTo = -1;
@@ -237,6 +253,7 @@ const theme = EditorView.theme({
   ".cm-lp-em": { fontStyle: "italic" },
   ".cm-lp-strike": { textDecoration: "line-through", color: "var(--muted-foreground)" },
   ".cm-lp-code": { fontFamily: "var(--font-mono)", fontSize: "0.9em", background: "var(--sunken)", borderRadius: "4px", padding: "0.1em 0.25em" },
+  ".cm-lp-kbd": { fontFamily: "var(--font-mono)", fontSize: "0.85em", background: "var(--sunken)", border: "1px solid var(--line-strong)", borderBottomWidth: "2px", borderRadius: "4px", padding: "0 0.3em" },
   ".cm-lp-block": { fontFamily: "var(--font-mono)", fontSize: "13px", background: "var(--sunken)", padding: "0 12px !important" },
   ".cm-lp-block-first": { borderTopLeftRadius: "6px", borderTopRightRadius: "6px", paddingTop: "6px !important" },
   ".cm-lp-block-last": { borderBottomLeftRadius: "6px", borderBottomRightRadius: "6px", paddingBottom: "6px !important" },

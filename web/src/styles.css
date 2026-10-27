@@ -209,6 +209,15 @@
 .prose-cc p,
 .prose-cc ul,
 .prose-cc ol,
+.prose-cc kbd {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--sunken);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 0.3em;
+}
 .prose-cc pre {
   margin: 0 0 0.7em;
 }
@@ -306,5 +315,20 @@
   * {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+/* An opened file's text starts at the page column's left edge (PAGE_COLUMN in Panes.tsx: 1180 px wide, 16 px
+   sides on phones, 32 px from 768 px up). */
+.cm-page .cm-scroller {
+  padding-inline: 16px;
+  scrollbar-gutter: stable;
+}
+.cm-page .cm-content {
+  padding-inline: 0 !important;
+}
+@media (min-width: 768px) {
+  .cm-page .cm-scroller {
+    padding-inline: max(32px, calc((100% - 1180px) / 2 + 32px));
   }
 }

@@ -76,6 +76,10 @@ Notable changes to Control Center, newest first.
 
 ### Fixed
 
+- Pictures in Guides load. The page now allows images from mintcdn.com, the server the Claude Code docs use, and from nowhere else outside the app.
+- An opened project, conversation, file or item starts its title at the same left edge, and puts its content in the same width, as the top-level pages.
+- Opening New session from a link that fills in the prompt, such as "Have Claude set it up", no longer hides what you had typed there. The linked prompt goes in the box, your earlier draft shows above it with "Use it instead", and it's back in the box after you send the linked prompt.
+- `<kbd>` keys in Markdown, such as the README's ⌘S, show as keys instead of raw tags. Other HTML still shows as typed.
 - A project with one changed file says "1 changed file", not "1 changed files"; archiving one session says "It can still be resumed".
 - A plugin's Files list no longer shows `.orphaned_at`, the marker Claude Code leaves in an old version's folder.
 - Settings no longer lets the whole window scroll past the end of the page.

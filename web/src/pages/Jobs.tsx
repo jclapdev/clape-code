@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { when } from "@/lib/format";
 import type { Job } from "@/lib/types";
-import { DetailHeader } from "@/components/Panes";
+import { DetailHeader, PAGE_COLUMN, PAGE_SCROLL } from "@/components/Panes";
 import { ErrorNote, Loading, Tag } from "@/components/ui";
 import { BackBar } from "./Sessions";
 
@@ -35,7 +35,7 @@ function JobDetail({ id }: { id: string }) {
       >
         {j.detail && <p className="text-ink-2">{j.detail}</p>}
       </DetailHeader>
-      <ol className="mx-auto max-w-[820px] px-6 py-5 md:pl-12">
+      <ol className={`${PAGE_COLUMN} py-5`}>
         {[...j.timeline].reverse().map((t, i) => (
           <li key={i} className="flex gap-4 border-l-2 border-line pb-4 pl-4">
             <span className="w-20 flex-none text-xs text-muted-foreground">{when(t.at)}</span>
@@ -57,7 +57,7 @@ export function JobsPage() {
   return (
     <div className="flex h-full flex-col">
       <BackBar />
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className={`min-h-0 flex-1 ${PAGE_SCROLL}`}>
         <JobDetail key={id} id={id} />
       </div>
     </div>

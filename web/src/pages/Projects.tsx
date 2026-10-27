@@ -393,7 +393,7 @@ function ProjectDetailView({ id }: { id: string }) {
           </>
         }
       />
-      <div className="mx-auto w-full max-w-[1180px] px-4 md:px-8 md:pl-12">
+      <div className={PAGE_COLUMN}>
         <Section id="board" title="Board">
           <ProjectBoard p={p} />
         </Section>

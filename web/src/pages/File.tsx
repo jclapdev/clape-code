@@ -9,7 +9,7 @@ export function FilePage() {
   const name = path.split(/[\\/]/).pop();
   return (
     <div className="h-full">
-      <FileEditor key={path} path={path} header={<DetailHeader title={name} />} />
+      <FileEditor key={path} path={path} header={<DetailHeader fixed title={name} />} />
     </div>
   );
 }

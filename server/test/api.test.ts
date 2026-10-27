@@ -822,3 +822,13 @@ describe("usage statistics", () => {
     expect(metricFor("GET", "/api/sessions/new")).toBeNull();
   });
 });
+
+describe("page security policy", () => {
+  test("pictures load from the page and the docs' image server only (BACKLOG #115)", async () => {
+    const { PAGE_CSP } = await import("../src/index");
+    const img = PAGE_CSP.split(";").map((d: string) => d.trim()).find((d: string) => d.startsWith("img-src"));
+    expect(img).toBe("img-src 'self' data: https://mintcdn.com");
+    expect(PAGE_CSP).toContain("default-src 'self'");
+    expect(PAGE_CSP).toContain("connect-src 'self'");
+  });
+});

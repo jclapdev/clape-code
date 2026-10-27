@@ -39,3 +39,16 @@ export function firstPage(o: { sessionId: string; liveId: string | null; project
     commands: [],
   };
 }
+
+/**
+ * A link that fills in the prompt (such as "Have Claude set it up") puts its prompt in the box, and the text you had
+ * typed there is kept beside it instead of being lost. Returns the draft to keep: the typed text, joined after one
+ * already kept, or the one already kept when there's nothing new to keep.
+ */
+export function keepDraft(typed: string | null, kept: string | null, linked: string | undefined): string | null {
+  const t = typed?.trim() ? typed : null;
+  if (linked === undefined || !t || t.trim() === linked.trim()) return kept;
+  if (!kept?.trim()) return t;
+  if (kept.includes(t)) return kept;
+  return `${kept}\n\n${t}`;
+}

@@ -8,10 +8,10 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { copyCommand, resumeCommand } from "@/lib/resume";
 import { accountLabel } from "@/lib/format";
-import { firstPage, pickProject, type NewSessionSearch } from "@/lib/newSession";
+import { firstPage, keepDraft, pickProject, type NewSessionSearch } from "@/lib/newSession";
 import type { PendingRequest, Project, Session, SlashCommand, Turn } from "@/lib/types";
 import { useAccount } from "@/components/Account";
-import { DetailHeader } from "@/components/Panes";
+import { DetailHeader, PAGE_BAND, PAGE_COLUMN } from "@/components/Panes";
 import { MessageBox } from "@/components/MessageBox";
 import { SimpleSelect } from "@/components/SimpleSelect";
 import { Transcript } from "@/components/Transcript";
@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { BackBar, useSessionActions } from "./Sessions";
-import { draftKey, useDraft } from "@/lib/draft";
+import { NEW_SESSION_DRAFT, adoptLinkedPrompt, draftKey, setKeptDraft, useDraft } from "@/lib/draft";
 
 export const MODES = [
   { value: "default", label: "Ask before changes" },
@@ -224,15 +224,15 @@ const SELECT = "h-8 min-w-[130px] max-w-full text-[13px]";
 function Composer({ box, onSubmit, children }: { box: Omit<ComponentProps<typeof MessageBox>, "onSubmit">; onSubmit: () => void; children: ReactNode }) {
   return (
     <form
-      className="flex-none border-t border-line bg-panel px-3 pb-3 pt-2.5 md:px-6"
+      className={`flex-none border-t border-line bg-panel pb-3 pt-2.5 ${PAGE_BAND}`}
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit();
       }}
     >
-      <div className="mx-auto flex max-w-[880px] flex-col gap-2 md:pl-6">
+      <div className={`${PAGE_COLUMN} flex flex-col gap-2`}>
         <MessageBox {...box} onSubmit={onSubmit} />
-        <div className="flex flex-wrap gap-2 md:pl-12">{children}</div>
+        <div className="flex flex-wrap gap-2">{children}</div>
       </div>
     </form>
   );
@@ -334,6 +334,7 @@ function Conversation({ sid }: { sid: string }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DetailHeader
+        fixed
         title={s.displayTitle}
         sub={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -385,13 +386,13 @@ function Conversation({ sid }: { sid: string }) {
       />
       <div
         ref={scroller}
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]"
         onScroll={(e) => {
           const el = e.currentTarget;
           atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
       >
-        <div className="mx-auto flex w-full max-w-[880px] flex-col gap-3 px-4 py-5 md:px-6 md:pl-12">
+        <div className={`${PAGE_COLUMN} flex flex-col gap-3 py-5`}>
           {turns.length + echoTurns.length > 0 ? <Transcript turns={[...turns, ...echoTurns]} details={details} /> : !active && <Transcript turns={[]} />}
           {q.hasNextPage && <Loading />}
           {pending.map((r) => (r.type === "question" ? <QuestionCard key={r.requestId} sid={sid} r={r} /> : <ApprovalCard key={r.requestId} sid={sid} r={r} />))}
@@ -468,8 +469,16 @@ function NewConversation({ search }: { search: NewSessionSearch }) {
   const [proj, setProj] = useState(search.project ?? "");
   const [model, setModel] = useState("");
   const [mode, setMode] = useState(search.mode ?? "default");
-  // A prompt in the address, such as /init, replaces the draft.
-  const [text, setText, clearText] = useDraft(draftKey("new-session"), "", search.prompt);
+  // A prompt in the address, such as /init, goes in the box; what you had typed there is kept aside, offered back
+  // here, and becomes the box's draft again once the linked prompt is sent.
+  const [kept, setKept] = useState(() => adoptLinkedPrompt(search.prompt, keepDraft));
+  const [text, setText, clearText] = useDraft(NEW_SESSION_DRAFT, "", search.prompt);
+  const restoreKept = () => {
+    const swap = text.trim() && text !== search.prompt ? text : null;
+    setText(kept ?? "");
+    setKeptDraft(swap);
+    setKept(swap);
+  };
   const account = useAccount(proj || undefined);
   const cmds = useQuery({ queryKey: ["live-commands", proj], queryFn: () => api.get<SlashCommand[]>(`/live-commands?project=${encodeURIComponent(proj)}`) });
   useEffect(() => {
@@ -480,6 +489,10 @@ function NewConversation({ search }: { search: NewSessionSearch }) {
     mutationFn: (prompt: string) => api.post<{ sessionId: string; liveId: string | null }>("/sessions/new", { project: proj, model, permissionMode: mode, prompt }),
     onSuccess: (r, prompt) => {
       clearText();
+      if (kept) {
+        setText(kept);
+        setKeptDraft(null);
+      }
       if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
       // The conversation page opens with the message already in it, then fills in from the server.
       const page = firstPage({ sessionId: r.sessionId, liveId: r.liveId, project: proj, prompt, model, permissionMode: mode, at: new Date().toISOString() });
@@ -499,8 +512,18 @@ function NewConversation({ search }: { search: NewSessionSearch }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <DetailHeader title="New session" sub={proj && account.data && !account.data.problem ? <span className="break-all">{accountLabel(account.data)}</span> : undefined} />
+      <DetailHeader fixed title="New session" sub={proj && account.data && !account.data.problem ? <span className="break-all">{accountLabel(account.data)}</span> : undefined} />
       <div className="min-h-0 flex-1" />
+      {kept && (
+        <div className={`flex-none ${PAGE_BAND}`}>
+          <div className={`${PAGE_COLUMN} flex flex-wrap items-center gap-2 pb-2 text-[13px] text-muted-foreground`}>
+            <span className="min-w-0 truncate">Your earlier draft: {kept.trim().split("\n")[0]}</span>
+            <Button type="button" size="sm" variant="outline" onClick={restoreKept}>
+              Use it instead
+            </Button>
+          </div>
+        </div>
+      )}
       <Composer
         onSubmit={submit}
         box={{

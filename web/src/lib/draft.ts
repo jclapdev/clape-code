@@ -67,3 +67,21 @@ export function useDraftForm<T extends Record<string, unknown>>(key: string, fal
   const field = useCallback(<K extends keyof T>(k: K) => (v: T[K]) => set((p) => ({ ...p, [k]: v })), [set]);
   return [form, field, clear] as const;
 }
+
+/** The New session box's draft, and the one kept aside when a link fills in the prompt (see keepDraft). */
+export const NEW_SESSION_DRAFT = draftKey("new-session");
+export const NEW_SESSION_KEPT = draftKey("new-session", "kept");
+
+/** Moves the typed draft aside for a linked prompt, which becomes the draft. Returns the kept draft. Safe to run twice. */
+export function adoptLinkedPrompt(linked: string | undefined, keep: (typed: string | null, kept: string | null, linked: string | undefined) => string | null): string | null {
+  const kept = keep(layoutStorage.getItem(NEW_SESSION_DRAFT), layoutStorage.getItem(NEW_SESSION_KEPT), linked);
+  if (kept) layoutStorage.setItem(NEW_SESSION_KEPT, kept);
+  if (linked !== undefined) writeDraft(NEW_SESSION_DRAFT, linked);
+  return kept;
+}
+
+/** Puts a kept draft back (or, with null, forgets it). */
+export function setKeptDraft(v: string | null) {
+  if (v?.trim()) layoutStorage.setItem(NEW_SESSION_KEPT, v);
+  else layoutStorage.removeItem(NEW_SESSION_KEPT);
+}

@@ -13,7 +13,7 @@ import { FileEditor } from "@/components/FileEditor";
 import { ItemActions, isSkillsDirPlugin } from "@/components/ItemActions";
 import { FindPlugins, NewPlugin } from "./PluginPanels";
 import { toast } from "sonner";
-import { PAGE_SCROLL, Page } from "@/components/Panes";
+import { PAGE_BAND, PAGE_COLUMN, PAGE_SCROLL, Page } from "@/components/Panes";
 import { Readable } from "@/components/Readable";
 import { SimpleSelect } from "@/components/SimpleSelect";
 import { ErrorNote, Loading, Tag } from "@/components/ui";
@@ -268,7 +268,8 @@ function ItemView({ r, f, back, onDeleted }: { r: Row; f: Feature; back: ReactNo
   const [gone, setGone] = useState(false);
   const i = r.item;
   const header = (
-    <header className="flex flex-col gap-3 border-b border-line px-4 py-4 md:px-6">
+    <header className={`flex-none border-b border-line ${editing ? PAGE_BAND : ""}`}>
+      <div className={`${PAGE_COLUMN} flex flex-col gap-3 py-4`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="break-words text-[20px] font-semibold tracking-[-0.01em]">{r.name}</h2>
@@ -287,11 +288,12 @@ function ItemView({ r, f, back, onDeleted }: { r: Row; f: Feature; back: ReactNo
       </div>
       {i?.kind === "workflow" && !editing && i.description && <p className="leading-relaxed text-ink-2">{i.description}</p>}
       {i && <ItemActions i={i} scope={i.projectId ?? "global"} projectId={i.projectId} onDeleting={setGone} onDeleted={onDeleted} />}
+      </div>
     </header>
   );
   if (gone)
     return (
-      <div className="h-full overflow-auto">
+      <div className={PAGE_SCROLL}>
         {back}
         {header}
       </div>
@@ -307,10 +309,10 @@ function ItemView({ r, f, back, onDeleted }: { r: Row; f: Feature; back: ReactNo
     );
   }
   return (
-    <div className="h-full overflow-auto">
+    <div className={PAGE_SCROLL}>
       {back}
       {header}
-      <div className="px-4 py-4 md:px-6">
+      <div className={`${PAGE_COLUMN} py-4`}>
         <ItemBody r={r} />
       </div>
     </div>

@@ -8,6 +8,7 @@ import { bytes, when } from "@/lib/format";
 import type { FileData } from "@/lib/types";
 import { DiffView, Editor } from "./Editor";
 import { MarkdownEditor } from "./MarkdownEditor";
+import { PAGE_BAND, PAGE_COLUMN } from "./Panes";
 import { AccessTag, ErrorNote, Loading } from "./ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 
@@ -99,7 +100,8 @@ export function FileEditor({ path, header, onSaved, line }: { path: string; head
   return (
     <div className="flex h-full flex-col">
       {header}
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-2 text-[12.5px] text-muted-foreground md:pl-12">
+      <div className={`flex-none border-b border-line ${PAGE_BAND}`}>
+      <div className={`${PAGE_COLUMN} flex flex-wrap items-center gap-2 py-2 text-[12.5px] text-muted-foreground`}>
         <span className="min-w-0 truncate font-mono">{f.display}</span>
         <AccessTag access={f.access} />
         <span className="ml-auto">{when(f.mtime)} · {bytes(f.size)}</span>
@@ -107,10 +109,11 @@ export function FileEditor({ path, header, onSaved, line }: { path: string; head
           <ExternalLink aria-hidden /> Open
         </Button>
       </div>
+      </div>
       {f.tooBig ? (
-        <div className="p-6 text-muted-foreground">This file is too large to open here.</div>
+        <div className={`${PAGE_COLUMN} py-6 text-muted-foreground`}>This file is too large to open here.</div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="cm-page min-h-0 flex-1 overflow-hidden">
           {isMarkdown ? (
             text !== null && <MarkdownEditor value={text} onChange={setText} path={path} readOnly={!editable} onSave={() => editable && save()} />
           ) : (
@@ -119,7 +122,8 @@ export function FileEditor({ path, header, onSaved, line }: { path: string; head
         </div>
       )}
       {editable && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-panel px-4 py-2.5">
+        <div className={`flex-none border-t border-line bg-panel ${PAGE_BAND}`}>
+        <div className={`${PAGE_COLUMN} flex flex-wrap items-center justify-between gap-2 py-2.5`}>
           <span className={dirty ? "text-attn" : "text-muted-foreground"}>{error ? <span className="text-danger">{error}</span> : dirty ? "Unsaved changes" : "No changes"}</span>
           <div className="flex gap-2">
             <Button variant="outline" disabled={!dirty} onClick={() => setDiffOpen(true)}>
@@ -132,6 +136,7 @@ export function FileEditor({ path, header, onSaved, line }: { path: string; head
               Save
             </Button>
           </div>
+        </div>
         </div>
       )}
       <Dialog open={diffOpen} onOpenChange={setDiffOpen}>
