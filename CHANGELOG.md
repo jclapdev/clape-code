@@ -6,6 +6,7 @@ Notable changes to Control Center, newest first.
 
 ### Added
 
+- Plans shows whether each plan was approved (Approved, Not approved or Draft) and the date it last changed instead of its file name. A plan's page lists the conversations that worked on it, newest first, and a conversation's page links to the plan it follows.
 - Plans are tagged with the project their conversations ran in, so picking a project on Plans shows its plans. Plans in a project's own plans folder (`plansDirectory`) are listed too.
 - Each project page has "Shared instructions and plugins": your instructions and rules for every project, and the plugins turned on in that project, each opening its own page.
 - Agents lists Claude Code's built-in agents (Explore, Plan, General-purpose, claude, statusline-setup, claude-code-guide), tagged "Built in". One of your own agents with the same name hides the built-in one.
