@@ -10,6 +10,7 @@ let root: string;
 // The last two come from the fake `claude auth status` (fixtures/fake-claude.ts).
 const SECRETS = ["token-source-secret", "org-secret-id", "sk-ant-oat01-secret-token", "secret@example.com", "user-secret-id", "machine-secret-id", "peer-secret-token", "rv-secret", "control-secret"];
 let app: any;
+const PLAN_SID = "7a1b2c3d-0000-4000-8000-000000000004";
 
 const request = (path: string, init: RequestInit = {}, ip = "127.0.0.1") =>
   app.request(path, { ...init, headers: { host: "127.0.0.1:4317", ...(init.headers ?? {}) } }, { server: { requestIP: () => ({ address: ip, family: "IPv4", port: 1 }) } });
@@ -59,6 +60,21 @@ beforeAll(async () => {
   // A session started from the app saved its account; the stray field must never reach the browser.
   await mkdir(join(root, "app"), { recursive: true });
   await writeFile(join(root, "app", "session-accounts.json"), JSON.stringify({ "e2644826-95f0-4880-8af9-8169d229cf1d": { provider: "firstParty", providerName: "Anthropic", email: "me@example.com", organization: "Acme", plan: "Claude Pro", tokenSource: "token-source-secret" } }));
+  // A plan written in the demo project and approved there, and one no conversation worked on (spec 004).
+  await mkdir(join(claude, "plans"), { recursive: true });
+  await writeFile(join(claude, "plans", "brave-plan.md"), "# Demo plan\n\n- [ ] step\n");
+  await writeFile(join(claude, "plans", "lonely-plan.md"), "# Lonely plan\n");
+  await mkdir(join(claude, "projects", "-plan"), { recursive: true });
+  const demo = join(root, "projects", "demo");
+  const pl = (o: object) => JSON.stringify({ sessionId: PLAN_SID, cwd: demo, slug: "brave-plan", ...o });
+  await writeFile(
+    join(claude, "projects", "-plan", `${PLAN_SID}.jsonl`),
+    [
+      pl({ type: "user", uuid: "u1", timestamp: "2026-10-05T10:00:00Z", message: { content: "plan the demo" } }),
+      pl({ type: "assistant", uuid: "a1", timestamp: "2026-10-05T10:01:00Z", message: { id: "m1", model: "claude", content: [{ type: "tool_use", id: "t1", name: "ExitPlanMode", input: {} }] } }),
+      pl({ type: "user", uuid: "u2", timestamp: "2026-10-05T10:02:00Z", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "User has approved your plan. You can now start coding." }] } }),
+    ].join("\n") + "\n",
+  );
   ({ app } = await import("../src/index"));
   const { indexSessions } = await import("../src/db/index");
   const { listProjects } = await import("../src/scan/projects");
@@ -87,6 +103,26 @@ describe("secrets never leave the server", () => {
       for (const s of SECRETS) expect(body).not.toContain(s);
     });
   }
+});
+
+describe("plans and their conversations", () => {
+  test("the catalog tags a plan with its project, status and conversations", async () => {
+    const cat = await (await request("/api/catalog")).json();
+    const plans = cat.items.filter((i: any) => i.kind === "plan");
+    const brave = plans.find((i: any) => i.path.endsWith("brave-plan.md"));
+    expect(brave).toMatchObject({ name: "Demo plan", projectId: "~/projects/demo", projectName: "demo", meta: { status: "approved" } });
+    expect(brave.meta.conversations).toEqual([{ sessionId: PLAN_SID, title: "plan the demo", at: "2026-10-05T10:02:00Z" }]);
+    expect(typeof brave.mtime).toBe("number");
+    expect(plans.find((i: any) => i.path.endsWith("lonely-plan.md"))).toMatchObject({ projectId: null, meta: { status: "draft", conversations: [] } });
+    expect(cat.projects.map((p: any) => p.id)).toContain("~/projects/demo");
+  });
+
+  test("a conversation gives the plan it follows", async () => {
+    const s = await (await request(`/api/sessions/${PLAN_SID}`)).json();
+    expect(s.plan).toEqual({ path: join(root, ".claude", "plans", "brave-plan.md"), title: "Demo plan" });
+    const other = await (await request("/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d")).json();
+    expect(other.plan).toBeNull();
+  });
 });
 
 describe("account", () => {

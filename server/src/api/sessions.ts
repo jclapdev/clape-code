@@ -10,7 +10,8 @@ import { readLines } from "../fs/lines";
 import { sessionAccounts, type SessionAccount } from "../account/sessions";
 import { getSession, isOpen, knownCommands, listLive, liveBySessionId, removeSession, startSession, waitingCount, type LiveStatus } from "../live/sessions";
 import { isFromScript, startedSessions } from "../live/started";
-import { globalLibrary, projectLibrary } from "../scan/library";
+import { globalLibrary, planItem, projectLibrary } from "../scan/library";
+import { planOfSession } from "../scan/plans";
 import { listJobs, listLiveProcesses } from "../scan/jobs";
 import { listProjects, projectDir, projectPathOf } from "../scan/projects";
 import { ls, readJson } from "../scan/md";
@@ -24,7 +25,8 @@ const UUID = /^[0-9a-f-]{36}$/i;
 type Ctx = Awaited<ReturnType<typeof context>>;
 
 function publicSession(s: IndexedSession, { archived, running, activity, projectOf, accounts, started }: Ctx) {
-  const { file, ...rest } = s;
+  // Every folder a session ran in is only for linking plans; the list would carry hundreds of paths.
+  const { file, cwds, slugs, planVerdict, ...rest } = s;
   return {
     ...rest,
     displayTitle: s.title ?? untitled(s.firstPrompt),
@@ -131,6 +133,7 @@ sessions.get("/sessions/:sid", async (c) => {
       archived: !!ctx.archived[sid],
       fromScript: false,
       account: l.account,
+      plan: null,
       turns,
       totalTurns: turns.length,
       offset: 0,
@@ -149,8 +152,10 @@ sessions.get("/sessions/:sid", async (c) => {
     const meta = await readJson<Record<string, any>>(join(subDir, f));
     subagents.push({ agentId: f.replace(/^agent-/, "").replace(/\.meta\.json$/, ""), type: meta?.agentType ?? null, description: meta?.description ?? null });
   }
+  const planPath = await planOfSession(s);
   return c.json({
     ...publicSession(s, ctx),
+    plan: planPath ? { path: planPath, title: (await planItem(planPath)).name } : null,
     turns: builder.turns.slice(offset, offset + limit),
     totalTurns: builder.turns.length,
     offset,

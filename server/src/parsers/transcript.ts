@@ -32,8 +32,39 @@ export interface SessionSummary {
   kind: string | null; // e.g. "bg" for background jobs
   entrypoint: string | null; // what started it: "cli", "sdk-cli" (the Agent SDK, `claude -p`), "sdk-ts"...
   plans: string[]; // plan files this session wrote in plan mode, oldest first
+  /** Claude Code's name for the session; plan mode names the plan file after it (`<slug>.md`). */
+  slugs: string[];
+  /** Every working folder the session ran in (it changes when Claude moves), with how many lines ran there. */
+  cwds: Record<string, number>;
+  /** The answer to the last ExitPlanMode call in this session. */
+  planVerdict: PlanVerdict | null;
   searchText: string; // prompts and Claude's replies in conversation order, capped, for search
 }
+
+export interface PlanVerdict {
+  status: "approved" | "not-approved";
+  at: string | null;
+}
+
+/**
+ * What an ExitPlanMode result means. On 27 Oct the results in ~/.claude/projects began "User has approved" (55),
+ * "The user doesn't want to proceed" (38) or "PreToolUse:ExitPlanMode hook error" (12).
+ */
+export function planVerdictOf(text: string): PlanVerdict["status"] | null {
+  const t = text.trimStart();
+  if (t.startsWith("User has approved")) return "approved";
+  if (t.startsWith("The user doesn't want to proceed") || /^\S*ExitPlanMode hook error/.test(t)) return "not-approved";
+  return null;
+}
+
+const resultText = (c: any): string => {
+  if (typeof c === "string") return c;
+  if (Array.isArray(c)) return c.map((b) => (b.type === "text" ? b.text : `[${b.type}]`)).join("\n");
+  return "";
+};
+
+/** Per-session cap on how many working folders are kept. */
+const MAX_CWDS = 200;
 
 /** Per-session cap on text sent to the search index. */
 export const SEARCH_TEXT_CAP = 20000;
@@ -74,6 +105,7 @@ export class Summarizer {
   private summary: string | null = null;
   private text: string[] = [];
   private chars = 0;
+  private exitPlanIds = new Set<string>();
 
   constructor(private fallbackId: string) {
     this.s = {
@@ -97,6 +129,9 @@ export class Summarizer {
       kind: null,
       entrypoint: null,
       plans: [],
+      slugs: [],
+      cwds: {},
+      planVerdict: null,
       searchText: "",
     };
   }
@@ -116,8 +151,10 @@ export class Summarizer {
       const p = JSON.parse(`"${m[1]}"`) as string;
       if (!s.plans.includes(p)) s.plans.push(p);
     }
+    if (typeof d.slug === "string" && d.slug && !s.slugs.includes(d.slug)) s.slugs.push(d.slug);
     if (d.sessionId && s.sessionId === this.fallbackId) s.sessionId = d.sessionId;
     if (d.cwd && !s.cwd) s.cwd = d.cwd;
+    if (typeof d.cwd === "string" && d.cwd && (d.cwd in s.cwds || Object.keys(s.cwds).length < MAX_CWDS)) s.cwds[d.cwd] = (s.cwds[d.cwd] ?? 0) + 1;
     if (d.gitBranch) s.gitBranch = d.gitBranch;
     if (d.version) s.version = d.version;
     if (d.sessionKind && !s.kind) s.kind = d.sessionKind;
@@ -148,6 +185,14 @@ export class Summarizer {
         if (typeof d.totalCostUSD === "number") s.costUSD = d.totalCostUSD;
         break;
       case "user": {
+        const c = d.message?.content;
+        if (this.exitPlanIds.size && Array.isArray(c)) {
+          for (const b of c) {
+            if (b?.type !== "tool_result" || !this.exitPlanIds.has(b.tool_use_id)) continue;
+            const status = planVerdictOf(resultText(b.content));
+            if (status) s.planVerdict = { status, at: typeof d.timestamp === "string" ? d.timestamp : null };
+          }
+        }
         const p = promptTextOf(d);
         if (p) {
           s.prompts++;
@@ -163,6 +208,7 @@ export class Summarizer {
         if (m.model) s.model = m.model;
         if (Array.isArray(m.content)) {
           s.toolCalls += m.content.filter((b: any) => b.type === "tool_use").length;
+          for (const b of m.content) if (b.type === "tool_use" && b.name === "ExitPlanMode" && b.id) this.exitPlanIds.add(b.id);
           if (!d.isSidechain) for (const b of m.content) if (b.type === "text" && b.text?.trim()) this.addText(b.text.trim());
         }
         const key = m.id ?? d.requestId ?? d.uuid;
@@ -215,12 +261,6 @@ export function toolSummary(name: string, input: any): string {
     input.command ?? input.file_path ?? input.pattern ?? input.url ?? input.query ?? input.description ?? input.prompt ?? input.skill ?? "";
   return String(v).replace(/\s+/g, " ").slice(0, 200);
 }
-
-const resultText = (c: any): string => {
-  if (typeof c === "string") return c;
-  if (Array.isArray(c)) return c.map((b) => (b.type === "text" ? b.text : `[${b.type}]`)).join("\n");
-  return "";
-};
 
 /** Builds display turns line by line: merged assistant blocks, tool results attached to their calls. */
 export class TurnBuilder {

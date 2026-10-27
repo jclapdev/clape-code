@@ -4,8 +4,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { claudeDir, claudeJson, tildify, untildify } from "../fs/paths";
 import { classify } from "../fs/policy";
-import { globalLibrary, projectLibrary, type LibraryItem, type PluginInfo } from "./library";
+import { listSessions } from "../db/index";
+import { globalLibrary, planItem, projectLibrary, type LibraryItem, type PluginInfo } from "./library";
 import { firstLine, ls, mtimeOf, readJson, readMd } from "./md";
+import { linkPlan, planFiles } from "./plans";
 import { listProjects } from "./projects";
 
 export interface CatalogItem extends LibraryItem {
@@ -94,7 +96,7 @@ export async function catalog(): Promise<Catalog> {
 
   const items: CatalogItem[] = [];
   for (const i of globalItems) {
-    if (SKIP.has(i.kind)) continue;
+    if (SKIP.has(i.kind) || i.kind === "plan") continue;
     // Auto memory notes live under ~/.claude but each belongs to one project folder. Agent memory there applies everywhere.
     if (i.kind === "memory" && !i.meta.agent) {
       const p = dirs.find((d) => i.sourceName === encOf(d.dir) || i.sourceName?.startsWith(`${encOf(d.dir)}--claude-worktrees-`));
@@ -117,6 +119,15 @@ export async function catalog(): Promise<Catalog> {
   }
   for (const i of await workflowItems(join(claudeDir(), "workflows"), "user", null)) items.push(tag(i, null));
   for (const i of await scheduledTasks()) items.push(tag(i, null));
+
+  // Plans: tagged with the project their conversations ran in, or the project whose plans folder holds them.
+  const sessions = listSessions();
+  for (const f of await planFiles(dirs)) {
+    const link = linkPlan(f.path, sessions, dirs);
+    const project = f.project ?? link.project;
+    const meta = { status: link.status, conversations: link.conversations };
+    items.push(tag(await planItem(f.path, f.project ? "project" : "user", f.project?.name ?? null, meta), project ? { id: project.id, name: project.name } : null));
+  }
 
   for (const d of dirs) {
     const project = { id: d.id, name: d.name };

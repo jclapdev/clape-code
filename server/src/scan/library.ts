@@ -296,15 +296,16 @@ async function hookScripts(dir: string, source: LibraryItem["source"], sourceNam
   return out;
 }
 
+/** A plan file, titled by its first line. */
+export async function planItem(p: string, source: LibraryItem["source"] = "user", sourceName: string | null = null, meta: Record<string, unknown> = {}): Promise<LibraryItem> {
+  const md = await readMd(p);
+  return item({ kind: "plan", name: firstLine(md?.body) || basename(p), description: basename(p), path: p, source, sourceName, meta });
+}
+
 export async function planItems(): Promise<LibraryItem[]> {
   const dir = join(claudeDir(), "plans");
   const out: LibraryItem[] = [];
-  for (const f of await ls(dir)) {
-    if (!f.endsWith(".md")) continue;
-    const p = join(dir, f);
-    const md = await readMd(p);
-    out.push(await item({ kind: "plan", name: firstLine(md?.body) || f, description: f, path: p, source: "user" }));
-  }
+  for (const f of await ls(dir)) if (f.endsWith(".md")) out.push(await planItem(join(dir, f)));
   return out.sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0));
 }
 
