@@ -140,10 +140,10 @@ export function ItemActions({ i, scope, projectId, onDeleting, onDeleted }: { i:
             busy={del.isPending}
             onClick={async () => {
               const a = ask();
-              if (await confirm({ title: `${how?.by === "uninstall" ? (isSkillsDirPlugin(i) ? "Remove" : "Uninstall") : "Delete"} ${i.name}?`, body: a.body, confirm: a.confirm, danger: true })) del.mutate();
+              if (await confirm({ title: `${how?.by === "uninstall" ? (isSkillsDirPlugin(i) ? "Remove" : "Uninstall") : how?.by === "mcp" ? "Remove" : "Delete"} ${i.name}?`, body: a.body, confirm: a.confirm, danger: true })) del.mutate();
             }}
           >
-            {how?.by === "uninstall" ? (isSkillsDirPlugin(i) ? "Remove" : "Uninstall") : "Delete"}
+            {how?.by === "uninstall" ? (isSkillsDirPlugin(i) ? "Remove" : "Uninstall") : how?.by === "mcp" ? "Remove" : "Delete"}
           </Button>
         )}
       </div>
