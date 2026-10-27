@@ -8,7 +8,8 @@ import { PAGE_COLUMN, PAGE_SCROLL } from "@/components/Panes";
 
 /** Old /live/<id> links: the conversation page for that live session's session ID. */
 function LiveRedirect({ id }: { id: string }) {
-  const q = useQuery({ queryKey: ["live", id], queryFn: () => api.get<LiveSession>(`/live/${id}`) });
+  // A copy just started has no session ID until Claude's first message, so keep asking until it has one.
+  const q = useQuery({ queryKey: ["live", id], queryFn: () => api.get<LiveSession>(`/live/${id}`), refetchInterval: (qq) => (qq.state.data && !qq.state.data.sessionId ? 500 : false) });
   const navigate = useNavigate();
   const sid = q.data?.sessionId;
   useEffect(() => {

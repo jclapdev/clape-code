@@ -529,7 +529,7 @@ describe("a conversation is addressed by its session ID", () => {
   };
 
   function fakeQuery({ prompt, options }: any) {
-    const sid = options.sessionId ?? options.resume;
+    const sid = options.forkSession ? crypto.randomUUID() : (options.sessionId ?? options.resume);
     const rec: (typeof queries)[number] = { options, received: [], mode: options.permissionMode, interrupts: 0 };
     queries.push(rec);
     const say = (text: string) => ({ type: "assistant", session_id: sid, message: { content: [{ type: "text", text }] } });
@@ -681,6 +681,29 @@ describe("a conversation is addressed by its session ID", () => {
     // Only one live session per conversation.
     expect((await get("/api/live")).filter((l: any) => l.sessionId === OLD)).toHaveLength(1);
     await post(`/api/sessions/${OLD}/stop`);
+  });
+
+  test("#112: a conversation open in a terminal isn't sent into; sending continues in a copy with its own ID", async () => {
+    const proc = join(root, ".claude", "sessions", `${process.pid}.json`);
+    await writeFile(proc, JSON.stringify({ pid: process.pid, sessionId: TERMINAL, cwd: join(root, "projects", "demo") }));
+    try {
+      const n = queries.length;
+      const plain = await post(`/api/sessions/${TERMINAL}/send`, { text: "hi" });
+      expect(plain.status).toBe(409);
+      expect((await plain.json()).error).toContain("continue in a copy");
+      expect(queries.length).toBe(n);
+      const r = await (await post(`/api/sessions/${TERMINAL}/send`, { text: "in a copy", copy: true })).json();
+      expect(r).toMatchObject({ sessionId: null, copy: true });
+      expect(queries.at(-1)!.options).toMatchObject({ resume: TERMINAL, forkSession: true });
+      await until(async () => !!(await get(`/api/live/${r.liveId}`)).sessionId);
+      const copy = (await get(`/api/live/${r.liveId}`)).sessionId;
+      expect(copy).not.toBe(TERMINAL);
+      await until(() => queries.at(-1)!.received.length === 1);
+      expect(await get(`/api/sessions/${TERMINAL}`)).toMatchObject({ status: "running", liveId: null });
+      await post(`/api/sessions/${copy}/stop`);
+    } finally {
+      await rm(proc, { force: true });
+    }
   });
 
   test("A4: approvals and questions wait in the conversation's live state and are answered by session ID", async () => {

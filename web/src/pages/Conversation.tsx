@@ -279,6 +279,8 @@ function Conversation({ sid }: { sid: string }) {
   const status = first?.status ?? "done";
   const open = OPEN.includes(status);
   const active = ACTIVE.includes(status);
+  // Another Claude Code has it open: sending from here continues in a copy, so the two don't mix into one transcript.
+  const elsewhere = status === "running";
   const mode = (open ? first?.permissionMode : (localMode ?? first?.permissionMode)) ?? "default";
   const pending = first?.pending ?? [];
 
@@ -294,8 +296,12 @@ function Conversation({ sid }: { sid: string }) {
     qc.invalidateQueries({ queryKey: ["overview"] });
   };
   const send = useMutation({
-    mutationFn: (t: string) => api.post(`/sessions/${sid}/send`, { text: t, model: model || undefined, permissionMode: mode }),
-    onSuccess: refresh,
+    mutationFn: (t: string) => api.post<{ liveId: string; copy?: boolean }>(`/sessions/${sid}/send`, { text: t, model: model || undefined, permissionMode: mode, copy: elsewhere }),
+    onSuccess: (r) => {
+      refresh();
+      // The copy's session ID comes from Claude's first message; its old-style live address opens the copy once it's known.
+      if (r.copy) void navigate({ to: "/live/$id", params: { id: r.liveId } });
+    },
     onError: (e: Error, t) => {
       toast.error(e.message);
       setSent((s) => s.filter((m) => m.text !== t.trim()));
@@ -398,7 +404,7 @@ function Conversation({ sid }: { sid: string }) {
           {pending.map((r) => (r.type === "question" ? <QuestionCard key={r.requestId} sid={sid} r={r} /> : <ApprovalCard key={r.requestId} sid={sid} r={r} />))}
           {active && !pending.length && (
             <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-              <Spinner /> {status === "running" ? "Open in another Claude Code window" : "Claude is working"}
+              <Spinner /> {elsewhere ? "Open in another Claude Code window. A message sent from here continues in a copy of this conversation, so that window's isn't changed." : "Claude is working"}
             </div>
           )}
           {status === "error" && (
@@ -414,7 +420,7 @@ function Conversation({ sid }: { sid: string }) {
           value: text,
           onChange: setText,
           commands: s.commands.length ? s.commands : (fallbackCmds.data ?? []),
-          placeholder: active ? "Send a message while Claude works" : "Reply to Claude, or type / for a command",
+          placeholder: elsewhere ? "Continue in a copy of this conversation" : active ? "Send a message while Claude works" : "Reply to Claude, or type / for a command",
           busy: send.isPending,
           extra: open && status !== "idle" && (
             <Button size="lg" type="button" variant="outline" onClick={() => call.mutate({ path: "stop" })} busy={call.isPending && call.variables?.path === "stop"}>

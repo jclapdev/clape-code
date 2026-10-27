@@ -156,11 +156,14 @@ class LiveSession {
     public permissionMode: PermissionMode,
     resume: string | null,
     transcriptPending = false,
+    fork = false,
   ) {
-    // A new session gets its ID up front, so its address is known before Claude answers. Resuming keeps the ID.
-    this.sessionId = resume ?? crypto.randomUUID();
-    void recordStarted(this.sessionId).catch(() => {});
-    if (!resume || !transcriptPending) this.launch(resume);
+    // A new session gets its ID up front, so its address is known before Claude answers. Resuming keeps the ID. A copy
+    // (`forkSession`) gets its ID from Claude's first message, as the Agent SDK sessions docs read it.
+    this.sessionId = fork ? "" : (resume ?? crypto.randomUUID());
+    if (this.sessionId) void recordStarted(this.sessionId).catch(() => {});
+    if (fork) this.launch(resume, true);
+    else if (!resume || !transcriptPending) this.launch(resume);
     else
       // Messages sent meanwhile wait in `input`. With no transcript at all, Claude never recorded the conversation, so
       // it starts afresh under the same ID.
@@ -175,14 +178,14 @@ class LiveSession {
       });
   }
 
-  private launch(resume: string | null) {
+  private launch(resume: string | null, fork = false) {
     this.q = runQuery({
       prompt: this.input,
       options: {
         cwd: this.cwd,
         model: this.model ?? undefined,
         permissionMode: this.permissionMode,
-        ...(resume ? { resume } : { sessionId: this.sessionId }),
+        ...(resume ? { resume, ...(fork && { forkSession: true }) } : { sessionId: this.sessionId }),
         abortController: this.abort,
         settingSources: ["user", "project", "local"],
         pathToClaudeCodeExecutable: claudeExecutable(),
@@ -379,11 +382,11 @@ class LiveSession {
 
 const sessions = new Map<string, LiveSession>();
 
-/** `transcriptPending`: resuming a conversation whose transcript isn't on disk yet. */
-export function startSession(o: { cwd: string; prompt: string; model?: string | null; permissionMode?: PermissionMode; resume?: string | null; transcriptPending?: boolean }) {
+/** `transcriptPending`: resuming a conversation whose transcript isn't on disk yet. `fork`: continue in a copy of `resume`. */
+export function startSession(o: { cwd: string; prompt: string; model?: string | null; permissionMode?: PermissionMode; resume?: string | null; transcriptPending?: boolean; fork?: boolean }) {
   // One live session per conversation: a finished one is replaced by its resumption.
-  if (o.resume) for (const old of [...sessions.values()]) if (old.sessionId === o.resume) removeSession(old.id);
-  const s = new LiveSession(o.cwd, o.model ?? null, o.permissionMode ?? "default", o.resume ?? null, !!o.transcriptPending);
+  if (o.resume && !o.fork) for (const old of [...sessions.values()]) if (old.sessionId === o.resume) removeSession(old.id);
+  const s = new LiveSession(o.cwd, o.model ?? null, o.permissionMode ?? "default", o.resume ?? null, !!o.transcriptPending, !!o.fork);
   sessions.set(s.id, s);
   s.send(o.prompt);
   return s.view();

@@ -183,13 +183,26 @@ sessions.post("/sessions/new", async (c) => {
   return c.json({ sessionId: v.sessionId, liveId: v.id });
 });
 
-/** Sends to the running session, or resumes the conversation under the same session ID when Claude isn't running. */
+/**
+ * Sends to the running session, or resumes the conversation under the same session ID when Claude isn't running.
+ * When another Claude Code has it open, resuming would mix both into one transcript (the sessions docs: "If you resume
+ * the same session in two terminals without forking, messages from both interleave into one transcript"), so only
+ * `copy` is accepted then: it continues in a copy with its own session ID, and returns the live session to follow.
+ */
 sessions.post("/sessions/:sid/send", async (c) => {
   const sid = sidOf(c);
   const body = await c.req.json();
   const text = String(body.text ?? "");
   if (!text.trim()) throw new WriteError(400, "Empty message.");
+  if (body.copy) {
+    const s = await findSession(sid);
+    if (!s?.cwd) throw new WriteError(404, "Can't find that session's folder.");
+    const v = startSession({ cwd: s.cwd, prompt: text, model: body.model || null, permissionMode: modeOf(body.permissionMode) ?? "default", resume: sid, fork: true });
+    return c.json({ sessionId: null, liveId: v.id, resumed: false, copy: true });
+  }
   const l = liveBySessionId(sid);
+  if (!(l && isOpen(l)) && (await listLiveProcesses()).some((p) => p.sessionId === sid))
+    throw new WriteError(409, "This conversation is open in another Claude Code window. Reply there, or send from here to continue in a copy.");
   if (l && isOpen(l)) {
     l.send(text);
     return c.json({ sessionId: sid, liveId: l.id, resumed: false });
