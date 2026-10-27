@@ -251,9 +251,18 @@
         "A4",
         "A5"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": [
+        "specs/screenshots/004-S2-A1.png",
+        "specs/screenshots/004-S2-A3.png",
+        "specs/screenshots/004-S2-A4.png",
+        "specs/screenshots/004-S2-A4-plan.png",
+        "specs/screenshots/004-S2-A5-A1-390-light.png",
+        "specs/screenshots/004-S2-A5-A1-390-dark.png",
+        "specs/screenshots/004-S2-A5-A3-390-light.png",
+        "specs/screenshots/004-S2-A5-A3-390-dark.png"
+      ]
     }
   ]
 }
