@@ -209,6 +209,9 @@
 .prose-cc p,
 .prose-cc ul,
 .prose-cc ol,
+.prose-cc pre {
+  margin: 0 0 0.7em;
+}
 .prose-cc kbd {
   font-family: var(--font-mono);
   font-size: 0.85em;
@@ -217,9 +220,6 @@
   border-bottom-width: 2px;
   border-radius: 4px;
   padding: 0 0.3em;
-}
-.prose-cc pre {
-  margin: 0 0 0.7em;
 }
 .prose-cc :last-child {
   margin-bottom: 0;
