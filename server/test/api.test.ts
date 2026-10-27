@@ -64,6 +64,9 @@ beforeAll(async () => {
   // A session started from the app saved its account; the stray field must never reach the browser.
   await mkdir(join(root, "app"), { recursive: true });
   await writeFile(join(root, "app", "session-accounts.json"), JSON.stringify({ "e2644826-95f0-4880-8af9-8169d229cf1d": { provider: "firstParty", providerName: "Anthropic", email: "me@example.com", organization: "Acme", plan: "Claude Pro", tokenSource: "token-source-secret" } }));
+  // The settings reference as if fetched just now, so no test downloads the live page.
+  const shipped = JSON.parse(await readFile(join(import.meta.dir, "..", "src", "data", "settings-reference.json"), "utf8"));
+  await writeFile(join(root, "app", "settings-reference.json"), JSON.stringify({ ...shipped, fetchedAt: new Date().toISOString() }));
   // A plan written in the demo project and approved there, and one no conversation worked on (spec 004).
   await mkdir(join(claude, "plans"), { recursive: true });
   await writeFile(join(claude, "plans", "brave-plan.md"), "# Demo plan\n\n- [ ] step\n");
@@ -105,7 +108,7 @@ beforeAll(async () => {
 afterAll(() => rm(root, { recursive: true, force: true }));
 
 describe("secrets never leave the server", () => {
-  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d", "/api/suggested", "/api/menu", "/api/projects/" + encodeURIComponent("~/projects/demo") + "/board"];
+  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/settings/reference", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d", "/api/suggested", "/api/menu", "/api/projects/" + encodeURIComponent("~/projects/demo") + "/board"];
   for (const ep of endpoints) {
     test(ep, async () => {
       const res = await request(ep);
@@ -486,9 +489,11 @@ describe("Settings page writes", () => {
   test("environment variable values stay on the server until asked for", async () => {
     expect((await change({ op: "env-set", name: "MY_TOKEN", value: "env-secret-value" })).status).toBe(200);
     expect((await json(user())).env).toEqual({ MY_TOKEN: "env-secret-value" });
-    const view = await (await request("/api/settings")).text();
-    expect(view).toContain("MY_TOKEN");
-    expect(view).not.toContain("env-secret-value");
+    for (const ep of ["/api/settings", "/api/settings/reference"]) {
+      const view = await (await request(ep)).text();
+      expect(view).toContain("MY_TOKEN");
+      expect(view).not.toContain("env-secret-value");
+    }
     const shown = (await (await request("/api/settings/env-value?source=user&name=MY_TOKEN")).json()) as { value: string };
     expect(shown.value).toBe("env-secret-value");
     expect((await request("/api/settings/env-value?source=local&name=MY_TOKEN")).status).toBe(400);
@@ -995,5 +1000,51 @@ describe("deleted hooks and MCP servers go to Archived items (#88)", () => {
     expect(res.status).toBe(400);
     expect((await res.json()).error).toContain("already exists");
     expect((await archive()).some((r) => r.id === rec.id)).toBe(true);
+  });
+});
+
+describe("every setting by topic (005-S1)", () => {
+  const find = (body: any, key: string) => body.topics.flatMap((t: any) => t.settings.map((s: any) => ({ ...s, topic: t.title }))).find((s: any) => s.key === key);
+
+  test("each setting comes with its value now and the file that set it, dotted keys read nested", async () => {
+    const localFile = join(root, "projects", "demo", ".claude", "settings.local.json");
+    const before = await readFile(localFile, "utf8").catch(() => null);
+    await mkdir(join(root, "projects", "demo", ".claude"), { recursive: true });
+    await writeFile(localFile, JSON.stringify({ tui: "default", sandbox: { network: { allowedDomains: ["local.example"] } } }));
+    try {
+      const all = await (await request("/api/settings/reference")).json();
+      expect(find(all, "tui")).toMatchObject({ topic: "Interface and terminal", value: "fullscreen", from: "user", choices: ["default", "fullscreen"] });
+      for (const k of ["agentPushNotifEnabled", "inputNeededNotifEnabled"]) expect(find(all, k)).toMatchObject({ topic: "Remote, desktop, and notifications", value: true, from: "user", type: "boolean" });
+      expect(find(all, "preferredNotifChannel")).toMatchObject({ value: "auto", from: "user", type: "choice" });
+      expect(find(all, "verbose")).toMatchObject({ from: null, setIn: [], default: "`false`" });
+      expect(find(all, "verbose").value).toBeUndefined();
+      expect(find(all, "permissions.allow")).toMatchObject({ value: ["Bash(osascript *)"], from: "user", section: "permissions" });
+
+      const demo = await (await request("/api/settings/reference?project=" + encodeURIComponent("~/projects/demo"))).json();
+      expect(find(demo, "tui")).toMatchObject({ value: "default", from: "local", setIn: ["local", "user"] });
+      expect(find(demo, "sandbox.network.allowedDomains")).toMatchObject({ value: ["local.example"], from: "local", section: "sandbox" });
+      expect(demo.sources.map((s: any) => s.source)).toEqual(["managed", "local", "project", "user"]);
+    } finally {
+      if (before === null) await rm(localFile, { force: true });
+      else await writeFile(localFile, before);
+    }
+  });
+
+  test("with no copy in the app folder and no internet, the copy shipped with the app is used", async () => {
+    const { resetSettingsReference, referenceCachePath } = await import("../src/scan/settingsReference");
+    const cache = await readFile(referenceCachePath(), "utf8");
+    await rm(referenceCachePath());
+    resetSettingsReference();
+    const offline = spyOn(globalThis, "fetch").mockImplementation((() => Promise.reject(new Error("offline"))) as any);
+    try {
+      const body = await (await request("/api/settings/reference")).json();
+      expect(body.origin).toBe("shipped");
+      expect(find(body, "tui").choices).toEqual(["default", "fullscreen"]);
+      expect(offline).toHaveBeenCalled();
+    } finally {
+      offline.mockRestore();
+      await writeFile(referenceCachePath(), cache);
+      resetSettingsReference();
+    }
   });
 });

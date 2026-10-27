@@ -8,7 +8,9 @@ import { claudeDir, claudeJson, isInside, tildify, untildify } from "../fs/paths
 import { canRead, classify } from "../fs/policy";
 import { readWithHash, safeWrite, WriteError } from "../fs/safeWrite";
 import { addEntry, isKeepAChangelog, parseChangelog } from "../parsers/changelog";
-import { effective, type Source } from "../parsers/settings";
+import { effective, valueNow, type Source } from "../parsers/settings";
+import { REFERENCE_URL } from "../parsers/settingsReference";
+import { settingsReference } from "../scan/settingsReference";
 import { applySettingsChange, redactEnv, removeKeybinding, setKeybinding, type SettingsChange } from "../parsers/settingsEdit";
 import { KEY_ACTIONS, KEY_CONTEXTS } from "../parsers/keybindingDocs";
 import { search as searchDocs, listSessions, untitled } from "../db/index";
@@ -515,8 +517,8 @@ content.post("/memory/sync", async (c) => {
 
 // ---- Settings ----
 
-content.get("/settings", async (c) => {
-  const projectId = c.req.query("project");
+/** The settings files for a project (or for every project), highest first, each parsed with env values redacted. */
+async function readSettingsFiles(projectId: string | undefined) {
   const dir = projectId ? await requireProject(projectId) : null;
   const files: { source: Source; path: string }[] = [
     { source: "managed", path: managedSettingsPath() },
@@ -540,12 +542,32 @@ content.get("/settings", async (c) => {
     }
     sources.push({ source: f.source, path: f.path, display: tildify(f.path), exists: !!cur, access: classify(f.path), error, values: parsed[f.source] ?? null });
   }
+  return { parsed, sources };
+}
+
+content.get("/settings", async (c) => {
+  const { parsed, sources } = await readSettingsFiles(c.req.query("project"));
   // Keyboard shortcuts and themes exist only for all projects, so they come with every settings view.
   return c.json({
     sources,
     entries: effective(parsed),
     keybindings: { ...(await readKeybindings()), contexts: KEY_CONTEXTS, actions: KEY_ACTIONS },
     themes: await listThemes(),
+  });
+});
+
+/**
+ * Every documented setting by topic (code.claude.com settings reference), with its value now and the file that
+ * set it, from the same files and order as GET /settings.
+ */
+content.get("/settings/reference", async (c) => {
+  const [{ ref, origin }, { parsed, sources }] = await Promise.all([settingsReference(), readSettingsFiles(c.req.query("project"))]);
+  return c.json({
+    url: REFERENCE_URL,
+    fetchedAt: ref.fetchedAt,
+    origin,
+    sources: sources.map(({ source, display, exists, access, error }) => ({ source, display, exists, access, error })),
+    topics: ref.topics.map((t) => ({ ...t, settings: t.settings.map((s) => ({ ...s, ...valueNow(parsed, s.key) })) })),
   });
 });
 
