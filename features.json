@@ -224,6 +224,33 @@
         "specs/screenshots/003-S3-A7-390-light-board.png",
         "specs/screenshots/003-S3-A7-390-light.png"
       ]
+    },
+    {
+      "id": "004-S1",
+      "spec": "specs/004-plans-with-project-and-status.md",
+      "description": "Server: link plans to conversations (slug / planFilePath), derive each plan's project and status, include plans from projects' plansDirectory; plans list gives project, status and date; plan item gives its conversations; conversation gives its plan.",
+      "checks": [
+        "A1",
+        "A2"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
+    },
+    {
+      "id": "004-S2",
+      "spec": "specs/004-plans-with-project-and-status.md",
+      "description": "Pages: Plans list shows project and status tags and date, no sentence under heading, project filter works; plan page lists its conversations; conversation page links to its plan.",
+      "checks": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5"
+      ],
+      "status": "failing",
+      "build_attempts": 0,
+      "screenshots": []
     }
   ]
 }
