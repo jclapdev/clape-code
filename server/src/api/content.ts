@@ -11,7 +11,8 @@ import { addEntry, isKeepAChangelog, parseChangelog } from "../parsers/changelog
 import { effective, valueNow, type Source } from "../parsers/settings";
 import { REFERENCE_URL } from "../parsers/settingsReference";
 import { settingsReference } from "../scan/settingsReference";
-import { applySettingsChange, redactEnv, removeKeybinding, setKeybinding, type SettingsChange } from "../parsers/settingsEdit";
+import { applySettingsChange, redactEnv, removeKeybinding, setKeybinding, settingValue, writableIn, type SettingsChange } from "../parsers/settingsEdit";
+import { setKeyInText } from "../parsers/jsonText";
 import { KEY_ACTIONS, KEY_CONTEXTS } from "../parsers/keybindingDocs";
 import { search as searchDocs, listSessions, untitled } from "../db/index";
 import { globalLibrary, listPlugins, listThemes, memoryItems, projectLibrary, readKeybindings, readWorktreeInclude } from "../scan/library";
@@ -540,7 +541,7 @@ async function readSettingsFiles(projectId: string | undefined) {
       // Environment variable values can be secrets: only their names leave the server here.
       if (!error) parsed[f.source] = redactEnv(JSON.parse(cur.content))!;
     }
-    sources.push({ source: f.source, path: f.path, display: tildify(f.path), exists: !!cur, access: classify(f.path), error, values: parsed[f.source] ?? null });
+    sources.push({ source: f.source, path: f.path, display: tildify(f.path), exists: !!cur, hash: cur?.hash ?? null, access: classify(f.path), error, values: parsed[f.source] ?? null });
   }
   return { parsed, sources };
 }
@@ -567,8 +568,30 @@ content.get("/settings/reference", async (c) => {
     fetchedAt: ref.fetchedAt,
     origin,
     sources: sources.map(({ source, display, exists, access, error }) => ({ source, display, exists, access, error })),
-    topics: ref.topics.map((t) => ({ ...t, settings: t.settings.map((s) => ({ ...s, ...valueNow(parsed, s.key) })) })),
+    topics: ref.topics.map((t) => ({ ...t, settings: t.settings.map((s) => ({ ...s, targets: writableIn(s.scope), ...valueNow(parsed, s.key) })) })),
   });
+});
+
+/**
+ * Sets or removes one documented setting in the file picked in "Change settings for". Only that key's lines change.
+ * `hash` is the file's hash when the browser read it (null when it didn't exist), so a newer file on disk is never overwritten.
+ */
+content.post("/settings/set", async (c) => {
+  const f = (await c.req.json()) as { scope?: string; local?: boolean; key?: string; value?: unknown; hash?: string | null };
+  if (f.hash === undefined) throw new WriteError(400, "Reload the page and try again.");
+  const setting = (await settingsReference()).ref.topics.flatMap((t) => t.settings).find((s) => s.key === f.key);
+  if (!setting) throw new WriteError(400, "That isn't a setting in Claude Code's settings reference.");
+  const target = !f.scope || f.scope === "global" ? "user" : f.local ? "local" : "project";
+  const value = settingValue(setting, target, f.value);
+  const file = await settingsFile(f.scope, f.local);
+  const cur = await readWithHash(file);
+  const problem = cur ? jsonProblem(cur.content) : null;
+  if (problem) throw new WriteError(400, `${problem} Fix it as text first.`);
+  const text = setKeyInText(cur?.content ?? "", setting.key, value);
+  if (text === (cur?.content ?? "")) return c.json({ hash: cur?.hash ?? null, backupPath: null, path: file, display: tildify(file) }); // nothing to remove
+  const r = await safeWrite(file, text, f.hash);
+  emit({ area: "settings" });
+  return c.json({ ...r, path: file, display: tildify(file) });
 });
 
 /** One environment variable's value, sent only when someone clicks to see it. */

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Section } from "./Projects";
 import { AccountDetails } from "@/components/Account";
-import { filterTopics, FindSetting, TopicSections, type SettingsReferenceView } from "./SettingsTopics";
+import { filterTopics, FindSetting, TopicSections, type SettingsReferenceView, type Where } from "./SettingsTopics";
 
 type Source = "managed" | "local" | "project" | "user";
 type Obj = Record<string, any>;
@@ -22,6 +22,7 @@ interface SourceFile {
   path: string;
   display: string;
   exists: boolean;
+  hash: string | null;
   access: Access;
   error: string | null;
   values: Obj | null;
@@ -707,6 +708,7 @@ export function SettingsPage() {
   // Under ["settings"], so a change from any section refreshes the values shown here too.
   const reference = useQuery({ queryKey: ["settings", "reference", project ?? ""], queryFn: () => api.get<SettingsReferenceView>(`/settings/reference${project ? `?project=${enc(project)}` : ""}`) });
   const [find, setFind] = useState("");
+  const qc = useQueryClient();
   const go = (s: SettingsSearch) => void navigate({ to: "/settings", search: s, replace: true });
 
   if (view.error) return <ErrorNote error={view.error} />;
@@ -730,7 +732,18 @@ export function SettingsPage() {
   const projectOptions = (projects.data ?? []).filter((p) => !p.empty);
   const topics = reference.data?.topics ?? [];
   const shownTopics = filterTopics(topics, find);
-  const where = { label, target, pathOf: (s: Source) => view.data!.sources.find((x) => x.source === s && x.exists)?.path };
+  const where: Where = {
+    label,
+    target,
+    pathOf: (s: Source) => view.data!.sources.find((x) => x.source === s && x.exists)?.path,
+    values: file.values,
+    hash: file.hash,
+    writable: ctx.writable,
+    scope: ctx.scope,
+    local,
+    wrote: (hash) =>
+      qc.setQueryData<SettingsView>(["settings", project ?? ""], (old) => old && { ...old, sources: old.sources.map((s) => (s.source === target ? { ...s, hash, exists: true } : s)) }),
+  };
 
   return (
     <Page title="Settings">

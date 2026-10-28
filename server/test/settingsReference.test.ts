@@ -107,6 +107,15 @@ describe("parsing", () => {
     expect(unlink("see [Model](https://a/b.md#c) and [`x`](#x)")).toBe("see Model and `x`");
     expect(firstSentence("Use `.mcp.json` files, e.g. this one. Then more.")).toBe("Use `.mcp.json` files, e.g. this one.");
   });
+
+  test("a code span opened with two backticks holds backticks and full stops (#123)", () => {
+    const docs = "Turn off inline shell execution for `` !`...` `` and ` ```! ` blocks in skills and custom commands. Then more.";
+    expect(firstSentence(docs)).toBe("Turn off inline shell execution for `` !`...` `` and ` ```! ` blocks in skills and custom commands.");
+    expect(firstSentence("A lone ` backtick. Then more.")).toBe("A lone ` backtick.");
+    expect(byKey("disableSkillShellExecution")?.description).toBe(
+      "Turn off inline shell execution for `` !`...` `` and ` ```! ` blocks in skills and custom commands from user, project, plugin, or additional-directory sources.",
+    );
+  });
 });
 
 describe("valueNow", () => {

@@ -1030,6 +1030,51 @@ describe("every setting by topic (005-S1)", () => {
     }
   });
 
+  test("changing a setting in place writes only its own lines, with the browser's hash (005-S3)", async () => {
+    const demo = encodeURIComponent("~/projects/demo");
+    const shared = join(root, "projects", "demo", ".claude", "settings.json");
+    const before = await readFile(shared, "utf8").catch(() => null);
+    const original = '{\n  "$schema": "https://json.schemastore.org/claude-code-settings.json",\n  "env": { "A": "1" },\n  "hooks": {}\n}\n';
+    await mkdir(join(root, "projects", "demo", ".claude"), { recursive: true });
+    await writeFile(shared, original);
+    const set = (body: object) => request("/api/settings/set", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scope: "~/projects/demo", ...body }) });
+    const hash = async () => (await (await request(`/api/settings?project=${demo}`)).json()).sources.find((s: any) => s.source === "project").hash;
+    try {
+      expect((await set({ key: "verbose", value: true, hash: await hash() })).status).toBe(200);
+      expect((await set({ key: "editorMode", value: "vim", hash: await hash() })).status).toBe(200);
+      expect((await set({ key: "cleanupPeriodDays", value: 14, hash: await hash() })).status).toBe(200);
+      const text = await readFile(shared, "utf8");
+      expect(JSON.parse(text)).toEqual({ cleanupPeriodDays: 14, editorMode: "vim", verbose: true, $schema: "https://json.schemastore.org/claude-code-settings.json", env: { A: "1" }, hooks: {} });
+      for (const l of original.split("\n")) expect(text.split("\n")).toContain(l);
+      // A stale hash is refused and nothing is written.
+      const stale = await set({ key: "verbose", value: null, hash: "0".repeat(64) });
+      expect(stale.status).toBe(409);
+      expect(await readFile(shared, "utf8")).toBe(text);
+      // Off and empty remove the keys, giving the file back as it was.
+      for (const key of ["verbose", "editorMode", "cleanupPeriodDays"]) expect((await set({ key, value: null, hash: await hash() })).status).toBe(200);
+      expect(await readFile(shared, "utf8")).toBe(original);
+      // A User or managed setting is refused for a project's files, shared or local.
+      const localFile = join(root, "projects", "demo", ".claude", "settings.local.json");
+      const localBefore = await readFile(localFile, "utf8").catch(() => null);
+      for (const local of [false, true]) {
+        const r = await set({ key: "desktopSessionCleanupPeriodDays", value: 3, local, hash: null });
+        expect(r.status).toBe(400);
+        expect((await r.json()).error).toContain("can be set only in your settings for every project");
+      }
+      expect(await readFile(shared, "utf8")).toBe(original);
+      expect(await readFile(localFile, "utf8").catch(() => null)).toBe(localBefore);
+      // Settings with their own section, or not in the reference, aren't written here.
+      expect((await set({ key: "model", value: "opus", hash: await hash() })).status).toBe(400);
+      expect((await set({ key: "madeUp", value: true, hash: await hash() })).status).toBe(400);
+      const ref = await (await request(`/api/settings/reference?project=${demo}`)).json();
+      expect(find(ref, "desktopSessionCleanupPeriodDays").targets).toEqual(["user"]);
+      expect(find(ref, "verbose").targets).toEqual(["user", "project", "local"]);
+    } finally {
+      if (before === null) await rm(shared, { force: true });
+      else await writeFile(shared, before);
+    }
+  });
+
   test("with no copy in the app folder and no internet, the copy shipped with the app is used", async () => {
     const { resetSettingsReference, referenceCachePath } = await import("../src/scan/settingsReference");
     const cache = await readFile(referenceCachePath(), "utf8");

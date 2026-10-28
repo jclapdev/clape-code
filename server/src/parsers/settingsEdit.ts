@@ -3,6 +3,7 @@
 // /sandboxing, /model-config and /keybindings (read 2026-10-18) are accepted.
 import { WriteError } from "../fs/safeWrite";
 import { KEY_ACTIONS, KEY_CONTEXTS } from "./keybindingDocs";
+import type { ReferenceSetting } from "./settingsReference";
 
 type Obj = Record<string, any>;
 
@@ -190,4 +191,46 @@ export function removeKeybinding(o: Obj, context: string, keys: string) {
   if (i < 0) throw new WriteError(404, "That shortcut isn't in keybindings.json any more.");
   delete blocks[i].bindings[keys];
   if (!Object.keys(blocks[i].bindings).length) blocks.splice(i, 1);
+}
+
+// ---- Any documented setting (spec 005) ----
+
+export type SettingsTarget = "user" | "project" | "local";
+
+/** The files a setting can be written to, from its Scope line: "Any file", or the ones it names, such as "User or managed". */
+export function writableIn(scope: string): SettingsTarget[] {
+  if (/any file/i.test(scope)) return ["user", "project", "local"];
+  return (["user", "project", "local"] as const).filter((t) => new RegExp(`\\b${t}\\b`, "i").test(scope));
+}
+
+/**
+ * The value to write for one documented setting, or undefined to remove the key: off, empty or "Not set" removes it,
+ * so Claude Code's own default applies.
+ */
+export function settingValue(s: ReferenceSetting, target: SettingsTarget, value: unknown): unknown {
+  if (s.section) throw new WriteError(400, "This setting is changed in its own section of the Settings page.");
+  if (s.type === "other") throw new WriteError(400, "This setting is changed as text.");
+  const targets = writableIn(s.scope);
+  if (!targets.includes(target))
+    throw new WriteError(400, targets.join() === "user" ? `${s.key} can be set only in your settings for every project.` : `${s.key} can't be set in this file (${s.scope}).`);
+  if (value === null || value === undefined || value === "") return undefined;
+  switch (s.type) {
+    case "boolean":
+      if (typeof value !== "boolean") throw new WriteError(400, "Pick on or off.");
+      return value;
+    case "choice":
+      if (typeof value !== "string" || !s.choices?.includes(value)) throw new WriteError(400, `Pick one of: ${s.choices?.join(", ")}.`);
+      return value;
+    case "number":
+      if (typeof value !== "number" || !Number.isFinite(value)) throw new WriteError(400, "Write a number.");
+      return value;
+    case "string":
+      if (typeof value !== "string") throw new WriteError(400, "Write the value as text.");
+      return value.trim() || undefined;
+    case "list": {
+      if (!Array.isArray(value) || value.some((v) => typeof v !== "string")) throw new WriteError(400, "Write one value per line.");
+      const list = value.map((v: string) => v.trim()).filter(Boolean);
+      return list.length ? list : undefined;
+    }
+  }
 }

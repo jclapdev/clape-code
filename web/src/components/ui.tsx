@@ -53,9 +53,17 @@ export function AccessTag({ access }: { access: Access }) {
 }
 
 /** A labelled on/off switch. */
-export function Switch({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+export function Switch({ label, on, onChange, disabled, ariaLabel }: { label: string; on: boolean; onChange: (v: boolean) => void; disabled?: boolean; ariaLabel?: string }) {
   return (
-    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className="flex min-h-9 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 hover:text-ink">
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={() => onChange(!on)}
+      className="flex min-h-9 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-ink-2"
+    >
       <span className={cn("relative h-5 w-9 flex-none rounded-full border transition-colors", on ? "border-primary bg-primary" : "border-line-strong bg-sunken")}>
         <span className={cn("absolute top-0.5 size-3.5 rounded-full bg-surface shadow transition-all", on ? "left-[18px]" : "left-0.5")} />
       </span>

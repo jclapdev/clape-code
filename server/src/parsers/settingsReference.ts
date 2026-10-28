@@ -49,13 +49,32 @@ export interface SettingsReference {
 /** `[text](url)` becomes `text`. */
 export const unlink = (s: string) => s.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
 
-/** The first sentence: up to the first `.`, `!` or `?` outside backticks that ends the text or comes before a space. */
+/**
+ * The first sentence: up to the first `.`, `!` or `?` outside code spans that ends the text or comes before a space.
+ * A code span opens with a run of backticks and closes at the next run of the same length (CommonMark), so
+ * `` !`...` `` is one span.
+ */
 export function firstSentence(text: string): string {
-  let code = false;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (ch === "`") code = !code;
-    else if (!code && ".!?".includes(ch) && (i === text.length - 1 || /\s/.test(text[i + 1])) && !/\b(e\.g|i\.e|etc|vs)$/.test(text.slice(0, i))) return text.slice(0, i + 1);
+    if (ch === "`") {
+      let n = 1;
+      while (text[i + n] === "`") n++;
+      const fence = "`".repeat(n);
+      // The closing run must be exactly n backticks long.
+      let j = i + n;
+      let close = -1;
+      while ((j = text.indexOf(fence, j)) >= 0) {
+        let m = n;
+        while (text[j + m] === "`") m++;
+        if (m === n) {
+          close = j;
+          break;
+        }
+        j += m;
+      }
+      i = close >= 0 ? close + n - 1 : i + n - 1; // with no closing run, the backticks are plain text
+    } else if (".!?".includes(ch) && (i === text.length - 1 || /\s/.test(text[i + 1])) && !/\b(e\.g|i\.e|etc|vs)$/.test(text.slice(0, i))) return text.slice(0, i + 1);
   }
   return text;
 }
