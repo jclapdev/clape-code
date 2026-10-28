@@ -54,7 +54,9 @@ changed in place.
   every project; with another file picked, its control is off and says so. Scope
   counts on 27 Oct included 12 plain "User or managed" and 92 plain "Any file".
 - "Off" or empty in a control removes the key from the file instead of writing a
-  default, so Claude Code's own default applies. Writes go through `safeWrite`
+  default, so Claude Code's own default applies. Except: a switch writes `false` when
+  the setting is on by default (22 settings) or another settings file turns it on,
+  since removing the key would leave it on (found while building 005-S3; #124). Writes go through `safeWrite`
   (CLAUDE.md). Claude's own call.
 - No sentence goes under a section heading (BRIEF.md won't-do).
 
