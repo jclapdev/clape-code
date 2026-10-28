@@ -15,6 +15,20 @@ export function when(iso: string | number | null | undefined): string {
   return d.getFullYear() === now.getFullYear() ? base : `${base} ${d.getFullYear()}`;
 }
 
+/** A date without the time: "today", "yesterday", "12 Oct" this year, "12 Oct 2025" otherwise. */
+export function day(iso: string | number | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return "today";
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return "yesterday";
+  const base = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return d.getFullYear() === now.getFullYear() ? base : `${base} ${d.getFullYear()}`;
+}
+
 /** Group label for a list: Today, Yesterday, This week, or the month. */
 export function dayGroup(iso: string | null): string {
   if (!iso) return "Undated";

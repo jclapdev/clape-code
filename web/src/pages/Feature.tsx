@@ -7,16 +7,16 @@ import { Archive, ChevronLeft, FolderOpen, PackageSearch, Play, Plus, Search } f
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { FEATURES, featureById, type Feature, type FeatureId } from "@/lib/features";
-import { plural } from "@/lib/format";
+import { day, plural, when } from "@/lib/format";
 import type { Catalog, CatalogItem, SlashCommand } from "@/lib/types";
 import { FileEditor } from "@/components/FileEditor";
-import { ItemActions, isSkillsDirPlugin } from "@/components/ItemActions";
+import { ItemActions, isSkillsDirPlugin, onInLabel } from "@/components/ItemActions";
 import { FindPlugins, NewPlugin } from "./PluginPanels";
 import { toast } from "sonner";
 import { PAGE_BAND, PAGE_COLUMN, PAGE_SCROLL, Page } from "@/components/Panes";
 import { Readable } from "@/components/Readable";
 import { SimpleSelect } from "@/components/SimpleSelect";
-import { ErrorNote, Loading, Tag } from "@/components/ui";
+import { ErrorNote, Loading, Tag, type Tone } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -38,6 +38,7 @@ interface Row {
   item: CatalogItem | null;
   projectId: string | null;
   command?: string; // what you type to run it, for the Slash commands page
+  hint?: string; // what the command takes after its name, such as <path>
   tag?: string; // shown instead of where the item applies
 }
 
@@ -68,8 +69,16 @@ export function whereLabel(i: CatalogItem | null) {
   if (!i) return "Built into Claude Code";
   if (i.kind !== "plugin" && i.source === "plugin") return `From plugin ${i.sourceName}`;
   if (i.source === "synced") return "From claude.ai";
+  if (i.kind === "plugin" && onInLabel(i)) return onInLabel(i)!;
   return i.projectName ?? "All projects";
 }
+
+/** "Turned off" and the like, or where it's on instead when only some projects turn it on. */
+const stateLabel = (i: CatalogItem | null) => {
+  if (!i?.state || i.state === "on") return null;
+  if (onInLabel(i)) return i.kind === "plugin" ? null : onInLabel(i);
+  return STATE_LABEL[i.state] ?? i.state;
+};
 
 function useCatalog() {
   return useQuery({ queryKey: ["catalog"], queryFn: () => api.get<Catalog>("/catalog") });
@@ -82,31 +91,36 @@ function useLiveCommands(on: boolean) {
 const COMMAND_KINDS: CatalogItem["kind"][] = ["skill", "command", "workflow"];
 
 /** The rows for one feature. Slash commands mixes your own commands with Claude Code's built-in ones. */
-function rowsFor(f: Feature, items: CatalogItem[], live: SlashCommand[] | undefined): { rows: Row[]; builtIn: number } {
+function rowsFor(f: Feature, items: CatalogItem[], live: SlashCommand[] | undefined): Row[] {
   if (f.id !== "commands") {
-    const rows: Row[] = items.filter((i) => f.kinds.includes(i.kind)).map((i) => ({ key: keyOf(i), name: i.name, description: i.description, item: i, projectId: i.projectId }));
+    // A plan's description is its file name; the date it last changed says more.
+    const rows: Row[] = items
+      .filter((i) => f.kinds.includes(i.kind))
+      .map((i) => ({ key: keyOf(i), name: i.name, description: i.kind === "plan" ? (i.mtime ? `Changed ${day(i.mtime)}` : "") : i.description, item: i, projectId: i.projectId }));
     if (f.id === "agents") {
       // The docs: "A user or project subagent named `Explore` overrides the built-in", so yours for every project hides it.
       const yours = new Set(rows.filter((r) => !r.projectId && r.item?.source === "user").map((r) => r.name.toLowerCase()));
       for (const a of BUILT_IN_AGENTS) if (!yours.has(a.name.toLowerCase())) rows.push({ key: `builtin-agent|${a.name}`, name: a.name, description: a.description, item: null, projectId: null, tag: "Built in" });
     }
-    return { rows, builtIn: 0 };
+    return rows;
   }
   const custom = items.filter((i) => COMMAND_KINDS.includes(i.kind));
   const rows: Row[] = custom.map((i) => ({ key: keyOf(i), name: slashOf(i), description: i.description, item: i, projectId: i.projectId, command: slashOf(i) }));
-  // Built-in commands are what the last session reported, minus your own skills and commands it also listed.
+  // Built-in commands come from the docs and the last session (with a tag), minus your own skills and commands.
   const mine = new Set(custom.flatMap((i) => [slashOf(i).slice(1), baseName(i), i.overrideKey ?? ""]));
   // Names starting with __ are Claude Code's internal commands, not ones you type.
-  const builtIn = (live ?? []).filter((c) => !mine.has(c.name) && !c.name.startsWith("__"));
-  for (const c of builtIn) rows.push({ key: `builtin|${c.name}`, name: `/${c.name}`, description: c.description, item: null, projectId: null, command: `/${c.name}` });
-  return { rows, builtIn: builtIn.length };
+  const builtIn = (live ?? []).filter((c) => c.tag && !mine.has(c.name) && !c.name.startsWith("__"));
+  for (const c of builtIn)
+    rows.push({ key: `builtin|${c.name}`, name: `/${c.name}`, description: c.description, item: null, projectId: null, command: `/${c.name}`, hint: c.argumentHint || undefined, tag: c.tag });
+  return rows;
 }
 
 function matches(r: Row, q: string, project: string) {
   if (project === "global" && r.projectId) return false;
-  if (project && project !== "global" && r.projectId !== project) return false;
+  // What's built into Claude Code applies in every project.
+  if (project && project !== "global" && r.item && r.projectId !== project) return false;
   if (!q) return true;
-  const hay = `${r.name} ${r.description} ${r.tag ?? whereLabel(r.item)} ${agentLabel(r.item) ?? ""} ${onlyYou(r.item) ? "only you" : ""}`.toLowerCase();
+  const hay = `${r.name} ${r.description} ${r.item?.description ?? ""} ${planStatus(r.item)?.[0] ?? ""}${r.tag ?? whereLabel(r.item)} ${stateLabel(r.item) ?? ""} ${agentLabel(r.item) ?? ""} ${onlyYou(r.item) ? "only you" : ""}`.toLowerCase();
   return q
     .toLowerCase()
     .split(/\s+/)
@@ -114,16 +128,22 @@ function matches(r: Row, q: string, project: string) {
     .every((w) => hay.includes(w));
 }
 
+const PLAN_STATUS: Record<string, [string, Tone]> = { approved: ["Approved", "ok"], "not-approved": ["Not approved", "attn"], draft: ["Draft", "muted"] };
+/** A plan's status label and colour, from the last time Claude asked to have it approved. */
+const planStatus = (i: CatalogItem | null) => (i?.kind === "plan" ? (PLAN_STATUS[String(i.meta?.status)] ?? null) : null);
+
 function RowTags({ r, f }: { r: Row; f: Feature }) {
   const i = r.item;
+  const status = planStatus(i);
   return (
     <>
       <Tag tone={i ? "muted" : "accent"}>{r.tag ?? whereLabel(i)}</Tag>
+      {status && <Tag tone={status[1]}>{status[0]}</Tag>}
       {agentLabel(i) && <Tag>{agentLabel(i)}</Tag>}
       {onlyYou(i) && <Tag>Only you</Tag>}
       {i?.kind === "plugin" && <Tag className="max-w-full break-all">{isSkillsDirPlugin(i) ? "Your skills folder" : `From ${String(i.meta?.marketplace ?? i.sourceName)}`}</Tag>}
       {i && f.kinds.length > 1 && KIND_LABEL[i.kind] && f.kinds[0] !== i.kind && <Tag>{KIND_LABEL[i.kind]}</Tag>}
-      {i?.state && i.state !== "on" && <Tag>{STATE_LABEL[i.state] ?? i.state}</Tag>}
+      {stateLabel(i) && <Tag>{stateLabel(i)}</Tag>}
       {i?.error && <Tag tone="danger">Has a mistake</Tag>}
     </>
   );
@@ -197,6 +217,11 @@ function ItemBody({ r }: { r: Row }) {
     return (
       <div className="flex flex-col gap-2 leading-relaxed text-ink-2">
         {r.description && <p>{r.description}</p>}
+        {r.hint && (
+          <p>
+            Takes <code className="break-all">{r.hint}</code>
+          </p>
+        )}
         <p className="text-muted-foreground">It's built into Claude Code, so it can't be changed here.</p>
       </div>
     );
@@ -223,7 +248,39 @@ function ItemBody({ r }: { r: Row }) {
     );
   }
   if (i.kind === "plugin") return <PluginBody i={i} />;
+  if (i.kind === "plan") return <PlanBody i={i} />;
   return <Readable path={i.path} editLink={false} />;
+}
+
+interface PlanConversation {
+  sessionId: string;
+  title: string;
+  at: string | null;
+}
+
+/** A plan: the conversations that worked on it, newest first, then its text. */
+function PlanBody({ i }: { i: CatalogItem }) {
+  const convs = Array.isArray(i.meta.conversations) ? (i.meta.conversations as PlanConversation[]) : [];
+  return (
+    <div className="flex flex-col gap-4">
+      {convs.length > 0 && (
+        <section aria-label="Conversations" className="flex flex-col gap-2">
+          <h3 className="text-[15px] font-semibold">Conversations</h3>
+          <ul className="flex flex-col rounded-md border border-line bg-surface text-[13.5px]">
+            {convs.map((c) => (
+              <li key={c.sessionId} className="border-b border-line last:border-b-0">
+                <Link to="/sessions/$sid" params={{ sid: c.sessionId }} className="flex flex-wrap items-baseline justify-between gap-x-3 px-3 py-2 text-ink no-underline hover:bg-sunken">
+                  <span className="min-w-0 break-words">{c.title}</span>
+                  <span className="flex-none text-[12.5px] text-muted-foreground">{when(c.at)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <Readable path={i.path} editLink={false} />
+    </div>
+  );
 }
 
 /** A plugin: where it comes from, the files in its folder (each opens readable and editable where allowed), and its manifest. */
@@ -387,13 +444,14 @@ export function FeaturePage() {
     go({ q: v || undefined }, true);
   };
 
-  const { rows, builtIn } = useMemo(() => rowsFor(f, cat.data?.items ?? [], live.data), [f, cat.data, live.data]);
+  const rows = useMemo(() => rowsFor(f, cat.data?.items ?? [], live.data), [f, cat.data, live.data]);
   const shown = useMemo(() => rows.filter((r) => matches(r, q, project)).sort((a, b) => a.name.localeCompare(b.name)), [rows, q, project]);
 
   if (cat.isLoading) return <Loading />;
   if (cat.error) return <ErrorNote error={cat.error} />;
 
-  const selected = rows.find((r) => r.key === search.item) ?? null;
+  // A conversation links to its plan by the plan's path, since it doesn't know the plan's project.
+  const selected = rows.find((r) => r.key === search.item) ?? (f.id === "plans" ? rows.find((r) => r.item?.path === search.item) : undefined) ?? null;
   const close = () => go({ item: undefined });
   const panel = f.id === "plugins" && !selected ? search.panel : undefined;
   const panelView = (back: ReactNode) =>
@@ -409,9 +467,6 @@ export function FeaturePage() {
   const list = (
     <>
       <ListHead f={f} count={shown.length} total={rows.length} q={q} setQ={setQ} project={project} setProject={(v) => go({ project: v || undefined }, true)} projects={cat.data!.projects} />
-      {f.id === "commands" && live.isSuccess && builtIn === 0 && (
-        <p className="mx-4 mb-3 rounded-md bg-sunken px-3 py-2 text-[13.5px] text-ink-2 md:mx-6">Claude Code's own commands, such as /compact, show here after a session has run once in this app. Start one from Sessions.</p>
-      )}
       {shown.length ? (
         <ul className="mx-4 mb-6 divide-y divide-line rounded-lg border border-line bg-surface md:mx-6">
           {shown.map((r) => (
@@ -419,6 +474,7 @@ export function FeaturePage() {
               <Link to={`/${f.id}`} search={{ ...search, item: r.key, panel: undefined } as never} className="flex flex-col gap-1 px-4 py-3 text-ink no-underline hover:bg-sunken">
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="min-w-0 break-words font-medium">{r.name}</span>
+                  {r.hint && <code className="min-w-0 break-all text-[13px] text-muted-foreground">{r.hint}</code>}
                   <RowTags r={r} f={f} />
                 </span>
                 {r.description && <span className="line-clamp-2 text-[13.5px] leading-relaxed text-ink-2">{r.description}</span>}
@@ -456,7 +512,7 @@ export function FeaturePage() {
 
 /** Counts per feature, for the Customize overview. */
 function countFor(id: FeatureId, items: CatalogItem[], live: SlashCommand[] | undefined) {
-  return rowsFor(featureById(id)!, items, live).rows.length;
+  return rowsFor(featureById(id)!, items, live).length;
 }
 
 export function CustomizePage() {

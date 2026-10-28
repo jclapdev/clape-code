@@ -44,6 +44,9 @@ export function setProjectDirs(dirs: string[]) {
 }
 
 export function classify(abs: string): Access {
+  // Holds account details (oauthAccount, userID, …): never served raw. The server reads only the fields it needs.
+  // Checked first: with CLAUDE_CONFIG_DIR set it sits inside the Claude folder.
+  if (isInside(abs, claudeJson())) return "secret";
   const cd = claudeDir();
   if (isInside(abs, cd)) {
     const rel = toPosix(relative(cd, abs));
@@ -53,8 +56,6 @@ export function classify(abs: string): Access {
     if (EDITABLE.some((r) => r.test(rel))) return "edit";
     return "app";
   }
-  // Holds account details (oauthAccount, userID, …): never served raw. The server reads only the fields it needs.
-  if (isInside(abs, claudeJson())) return "secret";
   for (const dir of projectDirs) {
     if (isInside(abs, dir)) {
       const rel = toPosix(relative(dir, abs));

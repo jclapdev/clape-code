@@ -31,6 +31,8 @@ export interface SessionEntry {
   jobId: string | null;
   fromScript: boolean;
   archived: boolean;
+  /** A copy Control Center made of a conversation open in another window: the original. */
+  copyOf?: Session["copyOf"];
   /** needs: waiting for an answer; running: Claude is working. */
   status: "needs" | "running" | null;
 }
@@ -65,6 +67,7 @@ export function useSessionEntries({ archived = false }: { archived?: boolean } =
         jobId: job?.id ?? null,
         fromScript: s.fromScript,
         archived: s.archived,
+        copyOf: s.copyOf,
         status: needs ? "needs" : s.activity === "working" ? "running" : null,
       };
     }),
@@ -166,11 +169,14 @@ export function SessionRow({ e }: { e: SessionEntry }) {
     <>
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium text-ink">{e.title}</div>
-        <div className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{join(folder(e.project ?? e.cwd) ?? "Not in a project", ago(e.at))}</div>
+        <div className="mt-0.5 truncate text-[12.5px] text-muted-foreground">
+          {join(folder(e.project ?? e.cwd) ?? "Not in a project", ago(e.at), e.copyOf && `Copy of ${e.copyOf.title ?? "another conversation"}`)}
+        </div>
       </div>
-      {(e.status || e.archived) && (
+      {(e.status || e.archived || e.copyOf) && (
         <div className="flex flex-none flex-wrap justify-end gap-1.5">
           {e.status && TAGS[e.status]}
+          {e.copyOf && <Tag>Copy</Tag>}
           {e.archived && <Tag>Archived</Tag>}
         </div>
       )}

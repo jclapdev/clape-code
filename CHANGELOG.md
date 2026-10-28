@@ -6,10 +6,15 @@ Notable changes to Control Center, newest first.
 
 ### Added
 
+- Slash commands always lists Claude Code's own commands, such as `/compact` and `/init`, from the docs' command list, even before any session has run in Control Center. Each shows its purpose and what it takes (such as `<path>` for `/add-dir`) and is tagged "Built into Claude Code", or "Built-in skill" for bundled skills such as `/fewer-permission-prompts`, or "From MCP server <server>" for an MCP server's prompts. They stay listed when a project is picked in the filter, and the same list is offered when you type `/` in a conversation.
+- Settings lists every setting from Claude Code's settings reference, one section per topic (such as "Interface and terminal" and "Remote, desktop, and notifications") below Themes, each with its description and its value now and the file that set it, or its default. "Find a setting" filters them by key or description. Each one can be changed in place, in the file picked in "Change settings for": an on/off switch, a choice, a number box, a text box, or one value per line. Turning it off or emptying it removes it from the file, except that a switch writes `false` when the setting is on by default or another settings file turns it on, so a project can turn off what your settings for every project turn on; every other line of the file stays as it was. Settings that can go only in your settings for every project are greyed out for a project, with a note saying so. A setting another section already edits links to that section; one that holds an object has "Edit as text", which opens its file at that key.
+- Plans shows whether each plan was approved (Approved, Not approved or Draft) and the date it last changed instead of its file name. A plan's page lists the conversations that worked on it, newest first, and a conversation's page links to the plan it follows.
+- Plans are tagged with the project their conversations ran in, so picking a project on Plans shows its plans. Plans in a project's own plans folder (`plansDirectory`) are listed too.
 - Each project page has "Shared instructions and plugins": your instructions and rules for every project, and the plugins turned on in that project, each opening its own page.
 - Agents lists Claude Code's built-in agents (Explore, Plan, General-purpose, claude, statusline-setup, claude-code-guide), tagged "Built in". One of your own agents with the same name hides the built-in one.
 - Deleted hooks and MCP servers go to Archived items, where Restore puts them back: a hook into its group in the same settings file, a server through Claude Code's `claude mcp add-json`.
 - A conversation open in another Claude Code window isn't sent into: a message sent from Control Center continues in a copy of it, with its own session, so the two don't mix into one transcript.
+- A copy Control Center makes of a conversation open in another window is tagged "Copy" on Sessions and in the menu, with "Copy of <title>" under it, and its page links to the original. Its title stays as Claude Code wrote it.
 - Text you type is kept when you leave the page: a conversation's reply box, the New session box, and the New skill, command, agent, rule, output style, memory note, instructions, hook, permission rule, MCP server and project forms. It's still there when you come back, and goes once you send or save it.
 - Guides has "In the cloud and your organization", with links to the official pages for cloud scheduled tasks (routines), Code Review on GitHub, Claude Code in Slack, gateways, organization-managed settings and the Agent SDK.
 - On Memory, notes kept in a project's `.claude/agent-memory-local/` are tagged "Only you", beside "Agent: <name>".
@@ -48,6 +53,7 @@ Notable changes to Control Center, newest first.
 
 ### Changed
 
+- Control Center reads only `~/.claude` and the folders inside your Project folders. Folders where a conversation ran or that `~/.claude.json` names, such as Documents, Desktop, Mail or iCloud Drive, are no longer looked at, so macOS stops asking for access to them. Their conversations still show on Sessions.
 - Every page's content starts at the same left edge and has the same width, including Projects and pages that scroll.
 - Cards on Projects, a project's "Build your setup", Customize and Guides are all the same height.
 - Every conversation has one page, at /sessions/<session id>: the whole conversation with tool calls folded into one line, Claude's approvals and questions as cards where it stopped, and a reply box at the bottom with the model and permission mode under it. Pressing Enter sends, whether Claude is working, finished, or the session was started in a terminal; Stop sits next to the box. "Show details" unfolds tool calls and thinking. "Copy command for the terminal", subagent runs, Archive and Delete are in the page's menu. The header names the conversation, its project and whether Claude is working, waiting for you or done. Old /live/<id>, /live?resume=<id> and /jobs/<id> links open this page.
@@ -80,6 +86,8 @@ Notable changes to Control Center, newest first.
 
 ### Fixed
 
+- A plugin turned off in your settings for every project but on in some projects says where it is on, such as "On in demo", on its page and in the lists, instead of "Turned off" and "All projects"; so do its skills and other parts. Its on/off box reads "On in every project" or "Only on in demo".
+- With `CLAUDE_CONFIG_DIR` set, your MCP servers for every project are read from the `.claude.json` inside that folder, where Claude Code keeps it, so they show on MCP servers and removing one keeps it in Archived items.
 - Empty pages (such as an empty Archived items) and the page for an old live-session link start at the same left edge as every other page.
 - Pictures in Guides load. The page now allows images from mintcdn.com, the server the Claude Code docs use, and from nowhere else outside the app.
 - An opened project, conversation, file or item starts its title at the same left edge, and puts its content in the same width, as the top-level pages.

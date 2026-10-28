@@ -13,7 +13,7 @@ import { IconButton } from "./IconButton";
 import { LoginGate } from "./LoginGate";
 import { SearchBox } from "./SearchBox";
 import { useIsMobile } from "./Panes";
-import { cn, CrashForTesting, PageErrorBoundary } from "./ui";
+import { cn, CrashForTesting, PageErrorBoundary, Tag } from "./ui";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
@@ -43,13 +43,14 @@ const itemClass = (on: boolean) =>
     on && "bg-accent font-semibold text-accent-foreground hover:bg-accent hover:text-accent-foreground",
   );
 
-function NavLink({ to, search, label, icon: Icon, dot, attn, onPick, sub, title }: { to: string; search?: Record<string, unknown>; label: string; icon?: LucideIcon; dot?: string; attn?: number; onPick?: () => void; sub?: boolean; title?: string }) {
+function NavLink({ to, search, label, icon: Icon, dot, attn, onPick, sub, title, tag }: { to: string; search?: Record<string, unknown>; label: string; icon?: LucideIcon; dot?: string; attn?: number; onPick?: () => void; sub?: boolean; title?: string; tag?: string }) {
   const on = isOn(usePath(), to);
   return (
     <Link to={to} search={search} onClick={onPick} title={title} aria-current={on ? "page" : undefined} className={cn(itemClass(on), sub && "h-8 text-[13.5px]")}>
       {Icon && <Icon className="size-4 flex-none" aria-hidden />}
       {dot && <span className={cn("mx-1 size-2 flex-none rounded-full", dot)} aria-hidden />}
       <span className="min-w-0 flex-1 truncate">{label}</span>
+      {tag && <Tag className="flex-none">{tag}</Tag>}
       {attn ? (
         <span className="rounded-full bg-attn-dot px-1.5 text-[11px] font-semibold text-white" aria-label={`${attn} need you`}>
           {attn}
@@ -85,7 +86,7 @@ function Group({ id, label, to, onPick, children }: { id: string; label: string;
 
 function useProjects() {
   const q = useQuery({ queryKey: ["projects"], queryFn: () => api.get<Project[]>("/projects") });
-  return (q.data ?? []).filter((p) => p.group === "root");
+  return q.data ?? [];
 }
 
 function useNeeds() {
@@ -98,6 +99,8 @@ interface MenuItem {
   jobId: string | null;
   title: string;
   project: string | null;
+  /** Set only on a copy Control Center made: the original's session ID. */
+  copyOf?: string;
 }
 interface MenuData {
   last: MenuItem | null;
@@ -110,7 +113,7 @@ interface MenuData {
 /** The conversation you last sent a message in, the ones that need you and the ones Claude is working in. */
 const useMenu = () => useQuery({ queryKey: ["menu"], queryFn: () => api.get<MenuData>("/menu") }).data;
 const linkOf = (i: MenuItem) => (i.sessionId ? `/sessions/${i.sessionId}` : `/jobs/${i.jobId}`);
-const about = (i: MenuItem) => [i.title, i.project?.split("/").pop()].filter(Boolean).join(" · ");
+const about = (i: MenuItem) => [i.copyOf ? `Copy: ${i.title}` : i.title, i.project?.split("/").pop()].filter(Boolean).join(" · ");
 const KINDS = [
   { key: "needsYou", more: "needsYouMore", label: "Needs you", dot: "bg-attn-dot", search: { needs: true } },
   { key: "running", more: "runningMore", label: "Working", dot: "bg-primary", search: {} },
@@ -121,14 +124,14 @@ function Conversations({ onPick }: { onPick?: () => void }) {
   if (!m) return null;
   return (
     <>
-      {m.last && <NavLink to={linkOf(m.last)} label="Continue last conversation" icon={History} title={about(m.last)} onPick={onPick} />}
+      {m.last && <NavLink to={linkOf(m.last)} label="Continue last conversation" icon={History} title={about(m.last)} onPick={onPick} tag={m.last.copyOf ? "Copy" : undefined} />}
       {KINDS.map(
         (k) =>
           m[k.key].length > 0 && (
             <section key={k.key} aria-label={k.label} className="mt-1 flex flex-col gap-0.5 pl-2">
               <h2 className="px-2.5 pt-1 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">{k.label}</h2>
               {m[k.key].map((i) => (
-                <NavLink key={linkOf(i)} to={linkOf(i)} label={i.title} dot={k.dot} title={about(i)} onPick={onPick} sub />
+                <NavLink key={linkOf(i)} to={linkOf(i)} label={i.title} dot={k.dot} title={about(i)} onPick={onPick} sub tag={i.copyOf ? "Copy" : undefined} />
               ))}
               {m[k.more] > 0 && <NavLink to="/sessions" search={k.search} label={`${m[k.more]} more`} onPick={onPick} sub />}
             </section>
@@ -156,7 +159,7 @@ function RailConversations() {
             className={cn("flex w-full flex-none items-start gap-1 rounded-md px-1.5 py-1.5 text-[11px] leading-tight text-ink-2 no-underline hover:bg-sunken hover:text-ink", isOn(path, linkOf(i)) && "bg-accent text-accent-foreground")}
           >
             <span className={cn("mt-1 size-1.5 flex-none rounded-full", k.dot)} aria-label={k.label} />
-            <span className="line-clamp-3 min-w-0 break-words">{i.title}</span>
+            <span className="line-clamp-3 min-w-0 break-words">{i.copyOf ? `Copy: ${i.title}` : i.title}</span>
           </Link>
         )),
       )}

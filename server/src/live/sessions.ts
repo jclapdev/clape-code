@@ -6,6 +6,7 @@ import { appDir, claudeDir, tildify } from "../fs/paths";
 import { toolSummary } from "../parsers/transcript";
 import { pickSessionAccount, saveSessionAccount, type SessionAccount } from "../account/sessions";
 import { claudeEnv, findClaude } from "./claude";
+import { recordCopy } from "./copies";
 import { recordStarted } from "./started";
 
 export { findClaude };
@@ -54,6 +55,7 @@ export interface LiveSessionView {
   pending: PendingRequest[];
   commands: { name: string; description: string; argumentHint: string }[];
   account: SessionAccount | null;
+  copyOf: string | null;
 }
 
 class AsyncQueue<T> implements AsyncIterable<T> {
@@ -149,6 +151,8 @@ class LiveSession {
   commands: LiveSessionView["commands"] = [];
   terminalOnly = new Set<string>();
   account: SessionAccount | null = null;
+  /** The conversation this one is a copy of, when it continues one open in another window. */
+  copyOf: string | null = null;
 
   constructor(
     public cwd: string,
@@ -161,6 +165,7 @@ class LiveSession {
     // A new session gets its ID up front, so its address is known before Claude answers. Resuming keeps the ID. A copy
     // (`forkSession`) gets its ID from Claude's first message, as the Agent SDK sessions docs read it.
     this.sessionId = fork ? "" : (resume ?? crypto.randomUUID());
+    this.copyOf = fork ? resume : null;
     if (this.sessionId) void recordStarted(this.sessionId).catch(() => {});
     if (fork) this.launch(resume, true);
     else if (!resume || !transcriptPending) this.launch(resume);
@@ -209,6 +214,7 @@ class LiveSession {
       pending: [...this.waiters.values()].map((w) => w.req),
       commands: this.commands,
       account: this.account,
+      copyOf: this.copyOf,
     };
   }
 
@@ -311,6 +317,7 @@ class LiveSession {
     if ("session_id" in m && m.session_id && m.session_id !== this.sessionId) {
       this.sessionId = m.session_id;
       void recordStarted(m.session_id).catch(() => {});
+      if (this.copyOf) void recordCopy(m.session_id, this.copyOf).catch(() => {});
     }
     if (m.type === "system" && (m as any).subtype === "commands_changed") {
       this.setCommands((m as any).commands ?? []);

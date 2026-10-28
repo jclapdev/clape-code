@@ -1,21 +1,26 @@
 // The real API, against a fixture home folder seeded with secrets: nothing secret may come back,
 // and the login lockout can't be reset with a client-set header.
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
+import * as fsp from "node:fs/promises";
 import { mkdtemp, mkdir, rm, writeFile, copyFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { installFakeClaude } from "./fakeClaude";
 
 let root: string;
 // The last two come from the fake `claude auth status` (fixtures/fake-claude.ts).
 const SECRETS = ["token-source-secret", "org-secret-id", "sk-ant-oat01-secret-token", "secret@example.com", "user-secret-id", "machine-secret-id", "peer-secret-token", "rv-secret", "control-secret"];
 let app: any;
+const PLAN_SID = "7a1b2c3d-0000-4000-8000-000000000004";
+const OUTSIDE_SID = "7a1b2c3d-0000-4000-8000-000000000039";
+let OUTSIDE: string[] = [];
 
 const request = (path: string, init: RequestInit = {}, ip = "127.0.0.1") =>
   app.request(path, { ...init, headers: { host: "127.0.0.1:4317", ...(init.headers ?? {}) } }, { server: { requestIP: () => ({ address: ip, family: "IPv4", port: 1 }) } });
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "cc-api-"));
+  OUTSIDE = [join(root, "Documents", "vault"), join(root, "Library", "Mail")];
   const claude = join(root, ".claude");
   process.env.CC_HOME = root;
   process.env.CC_CLAUDE_DIR = claude;
@@ -59,6 +64,43 @@ beforeAll(async () => {
   // A session started from the app saved its account; the stray field must never reach the browser.
   await mkdir(join(root, "app"), { recursive: true });
   await writeFile(join(root, "app", "session-accounts.json"), JSON.stringify({ "e2644826-95f0-4880-8af9-8169d229cf1d": { provider: "firstParty", providerName: "Anthropic", email: "me@example.com", organization: "Acme", plan: "Claude Pro", tokenSource: "token-source-secret" } }));
+  // The settings reference as if fetched just now, so no test downloads the live page.
+  const shipped = JSON.parse(await readFile(join(import.meta.dir, "..", "src", "data", "settings-reference.json"), "utf8"));
+  await writeFile(join(root, "app", "settings-reference.json"), JSON.stringify({ ...shipped, fetchedAt: new Date().toISOString() }));
+  const shippedCommands = JSON.parse(await readFile(join(import.meta.dir, "..", "src", "data", "commands-reference.json"), "utf8"));
+  await writeFile(join(root, "app", "commands-reference.json"), JSON.stringify({ ...shippedCommands, fetchedAt: new Date().toISOString() }));
+  // A plan written in the demo project and approved there, and one no conversation worked on (spec 004).
+  await mkdir(join(claude, "plans"), { recursive: true });
+  await writeFile(join(claude, "plans", "brave-plan.md"), "# Demo plan\n\n- [ ] step\n");
+  await writeFile(join(claude, "plans", "lonely-plan.md"), "# Lonely plan\n");
+  await mkdir(join(claude, "projects", "-plan"), { recursive: true });
+  const demo = join(root, "projects", "demo");
+  const pl = (o: object) => JSON.stringify({ sessionId: PLAN_SID, cwd: demo, slug: "brave-plan", ...o });
+  await writeFile(
+    join(claude, "projects", "-plan", `${PLAN_SID}.jsonl`),
+    [
+      pl({ type: "user", uuid: "u1", timestamp: "2026-10-05T10:00:00Z", message: { content: "plan the demo" } }),
+      pl({ type: "assistant", uuid: "a1", timestamp: "2026-10-05T10:01:00Z", message: { id: "m1", model: "claude", content: [{ type: "tool_use", id: "t1", name: "ExitPlanMode", input: {} }] } }),
+      pl({ type: "user", uuid: "u2", timestamp: "2026-10-05T10:02:00Z", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "User has approved your plan. You can now start coding." }] } }),
+    ].join("\n") + "\n",
+  );
+  // Folders outside the project folders (#39): a conversation ran in one, ~/.claude.json names the other. Each looks
+  // like a project with MCP servers, so any scan that reached them would read something.
+  for (const d of OUTSIDE) {
+    await mkdir(join(d, ".claude", "skills", "outside-skill"), { recursive: true });
+    await writeFile(join(d, ".claude", "skills", "outside-skill", "SKILL.md"), "---\nname: outside-skill\ndescription: x\n---\n");
+    await writeFile(join(d, ".mcp.json"), JSON.stringify({ mcpServers: { outside: { command: "x" } } }));
+    await writeFile(join(d, "BACKLOG.md"), "# Backlog\n");
+  }
+  const cjNow = JSON.parse(await readFile(join(root, ".claude.json"), "utf8"));
+  cjNow.projects[OUTSIDE[1]] = { mcpServers: { "outside-local": { command: "x" } } };
+  await writeFile(join(root, ".claude.json"), JSON.stringify(cjNow));
+  await mkdir(join(claude, "projects", "-vault"), { recursive: true });
+  const vl = (o: object) => JSON.stringify({ sessionId: OUTSIDE_SID, cwd: OUTSIDE[0], ...o });
+  await writeFile(
+    join(claude, "projects", "-vault", `${OUTSIDE_SID}.jsonl`),
+    [vl({ type: "user", uuid: "v1", timestamp: "2026-01-02T10:00:00Z", message: { content: "tidy the vault" } }), vl({ type: "assistant", uuid: "v2", timestamp: "2026-01-02T10:01:00Z", message: { id: "vm1", model: "claude", content: [{ type: "text", text: "Done." }] } })].join("\n") + "\n",
+  );
   ({ app } = await import("../src/index"));
   const { indexSessions } = await import("../src/db/index");
   const { listProjects } = await import("../src/scan/projects");
@@ -68,7 +110,7 @@ beforeAll(async () => {
 afterAll(() => rm(root, { recursive: true, force: true }));
 
 describe("secrets never leave the server", () => {
-  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d", "/api/suggested", "/api/menu", "/api/projects/" + encodeURIComponent("~/projects/demo") + "/board"];
+  const endpoints = ["/api/projects", "/api/sessions?empty=1", "/api/overview", "/api/library", "/api/settings", "/api/settings/reference", "/api/map", "/api/jobs", "/api/config", "/api/search?q=secret", "/api/memory/check", "/api/live", "/api/account", "/api/account?project=" + encodeURIComponent("~/projects/demo"), "/api/account/login", "/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d", "/api/suggested", "/api/menu", "/api/projects/" + encodeURIComponent("~/projects/demo") + "/board"];
   for (const ep of endpoints) {
     test(ep, async () => {
       const res = await request(ep);
@@ -87,6 +129,60 @@ describe("secrets never leave the server", () => {
       for (const s of SECRETS) expect(body).not.toContain(s);
     });
   }
+});
+
+describe("folders outside the project folders are never looked at (#39)", () => {
+  test("a conversation's folder and a ~/.claude.json project outside them are neither listed nor read", async () => {
+    const touched: string[] = [];
+    const record = (p: unknown) => touched.push(String(p instanceof URL ? p.pathname : p));
+    const wrap = <T extends object>(obj: T, key: keyof T) => {
+      const orig = (obj as any)[key].bind(obj);
+      return spyOn(obj as any, key as any).mockImplementation(((p: any, ...a: any[]) => (record(p), orig(p, ...a))) as any);
+    };
+    const origSpawn = Bun.spawn;
+    const spies = [
+      ...(["stat", "lstat", "readdir", "readFile", "access", "opendir", "realpath"] as const).map((k) => wrap(fsp, k)),
+      wrap(Bun, "file"),
+      spyOn(Bun, "spawn").mockImplementation(((cmd: any, o: any) => (record(o?.cwd ?? ""), (origSpawn as any)(cmd, o))) as any),
+    ];
+    try {
+      const { listProjects } = await import("../src/scan/projects");
+      await listProjects();
+      for (const ep of ["/api/projects", "/api/catalog", "/api/library", "/api/map", "/api/overview", "/api/suggested", "/api/menu", "/api/search?q=outside", "/api/sessions?empty=1"]) expect((await request(ep)).status).toBe(200);
+    } finally {
+      for (const s of spies) s.mockRestore();
+    }
+    expect(touched.filter((p) => OUTSIDE.some((d) => p === d || p.startsWith(d + sep)))).toEqual([]);
+    expect(touched.length).toBeGreaterThan(0);
+
+    const projects = await (await request("/api/projects")).json();
+    expect(projects.map((p: any) => p.id)).toEqual(["~/projects/demo"]);
+    const cat = await (await request("/api/catalog")).json();
+    expect(cat.items.some((i: any) => /outside/.test(i.name))).toBe(false);
+    // The conversation itself still shows on Sessions, with its folder and no project.
+    const s = (await (await request("/api/sessions?empty=1")).json()).find((x: any) => x.sessionId === OUTSIDE_SID);
+    expect(s).toMatchObject({ cwd: "~/Documents/vault", project: null });
+  });
+});
+
+describe("plans and their conversations", () => {
+  test("the catalog tags a plan with its project, status and conversations", async () => {
+    const cat = await (await request("/api/catalog")).json();
+    const plans = cat.items.filter((i: any) => i.kind === "plan");
+    const brave = plans.find((i: any) => i.path.endsWith("brave-plan.md"));
+    expect(brave).toMatchObject({ name: "Demo plan", projectId: "~/projects/demo", projectName: "demo", meta: { status: "approved" } });
+    expect(brave.meta.conversations).toEqual([{ sessionId: PLAN_SID, title: "plan the demo", at: "2026-10-05T10:02:00Z" }]);
+    expect(typeof brave.mtime).toBe("number");
+    expect(plans.find((i: any) => i.path.endsWith("lonely-plan.md"))).toMatchObject({ projectId: null, meta: { status: "draft", conversations: [] } });
+    expect(cat.projects.map((p: any) => p.id)).toContain("~/projects/demo");
+  });
+
+  test("a conversation gives the plan it follows", async () => {
+    const s = await (await request(`/api/sessions/${PLAN_SID}`)).json();
+    expect(s.plan).toEqual({ path: join(root, ".claude", "plans", "brave-plan.md"), title: "Demo plan" });
+    const other = await (await request("/api/sessions/e2644826-95f0-4880-8af9-8169d229cf1d")).json();
+    expect(other.plan).toBeNull();
+  });
 });
 
 describe("account", () => {
@@ -395,9 +491,11 @@ describe("Settings page writes", () => {
   test("environment variable values stay on the server until asked for", async () => {
     expect((await change({ op: "env-set", name: "MY_TOKEN", value: "env-secret-value" })).status).toBe(200);
     expect((await json(user())).env).toEqual({ MY_TOKEN: "env-secret-value" });
-    const view = await (await request("/api/settings")).text();
-    expect(view).toContain("MY_TOKEN");
-    expect(view).not.toContain("env-secret-value");
+    for (const ep of ["/api/settings", "/api/settings/reference"]) {
+      const view = await (await request(ep)).text();
+      expect(view).toContain("MY_TOKEN");
+      expect(view).not.toContain("env-secret-value");
+    }
     const shown = (await (await request("/api/settings/env-value?source=user&name=MY_TOKEN")).json()) as { value: string };
     expect(shown.value).toBe("env-secret-value");
     expect((await request("/api/settings/env-value?source=local&name=MY_TOKEN")).status).toBe(400);
@@ -699,8 +797,27 @@ describe("a conversation is addressed by its session ID", () => {
       const copy = (await get(`/api/live/${r.liveId}`)).sessionId;
       expect(copy).not.toBe(TERMINAL);
       await until(() => queries.at(-1)!.received.length === 1);
-      expect(await get(`/api/sessions/${TERMINAL}`)).toMatchObject({ status: "running", liveId: null });
+      expect(await get(`/api/sessions/${TERMINAL}`)).toMatchObject({ status: "running", liveId: null, copyOf: null });
+      // #120: the copy is recorded in the app folder and names its original, before and after its transcript exists.
+      const copiesFile = join(root, "app", "session-copies.json");
+      await until(async () => (await readFile(copiesFile, "utf8").catch(() => "{}")).includes(copy));
+      expect(JSON.parse(await readFile(copiesFile, "utf8"))[copy]).toBe(TERMINAL);
+      expect((await get(`/api/sessions/${copy}`)).copyOf).toEqual({ sessionId: TERMINAL, title: "hello from the terminal" });
       await post(`/api/sessions/${copy}/stop`);
+      const copyFile = join(root, ".claude", "projects", "-demo", `${copy}.jsonl`);
+      await writeFile(copyFile, JSON.stringify({ type: "user", entrypoint: "sdk-ts", sessionId: copy, cwd: join(root, "projects", "demo"), timestamp: "2026-10-27T10:00:00Z", message: { role: "user", content: "hello from the terminal" } }) + "\n");
+      try {
+        const { indexSessions } = await import("../src/db/index");
+        await indexSessions();
+        const list = await get("/api/sessions?empty=1");
+        expect(list.find((s: any) => s.sessionId === copy)).toMatchObject({ displayTitle: "hello from the terminal", fromScript: false, copyOf: { sessionId: TERMINAL, title: "hello from the terminal" } });
+        expect(list.find((s: any) => s.sessionId === TERMINAL).copyOf).toBeNull();
+        expect((await get("/api/menu")).last).toMatchObject({ sessionId: copy, copyOf: TERMINAL });
+      } finally {
+        await rm(copyFile, { force: true });
+        const { indexSessions } = await import("../src/db/index");
+        await indexSessions();
+      }
     } finally {
       await rm(proc, { force: true });
     }
@@ -904,5 +1021,179 @@ describe("deleted hooks and MCP servers go to Archived items (#88)", () => {
     expect(res.status).toBe(400);
     expect((await res.json()).error).toContain("already exists");
     expect((await archive()).some((r) => r.id === rec.id)).toBe(true);
+  });
+});
+
+describe("every setting by topic (005-S1)", () => {
+  const find = (body: any, key: string) => body.topics.flatMap((t: any) => t.settings.map((s: any) => ({ ...s, topic: t.title }))).find((s: any) => s.key === key);
+
+  test("each setting comes with its value now and the file that set it, dotted keys read nested", async () => {
+    const localFile = join(root, "projects", "demo", ".claude", "settings.local.json");
+    const before = await readFile(localFile, "utf8").catch(() => null);
+    await mkdir(join(root, "projects", "demo", ".claude"), { recursive: true });
+    await writeFile(localFile, JSON.stringify({ tui: "default", sandbox: { network: { allowedDomains: ["local.example"] } } }));
+    try {
+      const all = await (await request("/api/settings/reference")).json();
+      expect(find(all, "tui")).toMatchObject({ topic: "Interface and terminal", value: "fullscreen", from: "user", choices: ["default", "fullscreen"] });
+      for (const k of ["agentPushNotifEnabled", "inputNeededNotifEnabled"]) expect(find(all, k)).toMatchObject({ topic: "Remote, desktop, and notifications", value: true, from: "user", type: "boolean" });
+      expect(find(all, "preferredNotifChannel")).toMatchObject({ value: "auto", from: "user", type: "choice" });
+      expect(find(all, "verbose")).toMatchObject({ from: null, setIn: [], default: "`false`" });
+      expect(find(all, "verbose").value).toBeUndefined();
+      expect(find(all, "permissions.allow")).toMatchObject({ value: ["Bash(osascript *)"], from: "user", section: "permissions" });
+
+      const demo = await (await request("/api/settings/reference?project=" + encodeURIComponent("~/projects/demo"))).json();
+      expect(find(demo, "tui")).toMatchObject({ value: "default", from: "local", setIn: ["local", "user"] });
+      expect(find(demo, "sandbox.network.allowedDomains")).toMatchObject({ value: ["local.example"], from: "local", section: "sandbox" });
+      expect(demo.sources.map((s: any) => s.source)).toEqual(["managed", "local", "project", "user"]);
+    } finally {
+      if (before === null) await rm(localFile, { force: true });
+      else await writeFile(localFile, before);
+    }
+  });
+
+  test("changing a setting in place writes only its own lines, with the browser's hash (005-S3)", async () => {
+    const demo = encodeURIComponent("~/projects/demo");
+    const shared = join(root, "projects", "demo", ".claude", "settings.json");
+    const before = await readFile(shared, "utf8").catch(() => null);
+    const original = '{\n  "$schema": "https://json.schemastore.org/claude-code-settings.json",\n  "env": { "A": "1" },\n  "hooks": {}\n}\n';
+    await mkdir(join(root, "projects", "demo", ".claude"), { recursive: true });
+    await writeFile(shared, original);
+    const set = (body: object) => request("/api/settings/set", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scope: "~/projects/demo", ...body }) });
+    const hash = async () => (await (await request(`/api/settings?project=${demo}`)).json()).sources.find((s: any) => s.source === "project").hash;
+    try {
+      expect((await set({ key: "verbose", value: true, hash: await hash() })).status).toBe(200);
+      expect((await set({ key: "editorMode", value: "vim", hash: await hash() })).status).toBe(200);
+      expect((await set({ key: "cleanupPeriodDays", value: 14, hash: await hash() })).status).toBe(200);
+      const text = await readFile(shared, "utf8");
+      expect(JSON.parse(text)).toEqual({ cleanupPeriodDays: 14, editorMode: "vim", verbose: true, $schema: "https://json.schemastore.org/claude-code-settings.json", env: { A: "1" }, hooks: {} });
+      for (const l of original.split("\n")) expect(text.split("\n")).toContain(l);
+      // A stale hash is refused and nothing is written.
+      const stale = await set({ key: "verbose", value: null, hash: "0".repeat(64) });
+      expect(stale.status).toBe(409);
+      expect(await readFile(shared, "utf8")).toBe(text);
+      // Off and empty remove the keys, giving the file back as it was.
+      for (const key of ["verbose", "editorMode", "cleanupPeriodDays"]) expect((await set({ key, value: null, hash: await hash() })).status).toBe(200);
+      expect(await readFile(shared, "utf8")).toBe(original);
+      // A User or managed setting is refused for a project's files, shared or local.
+      const localFile = join(root, "projects", "demo", ".claude", "settings.local.json");
+      const localBefore = await readFile(localFile, "utf8").catch(() => null);
+      for (const local of [false, true]) {
+        const r = await set({ key: "desktopSessionCleanupPeriodDays", value: 3, local, hash: null });
+        expect(r.status).toBe(400);
+        expect((await r.json()).error).toContain("can be set only in your settings for every project");
+      }
+      expect(await readFile(shared, "utf8")).toBe(original);
+      expect(await readFile(localFile, "utf8").catch(() => null)).toBe(localBefore);
+      // Settings with their own section, or not in the reference, aren't written here.
+      expect((await set({ key: "model", value: "opus", hash: await hash() })).status).toBe(400);
+      expect((await set({ key: "madeUp", value: true, hash: await hash() })).status).toBe(400);
+      const ref = await (await request(`/api/settings/reference?project=${demo}`)).json();
+      expect(find(ref, "desktopSessionCleanupPeriodDays").targets).toEqual(["user"]);
+      expect(find(ref, "verbose").targets).toEqual(["user", "project", "local"]);
+    } finally {
+      if (before === null) await rm(shared, { force: true });
+      else await writeFile(shared, before);
+    }
+  });
+
+  test("a project turns off a switch that your settings for every project turn on (#124)", async () => {
+    const demo = encodeURIComponent("~/projects/demo");
+    const userFile = join(root, ".claude", "settings.json");
+    const shared = join(root, "projects", "demo", ".claude", "settings.json");
+    const [userBefore, sharedBefore] = await Promise.all([readFile(userFile, "utf8").catch(() => null), readFile(shared, "utf8").catch(() => null)]);
+    await mkdir(join(root, "projects", "demo", ".claude"), { recursive: true });
+    await writeFile(userFile, '{\n  "verbose": true\n}\n');
+    await writeFile(shared, "{}\n");
+    const set = (body: object) => request("/api/settings/set", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scope: "~/projects/demo", ...body }) });
+    const hash = async () => (await (await request(`/api/settings?project=${demo}`)).json()).sources.find((s: any) => s.source === "project").hash;
+    try {
+      // Your settings turn it on, so off writes false in the project's file and the project's value wins.
+      expect((await set({ key: "verbose", value: false, hash: await hash() })).status).toBe(200);
+      expect(JSON.parse(await readFile(shared, "utf8"))).toEqual({ verbose: false });
+      const ref = await (await request(`/api/settings/reference?project=${demo}`)).json();
+      expect(find(ref, "verbose")).toMatchObject({ value: false, from: "project" });
+      // With no other file turning it on, off removes the key.
+      await writeFile(userFile, "{}\n");
+      expect((await set({ key: "verbose", value: true, hash: await hash() })).status).toBe(200);
+      expect(JSON.parse(await readFile(shared, "utf8"))).toEqual({ verbose: true });
+      expect((await set({ key: "verbose", value: false, hash: await hash() })).status).toBe(200);
+      expect(await readFile(shared, "utf8")).toBe("{}\n");
+      expect(await readFile(userFile, "utf8")).toBe("{}\n");
+    } finally {
+      if (userBefore === null) await rm(userFile, { force: true });
+      else await writeFile(userFile, userBefore);
+      if (sharedBefore === null) await rm(shared, { force: true });
+      else await writeFile(shared, sharedBefore);
+    }
+  });
+
+  test("with no copy in the app folder and no internet, the copy shipped with the app is used", async () => {
+    const { resetSettingsReference, referenceCachePath } = await import("../src/scan/settingsReference");
+    const cache = await readFile(referenceCachePath(), "utf8");
+    await rm(referenceCachePath());
+    resetSettingsReference();
+    const offline = spyOn(globalThis, "fetch").mockImplementation((() => Promise.reject(new Error("offline"))) as any);
+    try {
+      const body = await (await request("/api/settings/reference")).json();
+      expect(body.origin).toBe("shipped");
+      expect(find(body, "tui").choices).toEqual(["default", "fullscreen"]);
+      expect(offline).toHaveBeenCalled();
+    } finally {
+      offline.mockRestore();
+      await writeFile(referenceCachePath(), cache);
+      resetSettingsReference();
+    }
+  });
+});
+
+describe("Claude Code's own commands (006-S1)", () => {
+  test("with no copy in the app folder and no internet, the shipped list feeds /live-commands", async () => {
+    const { resetCommandsReference, commandsCachePath } = await import("../src/scan/commandsReference");
+    const cache = await readFile(commandsCachePath(), "utf8");
+    await rm(commandsCachePath());
+    resetCommandsReference();
+    const offline = spyOn(globalThis, "fetch").mockImplementation((() => Promise.reject(new Error("offline"))) as any);
+    try {
+      const body: { name: string; description: string; argumentHint: string; tag?: string }[] = await (await request("/api/live-commands")).json();
+      const by = (n: string) => body.find((c) => c.name === n);
+      expect(by("compact")).toMatchObject({ tag: "Built into Claude Code", description: "Free up context by summarizing the conversation so far." });
+      expect(by("init")?.tag).toBe("Built into Claude Code");
+      expect(by("add-dir")?.argumentHint).toBe("<path>");
+      expect(by("fewer-permission-prompts")?.tag).toBe("Built-in skill");
+      expect(body.some((c) => c.name.startsWith("__"))).toBe(false);
+      expect(offline).toHaveBeenCalled();
+    } finally {
+      offline.mockRestore();
+      await writeFile(commandsCachePath(), cache);
+      resetCommandsReference();
+    }
+  });
+});
+
+describe("a plugin on in only one project (#122)", () => {
+  test("the catalog says which projects it is on in, and the project lists it as on", async () => {
+    const claude = join(root, ".claude");
+    const pl = join(root, "plugin-cache", "tidy");
+    const proj = join(root, "projects", "plugged");
+    await mkdir(join(pl, ".claude-plugin"), { recursive: true });
+    await mkdir(join(pl, "skills", "sweep"), { recursive: true });
+    await writeFile(join(pl, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "tidy", description: "Tidies up" }));
+    await writeFile(join(pl, "skills", "sweep", "SKILL.md"), "---\nname: sweep\ndescription: Sweeps\n---\nbody\n");
+    await mkdir(join(claude, "plugins"), { recursive: true });
+    await writeFile(join(claude, "plugins", "installed_plugins.json"), JSON.stringify({ plugins: { "tidy@scratch": [{ installPath: pl, version: "1.0.0" }] } }));
+    await mkdir(join(proj, ".claude"), { recursive: true });
+    await writeFile(join(proj, ".claude", "settings.local.json"), JSON.stringify({ enabledPlugins: { "tidy@scratch": true } }));
+    try {
+      const cat = await (await request("/api/catalog")).json();
+      const plugin = cat.items.find((i: any) => i.kind === "plugin" && i.overrideKey === "tidy@scratch");
+      expect(plugin).toMatchObject({ state: "off", projectId: null, meta: { onIn: ["plugged"] } });
+      expect(cat.items.find((i: any) => i.kind === "skill" && i.source === "plugin" && i.sourceName === "tidy")).toMatchObject({ state: "off", meta: { onIn: ["plugged"] } });
+      const detail = await (await request(`/api/projects/${encodeURIComponent("~/projects/plugged")}`)).json();
+      expect(detail.pluginsOn).toEqual(["tidy@scratch"]);
+      expect((await (await request(`/api/projects/${encodeURIComponent("~/projects/demo")}`)).json()).pluginsOn).toEqual([]);
+    } finally {
+      await rm(join(claude, "plugins"), { recursive: true, force: true });
+      await rm(proj, { recursive: true, force: true });
+    }
   });
 });

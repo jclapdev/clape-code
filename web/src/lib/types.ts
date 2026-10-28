@@ -11,7 +11,6 @@ export interface Project {
   id: string;
   name: string;
   path: string;
-  group: "root" | "other";
   empty: boolean;
   hasClaudeDir: boolean;
   isPlugin: boolean;
@@ -85,6 +84,8 @@ export interface Session {
   resumeCommand: string;
   /** Saved when the app started the session; null for sessions started elsewhere. */
   account: SessionAccount | null;
+  /** When Control Center made this conversation as a copy of one open in another window: the original. */
+  copyOf: { sessionId: string; title: string | null } | null;
 }
 
 export type TurnBlock =
@@ -206,6 +207,8 @@ export interface SlashCommand {
   name: string;
   description: string;
   argumentHint: string;
+  /** For Claude Code's own: "Built into Claude Code", "Built-in skill" or "From MCP server <server>". */
+  tag?: string;
 }
 
 export interface FileData {

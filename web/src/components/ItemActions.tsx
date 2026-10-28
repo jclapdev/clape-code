@@ -35,6 +35,9 @@ type How = { by: "archive"; kind: string } | { by: "hook" } | { by: "mcp" } | { 
 /** A plugin kept as a folder in your skills folder (`claude plugin init`), rather than installed from a marketplace. */
 export const isSkillsDirPlugin = (i: LibraryItem) => i.kind === "plugin" && typeof i.overrideKey === "string" && i.overrideKey.endsWith("@skills-dir");
 
+/** For a plugin (or what comes with it) that is off for every project but on in some: "On in demo, site" (#122). */
+export const onInLabel = (i: LibraryItem | null) => (i?.state === "off" && Array.isArray(i.meta?.onIn) && i.meta.onIn.length ? `On in ${i.meta.onIn.join(", ")}` : null);
+
 /** How an item is deleted, or why it can't be. */
 export function deleteHow(i: LibraryItem): How {
   if (i.kind === "plugin") return i.overrideKey ? { by: "uninstall" } : null;
@@ -123,7 +126,7 @@ export function ItemActions({ i, scope, projectId, onDeleting, onDeleted }: { i:
             value={i.kind === "plugin" ? (i.state === "off" ? "off" : "on") : (i.state ?? "on")}
             onChange={(v) => state.mutate(v)}
             className="max-w-full min-w-0 [&>[data-slot=select-value]]:block [&>[data-slot=select-value]]:truncate"
-            options={i.kind === "plugin" ? [{ value: "on", label: "On" }, { value: "off", label: "Off" }] : SKILL_STATES}
+            options={i.kind === "plugin" ? [{ value: "on", label: "On in every project" }, { value: "off", label: onInLabel(i) ? `Only ${onInLabel(i)!.charAt(0).toLowerCase()}${onInLabel(i)!.slice(1)}` : "Off" }] : SKILL_STATES}
           />
         )}
         {note && <span className="text-[13px] text-muted-foreground">{note}</span>}

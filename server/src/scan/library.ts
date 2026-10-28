@@ -153,6 +153,19 @@ export async function listPlugins(enabled: Record<string, boolean>): Promise<Plu
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/**
+ * The plugins on in a project: `enabledPlugins` in the project's shared and local settings override your settings
+ * for every project (the settings docs: "Settings precedence, highest first: managed settings, command line, project
+ * local, shared project, user"). A plugin neither file names keeps its state from your settings.
+ */
+export async function pluginsOnInProject(dir: string, plugins: PluginInfo[]): Promise<string[]> {
+  const set: Record<string, boolean> = {};
+  for (const f of [join(dir, ".claude", "settings.json"), join(dir, ".claude", "settings.local.json")]) {
+    Object.assign(set, (await readJson<{ enabledPlugins?: Record<string, boolean> }>(f))?.enabledPlugins ?? {});
+  }
+  return plugins.filter((p) => (typeof set[p.key] === "boolean" ? set[p.key] : p.enabled)).map((p) => p.key);
+}
+
 async function syncedSkills(overrides: Record<string, string>): Promise<LibraryItem[]> {
   const root = join(claudeDir(), "skills", "synced");
   const out: LibraryItem[] = [];
@@ -296,15 +309,16 @@ async function hookScripts(dir: string, source: LibraryItem["source"], sourceNam
   return out;
 }
 
+/** A plan file, titled by its first line. */
+export async function planItem(p: string, source: LibraryItem["source"] = "user", sourceName: string | null = null, meta: Record<string, unknown> = {}): Promise<LibraryItem> {
+  const md = await readMd(p);
+  return item({ kind: "plan", name: firstLine(md?.body) || basename(p), description: basename(p), path: p, source, sourceName, meta });
+}
+
 export async function planItems(): Promise<LibraryItem[]> {
   const dir = join(claudeDir(), "plans");
   const out: LibraryItem[] = [];
-  for (const f of await ls(dir)) {
-    if (!f.endsWith(".md")) continue;
-    const p = join(dir, f);
-    const md = await readMd(p);
-    out.push(await item({ kind: "plan", name: firstLine(md?.body) || f, description: f, path: p, source: "user" }));
-  }
+  for (const f of await ls(dir)) if (f.endsWith(".md")) out.push(await planItem(join(dir, f)));
   return out.sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0));
 }
 

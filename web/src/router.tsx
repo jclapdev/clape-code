@@ -91,7 +91,8 @@ const file = createRoute({
   getParentRoute: () => root,
   path: "/file",
   component: FilePage,
-  validateSearch: (s: Record<string, unknown>): { path?: string } => ({ path: str(s.path) }),
+  // key opens a settings file at that dotted key, as a setting's "Edit as text" does.
+  validateSearch: (s: Record<string, unknown>): { path?: string; key?: string } => ({ path: str(s.path), key: str(s.key) }),
 });
 const preferences = createRoute({ getParentRoute: () => root, path: "/preferences", component: PreferencesPage });
 

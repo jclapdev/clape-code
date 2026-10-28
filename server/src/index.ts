@@ -95,7 +95,7 @@ async function rebuildDocs() {
   const read = (p: string) => readFile(p, "utf8").catch(() => "");
   const { items } = await globalLibrary();
   const projects = (await listProjects()).filter((p) => !p.empty);
-  for (const p of projects.filter((p) => p.group === "root")) {
+  for (const p of projects) {
     const dir = untildify(p.id);
     items.push(...(await projectLibrary(dir)));
     for (const d of p.docs) docs.push({ kind: "doc", ref: join(dir, d), title: `${p.name} · ${d}`, subtitle: p.path, body: await read(join(dir, d)) });
@@ -124,7 +124,7 @@ async function boot() {
   await rebuildDocs();
   console.log(`Indexed ${n} changed transcripts and ${projects.length} projects in ${Date.now() - t} ms.`);
   startWatching(
-    projects.filter((p) => p.group === "root").map((p) => untildify(p.id)),
+    projects.map((p) => untildify(p.id)),
     async (areas) => {
       if (areas.has("sessions")) {
         await indexSessions().catch(console.error);

@@ -8,11 +8,14 @@ import { claudeDir, claudeJson, isInside, tildify, untildify } from "../fs/paths
 import { canRead, classify } from "../fs/policy";
 import { readWithHash, safeWrite, WriteError } from "../fs/safeWrite";
 import { addEntry, isKeepAChangelog, parseChangelog } from "../parsers/changelog";
-import { effective, type Source } from "../parsers/settings";
-import { applySettingsChange, redactEnv, removeKeybinding, setKeybinding, type SettingsChange } from "../parsers/settingsEdit";
+import { effective, valueNow, type Source } from "../parsers/settings";
+import { REFERENCE_URL } from "../parsers/settingsReference";
+import { settingsReference } from "../scan/settingsReference";
+import { applySettingsChange, redactEnv, removeKeybinding, setKeybinding, settingValue, writableIn, type SettingsChange } from "../parsers/settingsEdit";
+import { setKeyInText } from "../parsers/jsonText";
 import { KEY_ACTIONS, KEY_CONTEXTS } from "../parsers/keybindingDocs";
 import { search as searchDocs, listSessions, untitled } from "../db/index";
-import { globalLibrary, listPlugins, listThemes, memoryItems, projectLibrary, readKeybindings, readWorktreeInclude } from "../scan/library";
+import { globalLibrary, listPlugins, listThemes, pluginsOnInProject, memoryItems, projectLibrary, readKeybindings, readWorktreeInclude } from "../scan/library";
 import { catalog } from "../scan/catalog";
 import { initArgs, initResult, marketplaceCounts, parseAvailable, parseMarketplaces, pluginArgs, pluginResult, searchAvailable, skillsDirPlugins, type Available } from "../scan/plugins";
 import { buildMap, managedSettingsPath } from "../scan/map";
@@ -75,16 +78,10 @@ content.get("/projects/:id", async (c) => {
   });
 });
 
-/**
- * The plugins turned on in a project: `enabledPlugins` from your settings, then the project's shared and local
- * settings, each overriding the one before (the settings docs: "Settings precedence, highest first: managed
- * settings, command line, project local, shared project, user").
- */
+/** The plugins turned on in a project, after your settings and the project's own. */
 export async function pluginsOnIn(dir: string): Promise<string[]> {
-  const files = [join(claudeDir(), "settings.json"), join(dir, ".claude", "settings.json"), join(dir, ".claude", "settings.local.json")];
-  const enabled: Record<string, boolean> = {};
-  for (const f of files) Object.assign(enabled, (await readJson<{ enabledPlugins?: Record<string, boolean> }>(f))?.enabledPlugins ?? {});
-  return (await listPlugins(enabled)).filter((p) => p.enabled).map((p) => p.key);
+  const settings = await readJson<{ enabledPlugins?: Record<string, boolean> }>(join(claudeDir(), "settings.json"));
+  return pluginsOnInProject(dir, await listPlugins(settings?.enabledPlugins ?? {}));
 }
 
 /** Plans the project's sessions wrote, newest first, each with the session that wrote it. */
@@ -515,8 +512,8 @@ content.post("/memory/sync", async (c) => {
 
 // ---- Settings ----
 
-content.get("/settings", async (c) => {
-  const projectId = c.req.query("project");
+/** The settings files for a project (or for every project), highest first, each parsed with env values redacted. */
+async function readSettingsFiles(projectId: string | undefined) {
   const dir = projectId ? await requireProject(projectId) : null;
   const files: { source: Source; path: string }[] = [
     { source: "managed", path: managedSettingsPath() },
@@ -538,8 +535,13 @@ content.get("/settings", async (c) => {
       // Environment variable values can be secrets: only their names leave the server here.
       if (!error) parsed[f.source] = redactEnv(JSON.parse(cur.content))!;
     }
-    sources.push({ source: f.source, path: f.path, display: tildify(f.path), exists: !!cur, access: classify(f.path), error, values: parsed[f.source] ?? null });
+    sources.push({ source: f.source, path: f.path, display: tildify(f.path), exists: !!cur, hash: cur?.hash ?? null, access: classify(f.path), error, values: parsed[f.source] ?? null });
   }
+  return { parsed, sources };
+}
+
+content.get("/settings", async (c) => {
+  const { parsed, sources } = await readSettingsFiles(c.req.query("project"));
   // Keyboard shortcuts and themes exist only for all projects, so they come with every settings view.
   return c.json({
     sources,
@@ -547,6 +549,46 @@ content.get("/settings", async (c) => {
     keybindings: { ...(await readKeybindings()), contexts: KEY_CONTEXTS, actions: KEY_ACTIONS },
     themes: await listThemes(),
   });
+});
+
+/**
+ * Every documented setting by topic (code.claude.com settings reference), with its value now and the file that
+ * set it, from the same files and order as GET /settings.
+ */
+content.get("/settings/reference", async (c) => {
+  const [{ ref, origin }, { parsed, sources }] = await Promise.all([settingsReference(), readSettingsFiles(c.req.query("project"))]);
+  return c.json({
+    url: REFERENCE_URL,
+    fetchedAt: ref.fetchedAt,
+    origin,
+    sources: sources.map(({ source, display, exists, access, error }) => ({ source, display, exists, access, error })),
+    topics: ref.topics.map((t) => ({ ...t, settings: t.settings.map((s) => ({ ...s, targets: writableIn(s.scope), ...valueNow(parsed, s.key) })) })),
+  });
+});
+
+/**
+ * Sets or removes one documented setting in the file picked in "Change settings for". Only that key's lines change.
+ * `hash` is the file's hash when the browser read it (null when it didn't exist), so a newer file on disk is never overwritten.
+ */
+content.post("/settings/set", async (c) => {
+  const f = (await c.req.json()) as { scope?: string; local?: boolean; key?: string; value?: unknown; hash?: string | null };
+  if (f.hash === undefined) throw new WriteError(400, "Reload the page and try again.");
+  const setting = (await settingsReference()).ref.topics.flatMap((t) => t.settings).find((s) => s.key === f.key);
+  if (!setting) throw new WriteError(400, "That isn't a setting in Claude Code's settings reference.");
+  const target = !f.scope || f.scope === "global" ? "user" : f.local ? "local" : "project";
+  // The key's values in the other user, project and local files, so a switch turned off can write false where removing it would leave it on.
+  const { parsed } = await readSettingsFiles(target === "user" ? undefined : f.scope);
+  const others = (["user", "project", "local"] as const).filter((t) => t !== target).map((t) => valueNow({ [t]: parsed[t] }, setting.key).value);
+  const value = settingValue(setting, target, f.value, others);
+  const file = await settingsFile(f.scope, f.local);
+  const cur = await readWithHash(file);
+  const problem = cur ? jsonProblem(cur.content) : null;
+  if (problem) throw new WriteError(400, `${problem} Fix it as text first.`);
+  const text = setKeyInText(cur?.content ?? "", setting.key, value);
+  if (text === (cur?.content ?? "")) return c.json({ hash: cur?.hash ?? null, backupPath: null, path: file, display: tildify(file) }); // nothing to remove
+  const r = await safeWrite(file, text, f.hash);
+  emit({ area: "settings" });
+  return c.json({ ...r, path: file, display: tildify(file) });
 });
 
 /** One environment variable's value, sent only when someone clicks to see it. */
@@ -593,7 +635,7 @@ content.post("/keybindings/remove", async (c) => {
 // ---- Map and search ----
 
 content.get("/map", async (c) => {
-  const projects = (await listProjects()).filter((p) => p.group === "root" && !p.empty);
+  const projects = (await listProjects()).filter((p) => !p.empty);
   const groups = await buildMap(projects.map((p) => ({ id: p.id, name: p.name, dir: untildify(p.id) })));
   // Which settings file wins, highest first (command-line --settings is per launch and not on disk).
   const precedence = [

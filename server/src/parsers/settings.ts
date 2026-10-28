@@ -43,6 +43,32 @@ function flatten(s: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+/**
+ * One setting's value now, by dotted key such as `sandbox.network.allowedDomains` (nested in the JSON):
+ * the highest file's value, or lists and objects combined across files as `effective` does.
+ */
+export function valueNow(files: Partial<Record<Source, Record<string, unknown> | null>>, key: string): { value?: unknown; from: Source | "combined" | null; setIn: Source[] } {
+  const hits: { source: Source; value: unknown }[] = [];
+  for (const source of ORDER) {
+    let v: unknown = files[source];
+    let found = !!v;
+    for (const part of key.split(".")) {
+      if (!isObj(v) || !(part in v)) {
+        found = false;
+        break;
+      }
+      v = v[part];
+    }
+    if (found) hits.push({ source, value: v });
+  }
+  if (!hits.length) return { from: null, setIn: [] };
+  const leaf = key.split(".").pop()!;
+  const mergeable = hits.length > 1 && !WHOLE_VALUE.has(leaf) && hits.every((h) => Array.isArray(h.value) || isObj(h.value));
+  let value = hits[0].value;
+  if (mergeable) for (const h of hits.slice(1)) value = mergeValues(value, h.value, leaf);
+  return { value, from: mergeable ? "combined" : hits[0].source, setIn: hits.map((h) => h.source) };
+}
+
 export function effective(files: Partial<Record<Source, Record<string, unknown> | null>>): EffectiveEntry[] {
   const flat: Partial<Record<Source, Record<string, unknown>>> = {};
   for (const src of ORDER) if (files[src]) flat[src] = flatten(files[src]!);

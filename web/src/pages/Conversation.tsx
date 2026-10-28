@@ -2,7 +2,7 @@
 // stopped, and the reply box at the bottom. Sending resumes the conversation under the same ID when Claude isn't running.
 import { type InfiniteData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Copy, MoreHorizontal, Square, Trash2, Users } from "lucide-react";
+import { Archive, ArchiveRestore, ClipboardList, Copy,MoreHorizontal, Square, Trash2, Users } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -52,6 +52,8 @@ type Page = Partial<Session> &
     model: string | null;
     permissionMode: string | null;
     commands: SlashCommand[];
+    /** The plan this conversation worked on, if any. */
+    plan?: { path: string; title: string } | null;
   };
 
 const TURNS_PER_PAGE = 1000;
@@ -351,6 +353,23 @@ function Conversation({ sid }: { sid: string }) {
               </Link>
             ) : (
               s.cwd && <span className="break-all">{s.cwd}</span>
+            )}
+            {s.plan && (
+              <Link to="/plans" search={{ item: s.plan.path }} className="inline-flex min-w-0 items-center gap-1">
+                <ClipboardList className="size-3.5 flex-none" aria-label="Plan" />
+                <span className="break-words">{s.plan.title}</span>
+              </Link>
+            )}
+            {s.copyOf && (
+              <span className="inline-flex min-w-0 flex-wrap items-center gap-1.5">
+                <Tag>Copy</Tag>
+                <span>
+                  of{" "}
+                  <Link to="/sessions/$sid" params={{ sid: s.copyOf.sessionId }} className="break-words">
+                    {s.copyOf.title ?? "the original conversation"}
+                  </Link>
+                </span>
+              </span>
             )}
             {s.archived && <span>Archived</span>}
           </span>

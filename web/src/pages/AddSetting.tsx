@@ -80,7 +80,7 @@ export function AddSettingPage() {
     },
   });
 
-  const scopes = [{ value: "global", label: "All projects" }, ...(projects.data ?? []).filter((p) => p.group === "root").map((p) => ({ value: p.id, label: p.name }))];
+  const scopes = [{ value: "global", label: "All projects" }, ...(projects.data ?? []).map((p) => ({ value: p.id, label: p.name }))];
   const ready = what === "permission" ? !!rule.trim() : what === "hook" ? !!command.trim() : !!name.trim() && !!target.trim();
 
   return (
