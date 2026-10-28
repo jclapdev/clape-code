@@ -8,7 +8,8 @@ import { WriteError } from "../fs/safeWrite";
 import { TurnBuilder } from "../parsers/transcript";
 import { readLines } from "../fs/lines";
 import { sessionAccounts, type SessionAccount } from "../account/sessions";
-import { getSession, isOpen, knownCommands, listLive, liveBySessionId, removeSession, startSession, waitingCount, type LiveStatus } from "../live/sessions";
+import { builtInCommands } from "../scan/commandsReference";
+import { getSession, isOpen, listLive, liveBySessionId, removeSession, startSession, waitingCount, type LiveStatus } from "../live/sessions";
 import { isFromScript, startedSessions } from "../live/started";
 import { globalLibrary, planItem, projectLibrary } from "../scan/library";
 import { planOfSession } from "../scan/plans";
@@ -404,13 +405,13 @@ sessions.get("/suggested", async (c) => c.json(await suggestedPrompts()));
 
 sessions.get("/live", (c) => c.json(listLive()));
 
-/** Commands a new session will accept: your skills and commands, plus Claude Code's own from the last session that ran. */
+/** Commands a new session will accept: Claude Code's own (the docs' list and the last session's), plus your skills and commands. */
 sessions.get("/live-commands", async (c) => {
   const proj = c.req.query("project");
   const dir = proj ? await projectDir(proj) : null;
   const lib = [...(await globalLibrary()).items, ...(dir ? await projectLibrary(dir) : [])];
-  const out = new Map<string, { name: string; description: string; argumentHint: string }>();
-  for (const k of await knownCommands()) out.set(k.name, k);
+  const out = new Map<string, { name: string; description: string; argumentHint: string; tag?: string }>();
+  for (const k of await builtInCommands()) out.set(k.name, k);
   for (const i of lib) {
     if ((i.kind !== "skill" && i.kind !== "command") || i.state === "off") continue;
     const base = (i.folder ? i.folder.split(/[\\/]/).filter(Boolean).pop()! : i.name).replace(/\.md$/, "");

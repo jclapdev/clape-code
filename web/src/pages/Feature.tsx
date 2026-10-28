@@ -38,6 +38,7 @@ interface Row {
   item: CatalogItem | null;
   projectId: string | null;
   command?: string; // what you type to run it, for the Slash commands page
+  hint?: string; // what the command takes after its name, such as <path>
   tag?: string; // shown instead of where the item applies
 }
 
@@ -82,7 +83,7 @@ function useLiveCommands(on: boolean) {
 const COMMAND_KINDS: CatalogItem["kind"][] = ["skill", "command", "workflow"];
 
 /** The rows for one feature. Slash commands mixes your own commands with Claude Code's built-in ones. */
-function rowsFor(f: Feature, items: CatalogItem[], live: SlashCommand[] | undefined): { rows: Row[]; builtIn: number } {
+function rowsFor(f: Feature, items: CatalogItem[], live: SlashCommand[] | undefined): Row[] {
   if (f.id !== "commands") {
     // A plan's description is its file name; the date it last changed says more.
     const rows: Row[] = items
@@ -93,21 +94,23 @@ function rowsFor(f: Feature, items: CatalogItem[], live: SlashCommand[] | undefi
       const yours = new Set(rows.filter((r) => !r.projectId && r.item?.source === "user").map((r) => r.name.toLowerCase()));
       for (const a of BUILT_IN_AGENTS) if (!yours.has(a.name.toLowerCase())) rows.push({ key: `builtin-agent|${a.name}`, name: a.name, description: a.description, item: null, projectId: null, tag: "Built in" });
     }
-    return { rows, builtIn: 0 };
+    return rows;
   }
   const custom = items.filter((i) => COMMAND_KINDS.includes(i.kind));
   const rows: Row[] = custom.map((i) => ({ key: keyOf(i), name: slashOf(i), description: i.description, item: i, projectId: i.projectId, command: slashOf(i) }));
-  // Built-in commands are what the last session reported, minus your own skills and commands it also listed.
+  // Built-in commands come from the docs and the last session (with a tag), minus your own skills and commands.
   const mine = new Set(custom.flatMap((i) => [slashOf(i).slice(1), baseName(i), i.overrideKey ?? ""]));
   // Names starting with __ are Claude Code's internal commands, not ones you type.
-  const builtIn = (live ?? []).filter((c) => !mine.has(c.name) && !c.name.startsWith("__"));
-  for (const c of builtIn) rows.push({ key: `builtin|${c.name}`, name: `/${c.name}`, description: c.description, item: null, projectId: null, command: `/${c.name}` });
-  return { rows, builtIn: builtIn.length };
+  const builtIn = (live ?? []).filter((c) => c.tag && !mine.has(c.name) && !c.name.startsWith("__"));
+  for (const c of builtIn)
+    rows.push({ key: `builtin|${c.name}`, name: `/${c.name}`, description: c.description, item: null, projectId: null, command: `/${c.name}`, hint: c.argumentHint || undefined, tag: c.tag });
+  return rows;
 }
 
 function matches(r: Row, q: string, project: string) {
   if (project === "global" && r.projectId) return false;
-  if (project && project !== "global" && r.projectId !== project) return false;
+  // What's built into Claude Code applies in every project.
+  if (project && project !== "global" && r.item && r.projectId !== project) return false;
   if (!q) return true;
   const hay = `${r.name} ${r.description} ${r.item?.description ?? ""} ${planStatus(r.item)?.[0] ?? ""}${r.tag ?? whereLabel(r.item)} ${agentLabel(r.item) ?? ""} ${onlyYou(r.item) ? "only you" : ""}`.toLowerCase();
   return q
@@ -206,6 +209,11 @@ function ItemBody({ r }: { r: Row }) {
     return (
       <div className="flex flex-col gap-2 leading-relaxed text-ink-2">
         {r.description && <p>{r.description}</p>}
+        {r.hint && (
+          <p>
+            Takes <code className="break-all">{r.hint}</code>
+          </p>
+        )}
         <p className="text-muted-foreground">It's built into Claude Code, so it can't be changed here.</p>
       </div>
     );
@@ -428,7 +436,7 @@ export function FeaturePage() {
     go({ q: v || undefined }, true);
   };
 
-  const { rows, builtIn } = useMemo(() => rowsFor(f, cat.data?.items ?? [], live.data), [f, cat.data, live.data]);
+  const rows = useMemo(() => rowsFor(f, cat.data?.items ?? [], live.data), [f, cat.data, live.data]);
   const shown = useMemo(() => rows.filter((r) => matches(r, q, project)).sort((a, b) => a.name.localeCompare(b.name)), [rows, q, project]);
 
   if (cat.isLoading) return <Loading />;
@@ -451,9 +459,6 @@ export function FeaturePage() {
   const list = (
     <>
       <ListHead f={f} count={shown.length} total={rows.length} q={q} setQ={setQ} project={project} setProject={(v) => go({ project: v || undefined }, true)} projects={cat.data!.projects} />
-      {f.id === "commands" && live.isSuccess && builtIn === 0 && (
-        <p className="mx-4 mb-3 rounded-md bg-sunken px-3 py-2 text-[13.5px] text-ink-2 md:mx-6">Claude Code's own commands, such as /compact, show here after a session has run once in this app. Start one from Sessions.</p>
-      )}
       {shown.length ? (
         <ul className="mx-4 mb-6 divide-y divide-line rounded-lg border border-line bg-surface md:mx-6">
           {shown.map((r) => (
@@ -461,6 +466,7 @@ export function FeaturePage() {
               <Link to={`/${f.id}`} search={{ ...search, item: r.key, panel: undefined } as never} className="flex flex-col gap-1 px-4 py-3 text-ink no-underline hover:bg-sunken">
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="min-w-0 break-words font-medium">{r.name}</span>
+                  {r.hint && <code className="min-w-0 break-all text-[13px] text-muted-foreground">{r.hint}</code>}
                   <RowTags r={r} f={f} />
                 </span>
                 {r.description && <span className="line-clamp-2 text-[13.5px] leading-relaxed text-ink-2">{r.description}</span>}
@@ -498,7 +504,7 @@ export function FeaturePage() {
 
 /** Counts per feature, for the Customize overview. */
 function countFor(id: FeatureId, items: CatalogItem[], live: SlashCommand[] | undefined) {
-  return rowsFor(featureById(id)!, items, live).rows.length;
+  return rowsFor(featureById(id)!, items, live).length;
 }
 
 export function CustomizePage() {

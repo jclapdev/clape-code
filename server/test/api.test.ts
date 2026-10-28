@@ -67,6 +67,8 @@ beforeAll(async () => {
   // The settings reference as if fetched just now, so no test downloads the live page.
   const shipped = JSON.parse(await readFile(join(import.meta.dir, "..", "src", "data", "settings-reference.json"), "utf8"));
   await writeFile(join(root, "app", "settings-reference.json"), JSON.stringify({ ...shipped, fetchedAt: new Date().toISOString() }));
+  const shippedCommands = JSON.parse(await readFile(join(import.meta.dir, "..", "src", "data", "commands-reference.json"), "utf8"));
+  await writeFile(join(root, "app", "commands-reference.json"), JSON.stringify({ ...shippedCommands, fetchedAt: new Date().toISOString() }));
   // A plan written in the demo project and approved there, and one no conversation worked on (spec 004).
   await mkdir(join(claude, "plans"), { recursive: true });
   await writeFile(join(claude, "plans", "brave-plan.md"), "# Demo plan\n\n- [ ] step\n");
@@ -1121,6 +1123,30 @@ describe("every setting by topic (005-S1)", () => {
       offline.mockRestore();
       await writeFile(referenceCachePath(), cache);
       resetSettingsReference();
+    }
+  });
+});
+
+describe("Claude Code's own commands (006-S1)", () => {
+  test("with no copy in the app folder and no internet, the shipped list feeds /live-commands", async () => {
+    const { resetCommandsReference, commandsCachePath } = await import("../src/scan/commandsReference");
+    const cache = await readFile(commandsCachePath(), "utf8");
+    await rm(commandsCachePath());
+    resetCommandsReference();
+    const offline = spyOn(globalThis, "fetch").mockImplementation((() => Promise.reject(new Error("offline"))) as any);
+    try {
+      const body: { name: string; description: string; argumentHint: string; tag?: string }[] = await (await request("/api/live-commands")).json();
+      const by = (n: string) => body.find((c) => c.name === n);
+      expect(by("compact")).toMatchObject({ tag: "Built into Claude Code", description: "Free up context by summarizing the conversation so far." });
+      expect(by("init")?.tag).toBe("Built into Claude Code");
+      expect(by("add-dir")?.argumentHint).toBe("<path>");
+      expect(by("fewer-permission-prompts")?.tag).toBe("Built-in skill");
+      expect(body.some((c) => c.name.startsWith("__"))).toBe(false);
+      expect(offline).toHaveBeenCalled();
+    } finally {
+      offline.mockRestore();
+      await writeFile(commandsCachePath(), cache);
+      resetCommandsReference();
     }
   });
 });

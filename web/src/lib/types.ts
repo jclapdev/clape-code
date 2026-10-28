@@ -205,6 +205,8 @@ export interface SlashCommand {
   name: string;
   description: string;
   argumentHint: string;
+  /** For Claude Code's own: "Built into Claude Code", "Built-in skill" or "From MCP server <server>". */
+  tag?: string;
 }
 
 export interface FileData {
