@@ -153,6 +153,19 @@ export async function listPlugins(enabled: Record<string, boolean>): Promise<Plu
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/**
+ * The plugins on in a project: `enabledPlugins` in the project's shared and local settings override your settings
+ * for every project (the settings docs: "Settings precedence, highest first: managed settings, command line, project
+ * local, shared project, user"). A plugin neither file names keeps its state from your settings.
+ */
+export async function pluginsOnInProject(dir: string, plugins: PluginInfo[]): Promise<string[]> {
+  const set: Record<string, boolean> = {};
+  for (const f of [join(dir, ".claude", "settings.json"), join(dir, ".claude", "settings.local.json")]) {
+    Object.assign(set, (await readJson<{ enabledPlugins?: Record<string, boolean> }>(f))?.enabledPlugins ?? {});
+  }
+  return plugins.filter((p) => (typeof set[p.key] === "boolean" ? set[p.key] : p.enabled)).map((p) => p.key);
+}
+
 async function syncedSkills(overrides: Record<string, string>): Promise<LibraryItem[]> {
   const root = join(claudeDir(), "skills", "synced");
   const out: LibraryItem[] = [];

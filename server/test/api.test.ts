@@ -1150,3 +1150,31 @@ describe("Claude Code's own commands (006-S1)", () => {
     }
   });
 });
+
+describe("a plugin on in only one project (#122)", () => {
+  test("the catalog says which projects it is on in, and the project lists it as on", async () => {
+    const claude = join(root, ".claude");
+    const pl = join(root, "plugin-cache", "tidy");
+    const proj = join(root, "projects", "plugged");
+    await mkdir(join(pl, ".claude-plugin"), { recursive: true });
+    await mkdir(join(pl, "skills", "sweep"), { recursive: true });
+    await writeFile(join(pl, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "tidy", description: "Tidies up" }));
+    await writeFile(join(pl, "skills", "sweep", "SKILL.md"), "---\nname: sweep\ndescription: Sweeps\n---\nbody\n");
+    await mkdir(join(claude, "plugins"), { recursive: true });
+    await writeFile(join(claude, "plugins", "installed_plugins.json"), JSON.stringify({ plugins: { "tidy@scratch": [{ installPath: pl, version: "1.0.0" }] } }));
+    await mkdir(join(proj, ".claude"), { recursive: true });
+    await writeFile(join(proj, ".claude", "settings.local.json"), JSON.stringify({ enabledPlugins: { "tidy@scratch": true } }));
+    try {
+      const cat = await (await request("/api/catalog")).json();
+      const plugin = cat.items.find((i: any) => i.kind === "plugin" && i.overrideKey === "tidy@scratch");
+      expect(plugin).toMatchObject({ state: "off", projectId: null, meta: { onIn: ["plugged"] } });
+      expect(cat.items.find((i: any) => i.kind === "skill" && i.source === "plugin" && i.sourceName === "tidy")).toMatchObject({ state: "off", meta: { onIn: ["plugged"] } });
+      const detail = await (await request(`/api/projects/${encodeURIComponent("~/projects/plugged")}`)).json();
+      expect(detail.pluginsOn).toEqual(["tidy@scratch"]);
+      expect((await (await request(`/api/projects/${encodeURIComponent("~/projects/demo")}`)).json()).pluginsOn).toEqual([]);
+    } finally {
+      await rm(join(claude, "plugins"), { recursive: true, force: true });
+      await rm(proj, { recursive: true, force: true });
+    }
+  });
+});

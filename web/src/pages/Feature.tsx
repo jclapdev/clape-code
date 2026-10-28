@@ -10,7 +10,7 @@ import { FEATURES, featureById, type Feature, type FeatureId } from "@/lib/featu
 import { day, plural, when } from "@/lib/format";
 import type { Catalog, CatalogItem, SlashCommand } from "@/lib/types";
 import { FileEditor } from "@/components/FileEditor";
-import { ItemActions, isSkillsDirPlugin } from "@/components/ItemActions";
+import { ItemActions, isSkillsDirPlugin, onInLabel } from "@/components/ItemActions";
 import { FindPlugins, NewPlugin } from "./PluginPanels";
 import { toast } from "sonner";
 import { PAGE_BAND, PAGE_COLUMN, PAGE_SCROLL, Page } from "@/components/Panes";
@@ -69,8 +69,16 @@ export function whereLabel(i: CatalogItem | null) {
   if (!i) return "Built into Claude Code";
   if (i.kind !== "plugin" && i.source === "plugin") return `From plugin ${i.sourceName}`;
   if (i.source === "synced") return "From claude.ai";
+  if (i.kind === "plugin" && onInLabel(i)) return onInLabel(i)!;
   return i.projectName ?? "All projects";
 }
+
+/** "Turned off" and the like, or where it's on instead when only some projects turn it on. */
+const stateLabel = (i: CatalogItem | null) => {
+  if (!i?.state || i.state === "on") return null;
+  if (onInLabel(i)) return i.kind === "plugin" ? null : onInLabel(i);
+  return STATE_LABEL[i.state] ?? i.state;
+};
 
 function useCatalog() {
   return useQuery({ queryKey: ["catalog"], queryFn: () => api.get<Catalog>("/catalog") });
@@ -112,7 +120,7 @@ function matches(r: Row, q: string, project: string) {
   // What's built into Claude Code applies in every project.
   if (project && project !== "global" && r.item && r.projectId !== project) return false;
   if (!q) return true;
-  const hay = `${r.name} ${r.description} ${r.item?.description ?? ""} ${planStatus(r.item)?.[0] ?? ""}${r.tag ?? whereLabel(r.item)} ${agentLabel(r.item) ?? ""} ${onlyYou(r.item) ? "only you" : ""}`.toLowerCase();
+  const hay = `${r.name} ${r.description} ${r.item?.description ?? ""} ${planStatus(r.item)?.[0] ?? ""}${r.tag ?? whereLabel(r.item)} ${stateLabel(r.item) ?? ""} ${agentLabel(r.item) ?? ""} ${onlyYou(r.item) ? "only you" : ""}`.toLowerCase();
   return q
     .toLowerCase()
     .split(/\s+/)
@@ -135,7 +143,7 @@ function RowTags({ r, f }: { r: Row; f: Feature }) {
       {onlyYou(i) && <Tag>Only you</Tag>}
       {i?.kind === "plugin" && <Tag className="max-w-full break-all">{isSkillsDirPlugin(i) ? "Your skills folder" : `From ${String(i.meta?.marketplace ?? i.sourceName)}`}</Tag>}
       {i && f.kinds.length > 1 && KIND_LABEL[i.kind] && f.kinds[0] !== i.kind && <Tag>{KIND_LABEL[i.kind]}</Tag>}
-      {i?.state && i.state !== "on" && <Tag>{STATE_LABEL[i.state] ?? i.state}</Tag>}
+      {stateLabel(i) && <Tag>{stateLabel(i)}</Tag>}
       {i?.error && <Tag tone="danger">Has a mistake</Tag>}
     </>
   );

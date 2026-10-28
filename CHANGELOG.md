@@ -85,6 +85,7 @@ Notable changes to Control Center, newest first.
 
 ### Fixed
 
+- A plugin turned off in your settings for every project but on in some projects says where it is on, such as "On in demo", on its page and in the lists, instead of "Turned off" and "All projects"; so do its skills and other parts. Its on/off box reads "On in every project" or "Only on in demo".
 - With `CLAUDE_CONFIG_DIR` set, your MCP servers for every project are read from the `.claude.json` inside that folder, where Claude Code keeps it, so they show on MCP servers and removing one keeps it in Archived items.
 - Empty pages (such as an empty Archived items) and the page for an old live-session link start at the same left edge as every other page.
 - Pictures in Guides load. The page now allows images from mintcdn.com, the server the Claude Code docs use, and from nowhere else outside the app.

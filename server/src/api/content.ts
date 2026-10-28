@@ -15,7 +15,7 @@ import { applySettingsChange, redactEnv, removeKeybinding, setKeybinding, settin
 import { setKeyInText } from "../parsers/jsonText";
 import { KEY_ACTIONS, KEY_CONTEXTS } from "../parsers/keybindingDocs";
 import { search as searchDocs, listSessions, untitled } from "../db/index";
-import { globalLibrary, listPlugins, listThemes, memoryItems, projectLibrary, readKeybindings, readWorktreeInclude } from "../scan/library";
+import { globalLibrary, listPlugins, listThemes, pluginsOnInProject, memoryItems, projectLibrary, readKeybindings, readWorktreeInclude } from "../scan/library";
 import { catalog } from "../scan/catalog";
 import { initArgs, initResult, marketplaceCounts, parseAvailable, parseMarketplaces, pluginArgs, pluginResult, searchAvailable, skillsDirPlugins, type Available } from "../scan/plugins";
 import { buildMap, managedSettingsPath } from "../scan/map";
@@ -78,16 +78,10 @@ content.get("/projects/:id", async (c) => {
   });
 });
 
-/**
- * The plugins turned on in a project: `enabledPlugins` from your settings, then the project's shared and local
- * settings, each overriding the one before (the settings docs: "Settings precedence, highest first: managed
- * settings, command line, project local, shared project, user").
- */
+/** The plugins turned on in a project, after your settings and the project's own. */
 export async function pluginsOnIn(dir: string): Promise<string[]> {
-  const files = [join(claudeDir(), "settings.json"), join(dir, ".claude", "settings.json"), join(dir, ".claude", "settings.local.json")];
-  const enabled: Record<string, boolean> = {};
-  for (const f of files) Object.assign(enabled, (await readJson<{ enabledPlugins?: Record<string, boolean> }>(f))?.enabledPlugins ?? {});
-  return (await listPlugins(enabled)).filter((p) => p.enabled).map((p) => p.key);
+  const settings = await readJson<{ enabledPlugins?: Record<string, boolean> }>(join(claudeDir(), "settings.json"));
+  return pluginsOnInProject(dir, await listPlugins(settings?.enabledPlugins ?? {}));
 }
 
 /** Plans the project's sessions wrote, newest first, each with the session that wrote it. */

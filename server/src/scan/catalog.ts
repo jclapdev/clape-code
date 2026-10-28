@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { claudeDir, claudeJson, tildify, untildify } from "../fs/paths";
 import { classify } from "../fs/policy";
 import { listSessions } from "../db/index";
-import { globalLibrary, planItem, projectLibrary, type LibraryItem, type PluginInfo } from "./library";
+import { globalLibrary, planItem, pluginsOnInProject, projectLibrary, type LibraryItem, type PluginInfo } from "./library";
 import { firstLine, ls, mtimeOf, readJson, readMd } from "./md";
 import { linkPlan, planFiles } from "./plans";
 import { listProjects } from "./projects";
@@ -136,6 +136,15 @@ export async function catalog(): Promise<Catalog> {
     for (const i of await mcpItems((await readJson<{ mcpServers?: Record<string, any> }>(mcpFile))?.mcpServers, mcpFile, "project", "project", d.name)) items.push(tag(i, project));
     for (const i of await mcpItems(cj.projects?.[d.dir]?.mcpServers, claudeJson(), "local", "project", d.name)) items.push(tag({ ...i, meta: { ...i.meta, local: true } }, project));
     for (const i of await workflowItems(join(d.dir, ".claude", "workflows"), "project", d.name)) items.push(tag(i, project));
+  }
+
+  // A plugin off in your settings for every project can be on in some projects: those items say where (#122).
+  const onIn = new Map<string, string[]>();
+  for (const d of dirs) for (const key of await pluginsOnInProject(d.dir, plugins.filter((p) => !p.enabled))) onIn.set(key, [...(onIn.get(key) ?? []), d.name]);
+  for (const i of items) {
+    const key = i.kind === "plugin" ? i.overrideKey : i.source === "plugin" ? (i.meta.plugin as string | undefined) ?? plugins.find((p) => p.name === i.sourceName)?.key : null;
+    const where = key && i.state === "off" ? onIn.get(key) : undefined;
+    if (where) i.meta = { ...i.meta, onIn: where };
   }
 
   return { items, plugins, projects: dirs.map(({ id, name }) => ({ id, name })) };
