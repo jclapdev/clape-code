@@ -69,6 +69,19 @@ describe("settingValue", () => {
     expect(() => settingValue(setting("permissions.allow"), "user", ["x"])).toThrow("its own section");
   });
 
+  test("a switch writes false when off would leave the setting on (#124)", () => {
+    // Off by default: off removes the key unless another file turns it on.
+    expect(settingValue(setting("verbose"), "project", false)).toBeUndefined();
+    expect(settingValue(setting("verbose"), "project", false, [true, undefined])).toBe(false);
+    expect(settingValue(setting("verbose"), "project", false, [false])).toBeUndefined();
+    expect(settingValue(setting("verbose"), "project", true, [false])).toBe(true);
+    // On by default: off writes false; on removes the key unless another file turns it off.
+    expect(setting("autoCompactEnabled").default).toBe("`true`");
+    expect(settingValue(setting("autoCompactEnabled"), "local", false)).toBe(false);
+    expect(settingValue(setting("autoCompactEnabled"), "local", true)).toBeUndefined();
+    expect(settingValue(setting("autoCompactEnabled"), "local", true, [false])).toBe(true);
+  });
+
   test("a User or managed setting is refused for a project's files", () => {
     expect(setting("desktopSessionCleanupPeriodDays").scope).toBe("User or managed");
     expect(writableIn("User or managed")).toEqual(["user"]);

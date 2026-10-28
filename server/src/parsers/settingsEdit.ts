@@ -205,9 +205,12 @@ export function writableIn(scope: string): SettingsTarget[] {
 
 /**
  * The value to write for one documented setting, or undefined to remove the key: off, empty or "Not set" removes it,
- * so Claude Code's own default applies.
+ * so Claude Code's own default applies. A switch is the exception, since removing its key can leave it on: off writes
+ * `false` when the setting is on by default or another settings file turns it on, and on removes the key only when
+ * the setting is on by default and no other file turns it off. `others` holds this key's values in the other user,
+ * project and local files.
  */
-export function settingValue(s: ReferenceSetting, target: SettingsTarget, value: unknown): unknown {
+export function settingValue(s: ReferenceSetting, target: SettingsTarget, value: unknown, others: unknown[] = []): unknown {
   if (s.section) throw new WriteError(400, "This setting is changed in its own section of the Settings page.");
   if (s.type === "other") throw new WriteError(400, "This setting is changed as text.");
   const targets = writableIn(s.scope);
@@ -217,7 +220,9 @@ export function settingValue(s: ReferenceSetting, target: SettingsTarget, value:
   switch (s.type) {
     case "boolean":
       if (typeof value !== "boolean") throw new WriteError(400, "Pick on or off.");
-      return value;
+      const onByDefault = /^`true`/.test(s.default ?? "");
+      if (value) return onByDefault && !others.includes(false) ? undefined : true;
+      return onByDefault || others.includes(true) ? false : undefined;
     case "choice":
       if (typeof value !== "string" || !s.choices?.includes(value)) throw new WriteError(400, `Pick one of: ${s.choices?.join(", ")}.`);
       return value;

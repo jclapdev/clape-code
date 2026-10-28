@@ -1075,6 +1075,37 @@ describe("every setting by topic (005-S1)", () => {
     }
   });
 
+  test("a project turns off a switch that your settings for every project turn on (#124)", async () => {
+    const demo = encodeURIComponent("~/projects/demo");
+    const userFile = join(root, ".claude", "settings.json");
+    const shared = join(root, "projects", "demo", ".claude", "settings.json");
+    const [userBefore, sharedBefore] = await Promise.all([readFile(userFile, "utf8").catch(() => null), readFile(shared, "utf8").catch(() => null)]);
+    await mkdir(join(root, "projects", "demo", ".claude"), { recursive: true });
+    await writeFile(userFile, '{\n  "verbose": true\n}\n');
+    await writeFile(shared, "{}\n");
+    const set = (body: object) => request("/api/settings/set", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scope: "~/projects/demo", ...body }) });
+    const hash = async () => (await (await request(`/api/settings?project=${demo}`)).json()).sources.find((s: any) => s.source === "project").hash;
+    try {
+      // Your settings turn it on, so off writes false in the project's file and the project's value wins.
+      expect((await set({ key: "verbose", value: false, hash: await hash() })).status).toBe(200);
+      expect(JSON.parse(await readFile(shared, "utf8"))).toEqual({ verbose: false });
+      const ref = await (await request(`/api/settings/reference?project=${demo}`)).json();
+      expect(find(ref, "verbose")).toMatchObject({ value: false, from: "project" });
+      // With no other file turning it on, off removes the key.
+      await writeFile(userFile, "{}\n");
+      expect((await set({ key: "verbose", value: true, hash: await hash() })).status).toBe(200);
+      expect(JSON.parse(await readFile(shared, "utf8"))).toEqual({ verbose: true });
+      expect((await set({ key: "verbose", value: false, hash: await hash() })).status).toBe(200);
+      expect(await readFile(shared, "utf8")).toBe("{}\n");
+      expect(await readFile(userFile, "utf8")).toBe("{}\n");
+    } finally {
+      if (userBefore === null) await rm(userFile, { force: true });
+      else await writeFile(userFile, userBefore);
+      if (sharedBefore === null) await rm(shared, { force: true });
+      else await writeFile(shared, sharedBefore);
+    }
+  });
+
   test("with no copy in the app folder and no internet, the copy shipped with the app is used", async () => {
     const { resetSettingsReference, referenceCachePath } = await import("../src/scan/settingsReference");
     const cache = await readFile(referenceCachePath(), "utf8");

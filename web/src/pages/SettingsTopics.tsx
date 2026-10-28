@@ -152,10 +152,10 @@ function Control({ s, where }: { s: RefSetting; where: Where }) {
 
   let control: ReactNode = null;
   if (s.type === "boolean") {
-    // Off removes the key. For a setting that's on by default, on removes it and off writes false.
-    const onByDefault = /^`true`/.test(s.default ?? "");
-    const on = mine === undefined ? onByDefault : mine === true;
-    control = <Switch label={on ? "On" : "Off"} ariaLabel={s.key} on={on} disabled={disabled} onChange={(v) => set.mutate(v === onByDefault ? null : v)} />;
+    // The server decides whether off removes the key or writes false (settingValue in server/src/parsers/settingsEdit.ts).
+    // Not set in the picked file: show the value in effect, so a setting another file turns on shows On and can be turned off.
+    const on = mine === undefined ? (typeof s.value === "boolean" ? s.value : /^`true`/.test(s.default ?? "")) : mine === true;
+    control = <Switch label={on ? "On" : "Off"} ariaLabel={s.key} on={on} disabled={disabled} onChange={(v) => set.mutate(v)} />;
   } else if (s.type === "choice") {
     control = (
       <SimpleSelect

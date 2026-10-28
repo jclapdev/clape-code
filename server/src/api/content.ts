@@ -582,7 +582,10 @@ content.post("/settings/set", async (c) => {
   const setting = (await settingsReference()).ref.topics.flatMap((t) => t.settings).find((s) => s.key === f.key);
   if (!setting) throw new WriteError(400, "That isn't a setting in Claude Code's settings reference.");
   const target = !f.scope || f.scope === "global" ? "user" : f.local ? "local" : "project";
-  const value = settingValue(setting, target, f.value);
+  // The key's values in the other user, project and local files, so a switch turned off can write false where removing it would leave it on.
+  const { parsed } = await readSettingsFiles(target === "user" ? undefined : f.scope);
+  const others = (["user", "project", "local"] as const).filter((t) => t !== target).map((t) => valueNow({ [t]: parsed[t] }, setting.key).value);
+  const value = settingValue(setting, target, f.value, others);
   const file = await settingsFile(f.scope, f.local);
   const cur = await readWithHash(file);
   const problem = cur ? jsonProblem(cur.content) : null;
