@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Section } from "./Projects";
 import { AccountDetails } from "@/components/Account";
+import { filterTopics, FindSetting, TopicSections, type SettingsReferenceView } from "./SettingsTopics";
 
 type Source = "managed" | "local" | "project" | "user";
 type Obj = Record<string, any>;
@@ -703,6 +704,9 @@ export function SettingsPage() {
   const local = search.file === "local";
   const view = useQuery({ queryKey: ["settings", project ?? ""], queryFn: () => api.get<SettingsView>(`/settings${project ? `?project=${enc(project)}` : ""}`) });
   const map = useQuery({ queryKey: ["map"], queryFn: () => api.get<{ precedence: Precedence[] }>("/map") });
+  // Under ["settings"], so a change from any section refreshes the values shown here too.
+  const reference = useQuery({ queryKey: ["settings", "reference", project ?? ""], queryFn: () => api.get<SettingsReferenceView>(`/settings/reference${project ? `?project=${enc(project)}` : ""}`) });
+  const [find, setFind] = useState("");
   const go = (s: SettingsSearch) => void navigate({ to: "/settings", search: s, replace: true });
 
   if (view.error) return <ErrorNote error={view.error} />;
@@ -724,6 +728,9 @@ export function SettingsPage() {
     { id: "themes", title: "Themes", node: <Themes ctx={ctx} themes={view.data.themes} /> },
   ];
   const projectOptions = (projects.data ?? []).filter((p) => !p.empty);
+  const topics = reference.data?.topics ?? [];
+  const shownTopics = filterTopics(topics, find);
+  const where = { label, target, pathOf: (s: Source) => view.data!.sources.find((x) => x.source === s && x.exists)?.path };
 
   return (
     <Page title="Settings">
@@ -774,10 +781,20 @@ export function SettingsPage() {
               {s.node}
             </Section>
           ))}
+          <FindSetting value={find} onChange={setFind} />
+          {reference.error ? (
+            <ErrorNote error={reference.error} className="mt-4" />
+          ) : !reference.data ? (
+            <Loading />
+          ) : shownTopics.length ? (
+            <TopicSections topics={shownTopics} where={where} />
+          ) : (
+            <p className="py-6 text-[13.5px] text-muted-foreground">No setting matches.</p>
+          )}
         </div>
-        <nav aria-label="On this page" className="sticky top-4 hidden h-fit w-48 flex-none xl:block">
+        <nav aria-label="On this page" className="sticky top-4 hidden max-h-[calc(100vh-2rem)] w-48 flex-none overflow-y-auto xl:block">
           <ul className="flex flex-col gap-0.5 text-[13.5px]">
-            {[{ id: "account", title: "Account" }, ...sections].map((s) => (
+            {[{ id: "account", title: "Account" }, ...sections, ...shownTopics].map((s) => (
               <li key={s.id}>
                 <a href={`#${s.id}`} className="block rounded px-2 py-1 text-ink-2 no-underline hover:bg-sunken">
                   {s.title}
