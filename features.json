@@ -330,9 +330,17 @@
         "A4",
         "A5"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": [
+        "specs/screenshots/006-S1-A1.png",
+        "specs/screenshots/006-S1-A2.png",
+        "specs/screenshots/006-S1-A3.png",
+        "specs/screenshots/006-S1-A4.png",
+        "specs/screenshots/006-S1-A5.png",
+        "specs/screenshots/006-S1-A5-light.png",
+        "specs/screenshots/006-S1-slash-menu.png"
+      ]
     }
   ]
 }
