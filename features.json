@@ -272,9 +272,12 @@
         "A1",
         "A2"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": [
+        "specs/screenshots/005-A1.png",
+        "specs/screenshots/005-A2.png"
+      ]
     },
     {
       "id": "005-S2",
@@ -286,9 +289,16 @@
         "A5",
         "A6"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 1,
-      "screenshots": []
+      "screenshots": [
+        "specs/screenshots/005-A1.png",
+        "specs/screenshots/005-A2.png",
+        "specs/screenshots/005-A5.png",
+        "specs/screenshots/005-A5-edit-as-text.png",
+        "specs/screenshots/005-A6-390-light.png",
+        "specs/screenshots/005-A6-390-dark.png"
+      ]
     },
     {
       "id": "005-S3",
@@ -299,9 +309,15 @@
         "A4",
         "A6"
       ],
-      "status": "failing",
+      "status": "passing",
       "build_attempts": 2,
-      "screenshots": []
+      "screenshots": [
+        "specs/screenshots/005-A3.png",
+        "specs/screenshots/005-A3-user-on-turned-off.png",
+        "specs/screenshots/005-A4.png",
+        "specs/screenshots/005-A6-390-light.png",
+        "specs/screenshots/005-A6-390-dark.png"
+      ]
     },
     {
       "id": "006-S1",
