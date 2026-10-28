@@ -118,6 +118,29 @@ describe("parsing", () => {
   });
 });
 
+describe("descriptions without markup", () => {
+  const one = (body: string) => parseSettingsReference(`## Topic\n\n### \`k\`\n\n${body}\n\n* **Scope**: \`Any file\`\n* **Type**: Boolean\n* **Default**: unset\n`).topics[0].settings[0].description;
+
+  test("a callout before the description is skipped; a callout alone gives its text without markers", () => {
+    expect(one("> [!WARNING]\n>\n> Deprecated since v2.\n\nThe real description. More.")).toBe("The real description.");
+    expect(one("> [!WARNING]\n>\n> Deprecated, and replaced by [`b`](#b). Still read.")).toBe("Deprecated, and replaced by `b`.");
+  });
+
+  test("bold and italic become plain text; code spans stay", () => {
+    expect(one("The picker has a **Default** option and an *other* one, with `**raw**` and `snake_case_key`.")).toBe(
+      "The picker has a Default option and an other one, with `**raw**` and `snake_case_key`.",
+    );
+  });
+
+  test("no description in the shipped copy has callout or emphasis markup", () => {
+    for (const s of all) {
+      expect(s.description).not.toContain("[!");
+      expect(s.description).not.toContain("**");
+      expect(s.description.startsWith(">")).toBe(false);
+    }
+  });
+});
+
 describe("valueNow", () => {
   test("highest file wins; dotted keys are nested; lists combine", () => {
     const files = { user: { tui: "fullscreen", sandbox: { network: { allowedDomains: ["a"] } } }, local: { tui: "default", sandbox: { network: { allowedDomains: ["b"] } } } };

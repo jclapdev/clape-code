@@ -79,6 +79,15 @@ export function firstSentence(text: string): string {
   return text;
 }
 
+/** `**bold**`, `__bold__`, `*italic*` and `_italic_` become their text; code spans are left as they are. */
+export const unemphasize = (s: string) =>
+  s
+    .split(/(`+[^`]*`+)/)
+    .map((part, i) =>
+      i % 2 ? part : part.replace(/(\*\*|__)(\S(?:.*?\S)?)\1/g, "$2").replace(/(^|[^\w*])([*_])(\S(?:.*?\S)?)\2(?![\w*])/g, "$1$3"),
+    )
+    .join("");
+
 const slug = (s: string) =>
   s
     .toLowerCase()
@@ -97,7 +106,7 @@ function typeOf(typeText: string, choices: string[]): SettingType {
 export function parseSettingsReference(md: string, fetchedAt = new Date().toISOString()): SettingsReference {
   const topics: ReferenceTopic[] = [];
   let topic: ReferenceTopic | null = null;
-  let cur: { key: string; para: string[]; paraDone: boolean; scope?: string; typeText?: string; choices: string[]; inChoices: boolean; default: string | null } | null = null;
+  let cur: { key: string; para: string[]; callout: string[]; paraDone: boolean; scope?: string; typeText?: string; choices: string[]; inChoices: boolean; default: string | null } | null = null;
   let inFence = false;
 
   const finish = () => {
@@ -108,7 +117,8 @@ export function parseSettingsReference(md: string, fetchedAt = new Date().toISOS
     if (c.typeText === undefined || c.scope === undefined || LEFT_OUT_SCOPES.has(c.scope)) return;
     const s: ReferenceSetting = {
       key: c.key,
-      description: firstSentence(unlink(c.para.join(" ")).replace(/\s+/g, " ").trim()),
+      // A setting with only a callout (such as a deprecation warning) is described by the callout's text.
+      description: firstSentence(unemphasize(unlink((c.para.length ? c.para : c.callout).join(" "))).replace(/\s+/g, " ").trim()),
       type: typeOf(c.typeText, c.choices),
       typeText: c.typeText,
       default: c.default,
@@ -137,7 +147,7 @@ export function parseSettingsReference(md: string, fetchedAt = new Date().toISOS
     const h3 = /^### `([^`]+)`\s*$/.exec(line);
     if (h3) {
       finish();
-      cur = topic ? { key: h3[1], para: [], paraDone: false, choices: [], inChoices: false, default: null } : null;
+      cur = topic ? { key: h3[1], para: [], callout: [], paraDone: false, choices: [], inChoices: false, default: null } : null;
       continue;
     }
     if (/^#{1,3} /.test(line)) {
@@ -174,6 +184,12 @@ export function parseSettingsReference(md: string, fetchedAt = new Date().toISOS
       continue;
     }
     if (/^\s*<\/?[A-Za-z]/.test(line) && !cur.para.length) continue;
+    // A callout (`> [!WARNING]` and the quoted lines under it) before the description isn't part of it.
+    if (/^\s*>/.test(line) && !cur.para.length) {
+      const text = line.replace(/^\s*>\s?/, "").replace(/^\[![A-Za-z]+\]\s*/, "").trim();
+      if (text) cur.callout.push(text);
+      continue;
+    }
     cur.para.push(line.trim());
   }
   finish();

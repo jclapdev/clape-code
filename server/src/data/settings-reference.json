@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-10-28T00:03:37.497Z",
+  "fetchedAt": "2026-10-28T00:20:57.710Z",
   "topics": [
     {
       "id": "model-and-responses",
@@ -45,7 +45,7 @@
         },
         {
           "key": "enforceAvailableModels",
-          "description": "The `/model` picker has a **Default** option, and `default` model setting describes the model it resolves to.",
+          "description": "The `/model` picker has a Default option, and `default` model setting describes the model it resolves to.",
           "type": "boolean",
           "typeText": "Boolean",
           "default": "`false`",
@@ -851,7 +851,7 @@
         },
         {
           "key": "keybindingFlavor",
-          "description": "> [!WARNING] > > Deprecated since v2.1.261 and has no effect.",
+          "description": "In v2.1.238 through v2.1.260, setting it to `\"readline\"` made `Ctrl+W` delete back to the previous whitespace instead of only the previous word.",
           "type": "string",
           "typeText": "string, `\"classic\"` or `\"readline\"`",
           "default": "unset",
@@ -1078,7 +1078,7 @@
         },
         {
           "key": "voiceEnabled",
-          "description": "> [!WARNING] > > Deprecated since v2.1.92, when the `voice` object replaced it.",
+          "description": "Turn voice dictation on with the single Boolean form that predates the `voice` object.",
           "type": "boolean",
           "typeText": "Boolean",
           "default": "unset",
@@ -1108,7 +1108,7 @@
         },
         {
           "key": "includeCoAuthoredBy",
-          "description": "> [!WARNING] > > Deprecated since v2.0.62, when `attribution` replaced it.",
+          "description": "Use `attribution` instead, which replaces this key and lets you change or hide the commit trailer, the pull request text, and the session link separately.",
           "type": "boolean",
           "typeText": "Boolean",
           "default": "`true`",
@@ -1515,7 +1515,7 @@
         },
         {
           "key": "disableArtifact",
-          "description": "> [!WARNING] > > Deprecated, and replaced by `enableArtifact`.",
+          "description": "Use `enableArtifact` instead to turn off the Artifact tool, which publishes session output as a private web page on claude.ai.",
           "type": "boolean",
           "typeText": "Boolean",
           "default": "unset, so the tool follows your account's availability",
