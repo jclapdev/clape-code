@@ -11,7 +11,12 @@ export function claudeDir(): string {
   return process.env.CC_CLAUDE_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(home(), ".claude");
 }
 
+/**
+ * Claude Code's `.claude.json`. With CLAUDE_CONFIG_DIR set, Claude Code keeps it inside that folder (seen with
+ * Claude Code 2.1.311; the docs don't say); otherwise it sits in the home folder. CC_CLAUDE_DIR (tests) keeps the home one.
+ */
 export function claudeJson(): string {
+  if (!process.env.CC_CLAUDE_DIR && process.env.CLAUDE_CONFIG_DIR) return join(process.env.CLAUDE_CONFIG_DIR, ".claude.json");
   return join(home(), ".claude.json");
 }
 

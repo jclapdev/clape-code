@@ -85,6 +85,7 @@ Notable changes to Control Center, newest first.
 
 ### Fixed
 
+- With `CLAUDE_CONFIG_DIR` set, your MCP servers for every project are read from the `.claude.json` inside that folder, where Claude Code keeps it, so they show on MCP servers and removing one keeps it in Archived items.
 - Empty pages (such as an empty Archived items) and the page for an old live-session link start at the same left edge as every other page.
 - Pictures in Guides load. The page now allows images from mintcdn.com, the server the Claude Code docs use, and from nowhere else outside the app.
 - An opened project, conversation, file or item starts its title at the same left edge, and puts its content in the same width, as the top-level pages.

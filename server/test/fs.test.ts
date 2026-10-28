@@ -60,6 +60,26 @@ describe("policy", async () => {
   });
 });
 
+describe("paths", async () => {
+  const { claudeJson } = await import("../src/fs/paths");
+  const { classify } = await import("../src/fs/policy");
+  test(".claude.json sits inside CLAUDE_CONFIG_DIR when that is set (#121)", () => {
+    const saved = process.env.CC_CLAUDE_DIR;
+    const config = join(root, "other-config");
+    try {
+      expect(claudeJson()).toBe(join(root, ".claude.json"));
+      process.env.CLAUDE_CONFIG_DIR = config;
+      expect(claudeJson()).toBe(join(root, ".claude.json"));
+      delete process.env.CC_CLAUDE_DIR;
+      expect(claudeJson()).toBe(join(config, ".claude.json"));
+      expect(classify(join(config, ".claude.json"))).toBe("secret");
+    } finally {
+      process.env.CC_CLAUDE_DIR = saved;
+      delete process.env.CLAUDE_CONFIG_DIR;
+    }
+  });
+});
+
 describe("safeWrite", async () => {
   const { safeWrite, readWithHash, WriteError } = await import("../src/fs/safeWrite");
   const file = () => join(claude, "settings.json");
