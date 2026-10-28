@@ -14,6 +14,7 @@ Notable changes to Control Center, newest first.
 - Agents lists Claude Code's built-in agents (Explore, Plan, General-purpose, claude, statusline-setup, claude-code-guide), tagged "Built in". One of your own agents with the same name hides the built-in one.
 - Deleted hooks and MCP servers go to Archived items, where Restore puts them back: a hook into its group in the same settings file, a server through Claude Code's `claude mcp add-json`.
 - A conversation open in another Claude Code window isn't sent into: a message sent from Control Center continues in a copy of it, with its own session, so the two don't mix into one transcript.
+- A copy Control Center makes of a conversation open in another window is tagged "Copy" on Sessions and in the menu, with "Copy of <title>" under it, and its page links to the original. Its title stays as Claude Code wrote it.
 - Text you type is kept when you leave the page: a conversation's reply box, the New session box, and the New skill, command, agent, rule, output style, memory note, instructions, hook, permission rule, MCP server and project forms. It's still there when you come back, and goes once you send or save it.
 - Guides has "In the cloud and your organization", with links to the official pages for cloud scheduled tasks (routines), Code Review on GitHub, Claude Code in Slack, gateways, organization-managed settings and the Agent SDK.
 - On Memory, notes kept in a project's `.claude/agent-memory-local/` are tagged "Only you", beside "Agent: <name>".

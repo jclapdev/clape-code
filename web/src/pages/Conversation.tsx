@@ -360,6 +360,17 @@ function Conversation({ sid }: { sid: string }) {
                 <span className="break-words">{s.plan.title}</span>
               </Link>
             )}
+            {s.copyOf && (
+              <span className="inline-flex min-w-0 flex-wrap items-center gap-1.5">
+                <Tag>Copy</Tag>
+                <span>
+                  of{" "}
+                  <Link to="/sessions/$sid" params={{ sid: s.copyOf.sessionId }} className="break-words">
+                    {s.copyOf.title ?? "the original conversation"}
+                  </Link>
+                </span>
+              </span>
+            )}
             {s.archived && <span>Archived</span>}
           </span>
         }

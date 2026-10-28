@@ -10,6 +10,7 @@ import { readLines } from "../fs/lines";
 import { sessionAccounts, type SessionAccount } from "../account/sessions";
 import { builtInCommands } from "../scan/commandsReference";
 import { getSession, isOpen, listLive, liveBySessionId, removeSession, startSession, waitingCount, type LiveStatus } from "../live/sessions";
+import { sessionCopies } from "../live/copies";
 import { isFromScript, startedSessions } from "../live/started";
 import { globalLibrary, planItem, projectLibrary } from "../scan/library";
 import { planOfSession } from "../scan/plans";
@@ -25,7 +26,7 @@ const UUID = /^[0-9a-f-]{36}$/i;
 
 type Ctx = Awaited<ReturnType<typeof context>>;
 
-function publicSession(s: IndexedSession, { archived, running, activity, projectOf, accounts, started }: Ctx) {
+function publicSession(s: IndexedSession, { archived, running, activity, projectOf, accounts, started, copyOf }: Ctx) {
   // Every folder a session ran in is only for linking plans; the list would carry hundreds of paths.
   const { file, cwds, slugs, planVerdict, ...rest } = s;
   return {
@@ -39,6 +40,7 @@ function publicSession(s: IndexedSession, { archived, running, activity, project
     running: running.has(s.sessionId),
     activity: activity.get(s.sessionId) ?? null,
     account: accounts[s.sessionId] ?? null,
+    copyOf: copyOf(s.sessionId),
     resumeCommand: s.cwd ? `cd "${s.cwd}" && claude --resume ${s.sessionId}` : `claude --resume ${s.sessionId}`,
   };
 }
@@ -59,15 +61,22 @@ export function sessionActivity(procs: { sessionId: string; status: string | nul
   return activity;
 }
 
+/** For a copy Control Center made (#120): the conversation it copies, with that one's title. */
+function originalOf(sid: string | null) {
+  if (!sid) return null;
+  const o = sessionById(sid);
+  return { sessionId: sid, title: o ? (o.title ?? untitled(o.firstPrompt)) : null };
+}
+
 async function context() {
-  const [state, procs, projects, accounts, started] = await Promise.all([readState(), listLiveProcesses(), listProjects(), sessionAccounts(), startedSessions()]);
+  const [state, procs, projects, accounts, started, copies] = await Promise.all([readState(), listLiveProcesses(), listProjects(), sessionAccounts(), startedSessions(), sessionCopies()]);
   const running = new Set(procs.map((p) => p.sessionId));
   const live = listLive();
   for (const l of live) if (l.sessionId && l.status !== "stopped") running.add(l.sessionId);
   const activity = sessionActivity(procs, live);
   const dirs = projects.map((p) => ({ id: p.id, dir: untildify(p.id) }));
   const projectOf = (cwd: string | null) => (cwd ? dirs.find((d) => isInside(projectPathOf(cwd), d.dir))?.id ?? null : null);
-  return { archived: state.archivedSessions, running, activity, projectOf, state, accounts, started };
+  return { archived: state.archivedSessions, running, activity, projectOf, state, accounts, started, copyOf: (sid: string) => originalOf(copies[sid] ?? liveBySessionId(sid)?.copyOf ?? null) };
 }
 
 sessions.get("/sessions", async (c) => {
@@ -134,6 +143,7 @@ sessions.get("/sessions/:sid", async (c) => {
       archived: !!ctx.archived[sid],
       fromScript: false,
       account: l.account,
+      copyOf: ctx.copyOf(sid),
       plan: null,
       turns,
       totalTurns: turns.length,
@@ -348,19 +358,23 @@ interface MenuItem {
   jobId: string | null;
   title: string;
   project: string | null;
+  /** The original's session ID, only when this is a copy Control Center made. */
+  copyOf?: string;
 }
 
 /**
  * The main menu's conversations: the one you last sent a message in, the ones that need you and the ones Claude is
  * working in. Runs from scripts and archived conversations are left out, as on Sessions. Only ID, title and project.
  */
+const copyField = (original: string | null | undefined) => (original ? { copyOf: original } : {});
+
 sessions.get("/menu", async (c) => {
   const [ctx, { needsYou, jobs }] = await Promise.all([context(), needsYouNow()]);
   const list = listSessions().filter((s) => s.prompts > 0 && !ctx.archived[s.sessionId] && !isFromScript(s.entrypoint, s.sessionId, ctx.started));
   const byId = new Map(list.map((s) => [s.sessionId, s]));
   const jobName = new Map(jobs.flatMap((j) => (j.sessionId && j.name ? [[j.sessionId, j.name] as const] : [])));
   const projectOf = (cwd: string | null) => ctx.projectOf(cwd ? untildify(cwd) : null);
-  const item = (s: IndexedSession): MenuItem => ({ sessionId: s.sessionId, jobId: null, title: jobName.get(s.sessionId) ?? s.title ?? untitled(s.firstPrompt), project: ctx.projectOf(s.cwd) });
+  const item = (s: IndexedSession): MenuItem => ({ sessionId: s.sessionId, jobId: null, title: jobName.get(s.sessionId) ?? s.title ?? untitled(s.firstPrompt), project: ctx.projectOf(s.cwd), ...copyField(ctx.copyOf(s.sessionId)?.sessionId) });
   const last = list.reduce<IndexedSession | null>((a, s) => ((s.lastPromptAt ?? "") > (a?.lastPromptAt ?? "") ? s : a), null);
 
   const seen = new Set<string>();
@@ -387,7 +401,7 @@ sessions.get("/menu", async (c) => {
     const fresh = seen.has(sid) || sessionById(sid) ? null : liveBySessionId(sid);
     if (!fresh) continue;
     seen.add(sid);
-    (a === "waiting" ? needs : running).unshift({ sessionId: sid, jobId: null, title: "New conversation", project: projectOf(fresh.view().cwd) });
+    (a === "waiting" ? needs : running).unshift({ sessionId: sid, jobId: null, title: "New conversation", project: projectOf(fresh.view().cwd), ...copyField(fresh.copyOf) });
   }
   return c.json({
     last: last ? item(last) : null,

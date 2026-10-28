@@ -797,8 +797,27 @@ describe("a conversation is addressed by its session ID", () => {
       const copy = (await get(`/api/live/${r.liveId}`)).sessionId;
       expect(copy).not.toBe(TERMINAL);
       await until(() => queries.at(-1)!.received.length === 1);
-      expect(await get(`/api/sessions/${TERMINAL}`)).toMatchObject({ status: "running", liveId: null });
+      expect(await get(`/api/sessions/${TERMINAL}`)).toMatchObject({ status: "running", liveId: null, copyOf: null });
+      // #120: the copy is recorded in the app folder and names its original, before and after its transcript exists.
+      const copiesFile = join(root, "app", "session-copies.json");
+      await until(async () => (await readFile(copiesFile, "utf8").catch(() => "{}")).includes(copy));
+      expect(JSON.parse(await readFile(copiesFile, "utf8"))[copy]).toBe(TERMINAL);
+      expect((await get(`/api/sessions/${copy}`)).copyOf).toEqual({ sessionId: TERMINAL, title: "hello from the terminal" });
       await post(`/api/sessions/${copy}/stop`);
+      const copyFile = join(root, ".claude", "projects", "-demo", `${copy}.jsonl`);
+      await writeFile(copyFile, JSON.stringify({ type: "user", entrypoint: "sdk-ts", sessionId: copy, cwd: join(root, "projects", "demo"), timestamp: "2026-10-27T10:00:00Z", message: { role: "user", content: "hello from the terminal" } }) + "\n");
+      try {
+        const { indexSessions } = await import("../src/db/index");
+        await indexSessions();
+        const list = await get("/api/sessions?empty=1");
+        expect(list.find((s: any) => s.sessionId === copy)).toMatchObject({ displayTitle: "hello from the terminal", fromScript: false, copyOf: { sessionId: TERMINAL, title: "hello from the terminal" } });
+        expect(list.find((s: any) => s.sessionId === TERMINAL).copyOf).toBeNull();
+        expect((await get("/api/menu")).last).toMatchObject({ sessionId: copy, copyOf: TERMINAL });
+      } finally {
+        await rm(copyFile, { force: true });
+        const { indexSessions } = await import("../src/db/index");
+        await indexSessions();
+      }
     } finally {
       await rm(proc, { force: true });
     }
