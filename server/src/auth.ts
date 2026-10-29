@@ -97,7 +97,7 @@ export async function tlsFiles(): Promise<{ key: string; cert: string }> {
     return { key: await readFile(join(dir, "key.pem"), "utf8"), cert: await readFile(join(dir, "cert.pem"), "utf8") };
   } catch {
     const notAfterDate = new Date(Date.now() + 3 * 365 * 24 * 3600 * 1000);
-    const pems = await generate([{ name: "commonName", value: "control-center.local" }], { keySize: 2048, algorithm: "sha256", notAfterDate });
+    const pems = await generate([{ name: "commonName", value: "clape-code.local" }], { keySize: 2048, algorithm: "sha256", notAfterDate });
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, "key.pem"), pems.private, { mode: 0o600 });
     await writeFile(join(dir, "cert.pem"), pems.cert);

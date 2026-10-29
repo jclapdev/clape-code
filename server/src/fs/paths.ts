@@ -1,3 +1,4 @@
+import { existsSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 
@@ -22,10 +23,14 @@ export function claudeJson(): string {
 
 export function appDir(): string {
   if (process.env.CC_APP_DIR) return process.env.CC_APP_DIR;
-  if (process.platform === "win32") {
-    return join(process.env.APPDATA ?? join(home(), "AppData", "Roaming"), "control-center");
-  }
-  return join(process.env.XDG_CONFIG_HOME ?? join(home(), ".config"), "control-center");
+  const parent = process.platform === "win32"
+    ? (process.env.APPDATA ?? join(home(), "AppData", "Roaming"))
+    : (process.env.XDG_CONFIG_HOME ?? join(home(), ".config"));
+  const dir = join(parent, "clape-code");
+  // The app was called Control Center: its data moves to the new folder the first time it's needed.
+  const old = join(parent, "control-center");
+  if (!existsSync(dir) && existsSync(old)) renameSync(old, dir);
+  return dir;
 }
 
 export const backupsDir = () => join(appDir(), "backups");

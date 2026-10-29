@@ -50,7 +50,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
       <form onSubmit={submit} className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-line bg-surface p-6">
         <div className="flex items-center gap-2">
           <img src="/favicon.svg" alt="" className="size-7 rounded-md dark:ring-1 dark:ring-white/25" />
-          <h1 className="text-[18px] font-semibold">Control Center</h1>
+          <h1 className="text-[18px] font-semibold">Clape Code</h1>
         </div>
         <p className="text-muted-foreground">Enter the password set on the computer running the app.</p>
         <label className="flex flex-col gap-1.5">

@@ -24,10 +24,10 @@ export function useWaiting() {
   return n;
 }
 
-// The tab shows how many sessions wait for you, then the page you're on: "(1) cka-prep – Control Center".
+// The tab shows how many sessions wait for you, then the page you're on: "(1) cka-prep – Clape Code".
 let pageName = "";
 function applyTitle() {
-  const base = pageName ? `${pageName} – Control Center` : "Control Center";
+  const base = pageName ? `${pageName} – Clape Code` : "Clape Code";
   document.title = waitingNow ? `(${waitingNow}) ${base}` : base;
 }
 export function setPageTitle(name: string) {

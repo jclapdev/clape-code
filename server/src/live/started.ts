@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { appDir } from "../fs/paths";
 
-// The session ID of every session Control Center starts or resumes, so its Agent SDK transcripts aren't taken for
+// The session ID of every session Clape Code starts or resumes, so its Agent SDK transcripts aren't taken for
 // `claude -p` runs: both record an `entrypoint` starting with "sdk-". Kept in the app folder: sessionId -> ISO time.
 
 const file = () => join(appDir(), "started-sessions.json");

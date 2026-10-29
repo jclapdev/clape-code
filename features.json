@@ -40,7 +40,7 @@
     {
       "id": "002-S1",
       "spec": "specs/002-one-page-per-conversation.md",
-      "description": "Server: a conversation is addressed by its session ID. GET /sessions/:sid returns the transcript plus live state (status, pending approvals/questions, model, permission mode). POST /sessions/:sid/send sends to the running session or resumes it with the same ID; respond, interrupt, mode and stop by session ID. POST /sessions/new starts a session and returns its session ID. Control Center records the session ID of every session it starts; session list entries carry a 'fromScript' flag (entrypoint starts with sdk- and Control Center did not start it) and an archived flag. Tests in server/test/api.test.ts.",
+      "description": "Server: a conversation is addressed by its session ID. GET /sessions/:sid returns the transcript plus live state (status, pending approvals/questions, model, permission mode). POST /sessions/:sid/send sends to the running session or resumes it with the same ID; respond, interrupt, mode and stop by session ID. POST /sessions/new starts a session and returns its session ID. Clape Code records the session ID of every session it starts; session list entries carry a 'fromScript' flag (entrypoint starts with sdk- and Clape Code did not start it) and an archived flag. Tests in server/test/api.test.ts.",
       "checks": [
         "A2",
         "A3",

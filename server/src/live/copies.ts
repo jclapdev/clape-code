@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { appDir } from "../fs/paths";
 
-// Every copy Control Center makes of a conversation open in another window (`forkSession`), so the copy can say it is
+// Every copy Clape Code makes of a conversation open in another window (`forkSession`), so the copy can say it is
 // one: Claude Code gives it the original's title. Kept in the app folder: copy's session ID -> original's session ID.
 
 const file = () => join(appDir(), "session-copies.json");

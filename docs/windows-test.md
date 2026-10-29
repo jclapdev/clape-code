@@ -1,4 +1,4 @@
-# Testing Control Center on Windows
+# Testing Clape Code on Windows
 
 The Windows executable has been built but never run. These steps check that it works. They take about ten minutes on a Windows 10 or 11 PC that has Claude Code installed and signed in.
 
@@ -10,14 +10,14 @@ On the Mac, build it if `dist/` doesn't have it yet:
 bun run compile windows-x64
 ```
 
-Copy `dist/control-center-windows-x64.exe` to the Windows PC, for example with a USB stick or a shared folder.
+Copy `dist/clape-code-windows-x64.exe` to the Windows PC, for example with a USB stick or a shared folder.
 
 ## 2. Start it
 
-Double-click `control-center-windows-x64.exe`.
+Double-click `clape-code-windows-x64.exe`.
 
 - If Windows SmartScreen says "Windows protected your PC", choose **More info**, then **Run anyway**. The file isn't signed, so Windows warns about it.
-- A console window opens with `Control Center is running at http://127.0.0.1:4317`, and your browser opens that address.
+- A console window opens with `Clape Code is running at http://127.0.0.1:4317`, and your browser opens that address.
 
 If the browser doesn't open, type `http://127.0.0.1:4317` into it yourself.
 
@@ -29,7 +29,7 @@ If the browser doesn't open, type `http://127.0.0.1:4317` into it yourself.
 | Projects | Your projects listed. Folders where you've run Claude Code appear under "Other folders with Claude sessions". |
 | Sessions | Your past sessions listed. Opening one shows the conversation. |
 | Paths | Paths shown as `~/…` or `C:\…`, never broken or empty. |
-| Saving a file | In Library, open any command or create a test one with **New**, change a word, then press **Save**. A "Saved" message appears. The previous version is in `%APPDATA%\control-center\backups`. |
+| Saving a file | In Library, open any command or create a test one with **New**, change a word, then press **Save**. A "Saved" message appears. The previous version is in `%APPDATA%\clape-code\backups`. |
 | Live session | In **Live**, choose **New session**, pick a project, model **Haiku**, and send `Run one command: echo hi > hi.txt`. Approve the command when asked. `hi.txt` appears in that project folder. |
 | Dark mode | The moon button at the bottom of the menu switches to dark. |
 

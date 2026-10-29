@@ -8,7 +8,7 @@ export class ApiError extends Error {
   }
 }
 
-export const UNREACHABLE = "Can't reach Control Center. Is it still running?";
+export const UNREACHABLE = "Can't reach Clape Code. Is it still running?";
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;

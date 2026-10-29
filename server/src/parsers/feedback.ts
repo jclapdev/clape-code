@@ -31,7 +31,7 @@ export function appendFeedback(src: string | null, note: string, when: Date, tem
   const t = fromTemplate(template);
   const base = src ?? t.head.join("\n") + "\n";
   const n = Math.max(0, ...parseBacklogBoard(base).flatMap((c) => c.cards.map((x) => x.n))) + 1;
-  const row = `| ${n} | ${day(when)} | "${cellOf(note)}" | pending | | Feedback in Control Center | open |`;
+  const row = `| ${n} | ${day(when)} | "${cellOf(note)}" | pending | | Feedback in Clape Code | open |`;
 
   const segs = toSegs(base);
   let fence = false;

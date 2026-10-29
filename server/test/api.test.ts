@@ -399,7 +399,7 @@ describe("project board, context files and new projects", () => {
     expect(await res.json()).toEqual({ n: 8, path: "~/projects/feedback/BACKLOG.md" });
     const after = await readFile(join(dir, "BACKLOG.md"), "utf8");
     expect(after.startsWith(before + "\r\n")).toBe(true);
-    expect(after.slice(before.length).split("\r\n").at(-1)).toMatch(/^\| 8 \| \d{4}-\d\d-\d\d \| "a \\\| b c" \| pending \| \| Feedback in Control Center \| open \|$/);
+    expect(after.slice(before.length).split("\r\n").at(-1)).toMatch(/^\| 8 \| \d{4}-\d\d-\d\d \| "a \\\| b c" \| pending \| \| Feedback in Clape Code \| open \|$/);
     const board = (await (await request(`/api/projects/${encodeURIComponent(id)}/board`)).json()) as any;
     expect(board.columns[0].cards.map((c: any) => [c.n, c.idea])).toEqual([[8, '"a | b c"']]);
     expect((await post("/api/feedback", { project: id, note: "  " })).status).toBe(400);
@@ -678,7 +678,7 @@ describe("a conversation is addressed by its session ID", () => {
   test("list entries say whether a script ran them and whether they're archived", async () => {
     const list = await get("/api/sessions?empty=1");
     const of = (id: string) => list.find((s: any) => s.sessionId === id);
-    // The fixture's entrypoint is "sdk-cli" and Control Center has no record of starting it: a `claude -p` run.
+    // The fixture's entrypoint is "sdk-cli" and Clape Code has no record of starting it: a `claude -p` run.
     expect(of(OLD)).toMatchObject({ fromScript: true, archived: false });
     expect(of(TERMINAL)).toMatchObject({ fromScript: false, archived: false });
     await post("/api/sessions/archive", { ids: [TERMINAL], archived: true });
@@ -722,7 +722,7 @@ describe("a conversation is addressed by its session ID", () => {
     expect((await request("/api/sessions/00000000-0000-4000-8000-000000000000")).status).toBe(404);
   });
 
-  test("New starts a session, returns its session ID at once and records it as started by Control Center", async () => {
+  test("New starts a session, returns its session ID at once and records it as started by Clape Code", async () => {
     expect((await post("/api/sessions/new", { project: "~/projects/demo", prompt: " " })).status).toBe(400);
     expect((await post("/api/sessions/new", { project: "~/nowhere", prompt: "hi" })).status).toBe(400);
     const res = await post("/api/sessions/new", { project: "~/projects/demo", prompt: "hello", model: "sonnet", permissionMode: "acceptEdits" });
@@ -768,7 +768,7 @@ describe("a conversation is addressed by its session ID", () => {
     expect(q.options.permissionMode).toBe("plan");
     await until(() => q.received.length === 1);
     expect((await get(`/api/sessions/${OLD}`)).liveId).toBe(res.liveId);
-    // Now Control Center has started it, so it's no longer taken for a script run.
+    // Now Clape Code has started it, so it's no longer taken for a script run.
     await until(async () => (await get("/api/sessions?empty=1")).find((s: any) => s.sessionId === OLD).fromScript === false);
     // A second message goes to the running session; after Stop, the next one resumes again with the same ID.
     expect((await (await post(`/api/sessions/${OLD}/send`, { text: "more" })).json()).resumed).toBe(false);

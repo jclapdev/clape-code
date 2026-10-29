@@ -31,7 +31,7 @@ export interface SessionEntry {
   jobId: string | null;
   fromScript: boolean;
   archived: boolean;
-  /** A copy Control Center made of a conversation open in another window: the original. */
+  /** A copy Clape Code made of a conversation open in another window: the original. */
   copyOf?: Session["copyOf"];
   /** needs: waiting for an answer; running: Claude is working. */
   status: "needs" | "running" | null;

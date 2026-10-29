@@ -2,8 +2,8 @@ import type { ElectrobunConfig } from "electrobun";
 
 export default {
   app: {
-    name: "Control Center",
-    identifier: "local.control-center",
+    name: "Clape Code",
+    identifier: "local.clape-code",
     version: "0.1.0",
   },
   build: {

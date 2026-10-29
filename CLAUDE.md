@@ -1,4 +1,4 @@
-# Control Center
+# Clape Code
 
 Local web app for viewing and editing Claude Code's files.
 
@@ -34,7 +34,7 @@ After a change, run in this order:
 2. `bun run test`
 3. `bun run build`
 4. For UI changes: do the task in the running app as a person would, then check light and dark themes and a 390 px wide window. Flag sideways scrolling inside panes, not only the page. If `bun run dev` gets stopped, run the server (`bun src/index.ts` in `server/`) and Vite (`bun run dev` in `web/`) as two processes.
-5. After merging into `main`: `bun run app` from the main checkout, open Control Center from Applications, take a screenshot of its window (`screencapture -x <file>`) and look at the change there. The app carries its own copy of the pages, so nothing merged reaches John until this runs. The first launch after an install can show Electrobun's "Installation complete" box over a blank window; quit and open it again.
+5. After merging into `main`: `bun run app` from the main checkout, open Clape Code from Applications, take a screenshot of its window (`screencapture -x <file>`) and look at the change there. The app carries its own copy of the pages, so nothing merged reaches John until this runs. The first launch after an install can show Electrobun's "Installation complete" box over a blank window; quit and open it again.
 
 ## How work runs
 

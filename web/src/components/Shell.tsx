@@ -99,7 +99,7 @@ interface MenuItem {
   jobId: string | null;
   title: string;
   project: string | null;
-  /** Set only on a copy Control Center made: the original's session ID. */
+  /** Set only on a copy Clape Code made: the original's session ID. */
   copyOf?: string;
 }
 interface MenuData {
@@ -171,7 +171,7 @@ function Brand({ onPick }: { onPick?: () => void }) {
   return (
     <Link to="/" onClick={onPick} className="flex min-w-0 items-center gap-2 text-ink no-underline">
       <img src="/favicon.svg" alt="" className="size-6 flex-none rounded-md dark:ring-1 dark:ring-white/25" />
-      <span className="truncate whitespace-nowrap text-[14px] font-semibold">Control Center</span>
+      <span className="truncate whitespace-nowrap text-[14px] font-semibold">Clape Code</span>
     </Link>
   );
 }
@@ -246,7 +246,7 @@ function Rail({ connected, onFeedback }: { connected: boolean; onFeedback: () =>
   const needs = useNeeds();
   return (
     <nav aria-label="Main" className="flex h-full w-[84px] flex-none flex-col items-center gap-1 overflow-y-auto border-r border-line bg-panel px-1.5 py-3">
-      <Link to="/" className="mb-2" aria-label="Control Center home">
+      <Link to="/" className="mb-2" aria-label="Clape Code home">
         <img src="/favicon.svg" alt="" className="size-7 rounded-md dark:ring-1 dark:ring-white/25" />
       </Link>
       <RailLink to="/" label="Home" icon={Home} attn={needs || undefined} />

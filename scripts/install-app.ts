@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const NAME = "Control Center";
+const NAME = "Clape Code";
 const buildDir = join(import.meta.dir, "..", "build");
 const release = readdirSync(buildDir).find((d) => d.startsWith("stable-"));
 if (!release) {
@@ -39,6 +39,8 @@ if (packed) {
 const apps = join(homedir(), "Applications");
 const target = join(apps, `${NAME}.app`);
 if (existsSync(target)) rmSync(target, { recursive: true, force: true });
+// The app was called Control Center: remove that copy so only one is in Applications.
+rmSync(join(apps, "Control Center.app"), { recursive: true, force: true });
 // ditto keeps the bundle's symlinks, permissions and extended attributes.
 run(["ditto", built, target]);
 rmSync(unpacked, { recursive: true, force: true });

@@ -71,7 +71,7 @@ function Suggested() {
 export function HomePage() {
   return (
     <Page
-      title="Control Center"
+      title="Clape Code"
       actions={
         <Button asChild size="lg" className="no-underline">
           <Link to="/sessions/new" search={{}}>

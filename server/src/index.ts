@@ -173,7 +173,7 @@ function listen(o: Awaited<ReturnType<typeof serveOptions>>) {
     idleTimeout: 0, // server-sent events stay open
     fetch: handle,
   });
-  console.log(`Control Center is running at ${o.url}${o.lan ? " (home network mode)" : ""}`);
+  console.log(`Clape Code is running at ${o.url}${o.lan ? " (home network mode)" : ""}`);
   return o.url;
 }
 

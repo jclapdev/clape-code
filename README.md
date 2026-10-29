@@ -1,4 +1,4 @@
-# Control Center
+# Clape Code
 
 An app for seeing and managing everything Claude Code keeps on your computer: projects, sessions, instructions, skills, agents, slash commands, hooks, MCP servers, plugins, plans, memory and settings. You can edit these files safely, archive the ones you no longer want, and start or answer Claude sessions in its window or a browser.
 
@@ -6,9 +6,9 @@ It runs on macOS, Linux and Windows. Your files stay where they are; the app rea
 
 ## Start it
 
-Open Control Center from Applications (or Spotlight). It opens in its own window; quitting it (Cmd+Q) stops it.
+Open Clape Code from Applications (or Spotlight). It opens in its own window; quitting it (Cmd+Q) stops it.
 
-The first time, macOS asks whether "launcher" may open files in folders such as Documents, Desktop or iCloud Drive. Those questions come from Control Center reading projects kept there.
+The first time, macOS asks whether "launcher" may open files in folders such as Documents, Desktop or iCloud Drive. Those questions come from Clape Code reading projects kept there.
 
 ## After changing the code
 
@@ -18,7 +18,7 @@ Run this in this folder to rebuild the app and reinstall it in `~/Applications`:
 bun run app
 ```
 
-Quit Control Center before running it, then open it again.
+Quit Clape Code before running it, then open it again.
 
 ## Development
 
@@ -41,11 +41,11 @@ bun run compile darwin-arm64         # or just the ones you need
 Then run the one for that computer:
 
 ```shell
-./dist/control-center-darwin-arm64     # macOS on Apple silicon (tested)
-./dist/control-center-darwin-x64       # macOS on Intel (built, not run)
-./dist/control-center-linux-x64        # Linux on Intel/AMD (built, not run)
-./dist/control-center-linux-arm64      # Linux on ARM (tested in a container)
-dist\control-center-windows-x64.exe    # Windows (built, not run; see docs/windows-test.md)
+./dist/clape-code-darwin-arm64     # macOS on Apple silicon (tested)
+./dist/clape-code-darwin-x64       # macOS on Intel (built, not run)
+./dist/clape-code-linux-x64        # Linux on Intel/AMD (built, not run)
+./dist/clape-code-linux-arm64      # Linux on ARM (tested in a container)
+dist\clape-code-windows-x64.exe    # Windows (built, not run; see docs/windows-test.md)
 ```
 
 The browser opens at `http://127.0.0.1:4317`. Add `--no-open` to skip that.
@@ -79,7 +79,7 @@ The search box at the top of the menu searches everything. **Feedback** in the m
 - Archive moves an item into the app's `archive` folder so Claude Code stops loading it; Restore puts it back. Delete moves it to the system trash.
 - Archived sessions are only hidden from the list, so `claude --resume` still works.
 
-App data lives in `~/.config/control-center` (macOS and Linux) or `%APPDATA%\control-center` (Windows): `config.json`, `backups/`, `archive/`, `index.sqlite` (a cache you can delete) and `metrics.json`.
+App data lives in `~/.config/clape-code` (macOS and Linux) or `%APPDATA%\clape-code` (Windows): `config.json`, `backups/`, `archive/`, `index.sqlite` (a cache you can delete) and `metrics.json`.
 
 ## Home network mode
 

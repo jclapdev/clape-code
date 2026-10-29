@@ -1,5 +1,5 @@
 {
-  "name": "control-center",
+  "name": "clape-code",
   "private": true,
   "type": "module",
   "workspaces": ["server", "web"],

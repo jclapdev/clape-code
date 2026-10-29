@@ -1,4 +1,4 @@
-# Control Center brief
+# Clape Code brief
 
 ## Who it's for
 

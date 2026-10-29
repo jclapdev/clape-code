@@ -61,7 +61,7 @@ export function sessionActivity(procs: { sessionId: string; status: string | nul
   return activity;
 }
 
-/** For a copy Control Center made (#120): the conversation it copies, with that one's title. */
+/** For a copy Clape Code made (#120): the conversation it copies, with that one's title. */
 function originalOf(sid: string | null) {
   if (!sid) return null;
   const o = sessionById(sid);
@@ -358,7 +358,7 @@ interface MenuItem {
   jobId: string | null;
   title: string;
   project: string | null;
-  /** The original's session ID, only when this is a copy Control Center made. */
+  /** The original's session ID, only when this is a copy Clape Code made. */
   copyOf?: string;
 }
 

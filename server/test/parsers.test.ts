@@ -317,7 +317,7 @@ describe("board", () => {
     expect(attachSteps(parseBacklogBoard(BOARD_BACKLOG), "{not json")[1].cards[0].steps).toEqual([]);
   });
 
-  test("reads Control Center's own BACKLOG.md", async () => {
+  test("reads Clape Code's own BACKLOG.md", async () => {
     const own = await Bun.file(join(import.meta.dir, "..", "..", "BACKLOG.md")).text();
     const rows = own.split("\n").filter((l) => /^\| \d+ \|/.test(l)).length;
     const cols = parseBacklogBoard(own);
@@ -329,7 +329,7 @@ describe("board", () => {
 
 describe("feedback", () => {
   const ON = new Date(2026, 9, 26);
-  const row = (n: number, note: string) => `| ${n} | 2026-10-26 | "${note}" | pending | | Feedback in Control Center | open |`;
+  const row = (n: number, note: string) => `| ${n} | 2026-10-26 | "${note}" | pending | | Feedback in Clape Code | open |`;
   const TEMPLATE = "# Backlog\n\nVerdicts: `build`.\nStatus: `open`.\n\n| # | Date | Idea (his words) | Verdict | Reason | Source | Status |\n|---|---|---|---|---|---|---|\n| 1 | YYYY-MM-DD | <idea> | build | Serves job 2. | <URL> | in spec 001 |\n";
 
   test("adds a Feedback table at the end, numbered after the highest # in any table, and keeps every other byte", () => {
@@ -386,7 +386,7 @@ describe("feedback", () => {
     expect(appendFeedback(null, "x", ON, null).text).toStartWith("# Backlog\n\n## Feedback\n");
   });
 
-  test("Control Center's own BACKLOG.md keeps every byte", async () => {
+  test("Clape Code's own BACKLOG.md keeps every byte", async () => {
     const own = await Bun.file(join(import.meta.dir, "..", "..", "BACKLOG.md")).text();
     const max = Math.max(...own.split("\n").map((l) => /^\| (\d+) \|/.exec(l)?.[1]).filter(Boolean).map(Number));
     const { text, n } = appendFeedback(own, "x", ON);

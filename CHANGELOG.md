@@ -1,6 +1,6 @@
 # Changelog
 
-Notable changes to Control Center, newest first.
+Notable changes to Clape Code, newest first.
 
 ## Unreleased
 
@@ -53,6 +53,7 @@ Notable changes to Control Center, newest first.
 
 ### Changed
 
+- Control Center is now called Clape Code. Its app data moves from `control-center` to `clape-code` on first launch, and installing it replaces the old Control Center app in Applications.
 - Control Center reads only `~/.claude` and the folders inside your Project folders. Folders where a conversation ran or that `~/.claude.json` names, such as Documents, Desktop, Mail or iCloud Drive, are no longer looked at, so macOS stops asking for access to them. Their conversations still show on Sessions.
 - Every page's content starts at the same left edge and has the same width, including Projects and pages that scroll.
 - Cards on Projects, a project's "Build your setup", Customize and Guides are all the same height.

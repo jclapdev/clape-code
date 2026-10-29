@@ -1,4 +1,4 @@
-// Desktop entry point: runs the Control Center server inside this process and shows it in a native window.
+// Desktop entry point: runs the Clape Code server inside this process and shows it in a native window.
 // Electrobun bundles this file into the app, so the built web app is copied in by electrobun.config.ts
 // (build.copy) and handed to the server the same way the compiled executable does it.
 import Electrobun, { ApplicationMenu, BrowserWindow } from "electrobun/main";
@@ -12,7 +12,7 @@ process.env.PORT = "4317";
 // mode from the window doesn't move the window's address (the main listener turns into https on all addresses).
 const { localUrl: URL, localPort } = await serverAddress();
 
-/** Is a Control Center already answering at that address? Then this launch is a second copy. */
+/** Is a Clape Code already answering at that address? Then this launch is a second copy. */
 async function alreadyRunning(): Promise<boolean> {
   try {
     await fetch(`${URL}/api/config`, { signal: AbortSignal.timeout(1000) });
@@ -37,7 +37,7 @@ function webAssets(dir: string): Record<string, string> {
 }
 
 if (await alreadyRunning()) {
-  console.log(`Control Center is already running at ${URL}.`);
+  console.log(`Clape Code is already running at ${URL}.`);
   process.exit(0);
 }
 
@@ -46,7 +46,7 @@ await main({ open: false });
 
 // macOS takes the first menu as the app menu. Roles are the operating system's own commands and shortcuts.
 ApplicationMenu.setApplicationMenu([
-  { label: "Control Center", submenu: [{ role: "quit" }] },
+  { label: "Clape Code", submenu: [{ role: "quit" }] },
   {
     label: "Edit",
     submenu: [
@@ -63,14 +63,14 @@ ApplicationMenu.setApplicationMenu([
 ]);
 
 // Without the local-only listener the window has nothing to show: say why instead of a blank page.
-const failed = `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>Control Center</title>
+const failed = `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>Clape Code</title>
 <body style="font:15px/1.5 -apple-system,system-ui,sans-serif;max-width:560px;margin:80px auto;padding:0 24px">
-<h1 style="font-size:20px">Control Center couldn't start its window</h1>
-<p>Port ${localPort} on this computer is already in use by another program, so the window can't connect to Control Center.
-Quit the program using port ${localPort}, then open Control Center again.</p></body>`;
+<h1 style="font-size:20px">Clape Code couldn't start its window</h1>
+<p>Port ${localPort} on this computer is already in use by another program, so the window can't connect to Clape Code.
+Quit the program using port ${localPort}, then open Clape Code again.</p></body>`;
 
 const win = new BrowserWindow({
-  title: "Control Center",
+  title: "Clape Code",
   ...(localListening() ? { url: URL } : { url: null, html: failed }),
   frame: { width: 1440, height: 900 },
 });

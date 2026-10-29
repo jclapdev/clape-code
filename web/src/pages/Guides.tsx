@@ -31,7 +31,7 @@ export function GuideText({ slug }: { slug: string }) {
   );
 }
 
-// Claude Code features that live in the cloud or an organization's admin console. Control Center doesn't show
+// Claude Code features that live in the cloud or an organization's admin console. Clape Code doesn't show
 // or change them (BRIEF.md, What it will not do), so Guides links to their official pages.
 const CLOUD = [
   { title: "Cloud scheduled tasks (routines)", about: "Prompts that run in the cloud on a schedule, on API calls or on GitHub events.", url: "https://code.claude.com/docs/en/routines" },

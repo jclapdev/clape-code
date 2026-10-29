@@ -76,7 +76,7 @@ export interface Session {
   project: string | null;
   archivedAt: string | null;
   archived: boolean;
-  /** A `claude -p` or Agent SDK run that Control Center didn't start. */
+  /** A `claude -p` or Agent SDK run that Clape Code didn't start. */
   fromScript: boolean;
   running: boolean;
   /** Claude working or waiting for an answer now; null when idle or finished. */
@@ -84,7 +84,7 @@ export interface Session {
   resumeCommand: string;
   /** Saved when the app started the session; null for sessions started elsewhere. */
   account: SessionAccount | null;
-  /** When Control Center made this conversation as a copy of one open in another window: the original. */
+  /** When Clape Code made this conversation as a copy of one open in another window: the original. */
   copyOf: { sessionId: string; title: string | null } | null;
 }
 
